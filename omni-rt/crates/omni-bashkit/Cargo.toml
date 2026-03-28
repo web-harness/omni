@@ -1,0 +1,10 @@
+[package]
+name = "omni-bashkit"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+bashkit = { git = "https://github.com/everruns/bashkit", features = ["python", "git"] }
+tokio = { version = "1", features = ["full"] }
+anyhow = "1.0"

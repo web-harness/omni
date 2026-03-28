@@ -1,0 +1,16 @@
+[package]
+name = "omni-rt"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+omni-protocol = { path = "../omni-protocol" }
+omni-bashkit = { path = "../omni-bashkit", optional = true }
+omni-zenfs = { path = "../omni-zenfs", optional = true }
+omni-deepagents = { path = "../omni-deepagents", optional = true }
+
+[features]
+default = []
+native = ["omni-bashkit"]
+wasm = ["omni-zenfs", "omni-deepagents"]

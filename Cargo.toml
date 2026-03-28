@@ -1,0 +1,18 @@
+[workspace]
+members = [
+  "omni",
+  "omni-rt/crates/omni-rt",
+  "omni-rt/crates/omni-protocol",
+  "omni-rt/crates/omni-bashkit",
+  "omni-rt/crates/omni-zenfs",
+  "omni-rt/crates/omni-deepagents",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+authors = ["Sepehr Laal <5657848+3p3r@users.noreply.github.com>"]
+edition = "2021"
+
+[workspace.dependencies]
+getrandom = { version = "0.3", features = ["wasm_js"] }
