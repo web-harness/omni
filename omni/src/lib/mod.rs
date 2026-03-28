@@ -706,7 +706,11 @@ impl AppState {
             let search = web_sys::window()
                 .and_then(|w| w.location().search().ok())
                 .unwrap_or_default();
-            if search.contains("theme=light") { Theme::Light } else { Theme::Dark }
+            if search.contains("theme=light") {
+                Theme::Light
+            } else {
+                Theme::Dark
+            }
         };
         #[cfg(not(target_arch = "wasm32"))]
         let initial_theme = Theme::Dark;

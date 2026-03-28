@@ -58,8 +58,8 @@ class OmniDock extends LitElement {
       --dv-background-color: var(--background);
       --dv-group-view-background-color: var(--background-elevated);
       --dv-tabs-and-actions-container-background-color: var(--sidebar);
-      --dv-activegroup-visiblepanel-tab-background-color: var(--sidebar);
-      --dv-inactivegroup-visiblepanel-tab-background-color: var(--sidebar);
+      --dv-activegroup-visiblepanel-tab-background-color: var(--background-elevated);
+      --dv-inactivegroup-visiblepanel-tab-background-color: var(--background-elevated);
       --dv-activegroup-hiddenpanel-tab-background-color: var(--sidebar);
       --dv-inactivegroup-hiddenpanel-tab-background-color: var(--sidebar);
       --dv-activegroup-visiblepanel-tab-border-color: var(--border);
@@ -95,6 +95,7 @@ class OmniDock extends LitElement {
 
   private api: DockviewApi | null = null;
   private slotObserver: MutationObserver | null = null;
+  private tabObserver: MutationObserver | null = null;
   private knownSlots: Set<string> = new Set();
   private permanentPanels: Set<string> = new Set();
 
@@ -108,6 +109,8 @@ class OmniDock extends LitElement {
       theme: themeAbyss,
       createComponent: (options) => new SlotPanel(options.name),
     });
+    this.tabObserver = new MutationObserver(() => this.tagPermanentTabs());
+    this.tabObserver.observe(container, { childList: true, subtree: true });
     this.initializePanels();
     this.observeSlots();
   }
@@ -129,6 +132,8 @@ class OmniDock extends LitElement {
     super.disconnectedCallback();
     this.slotObserver?.disconnect();
     this.slotObserver = null;
+    this.tabObserver?.disconnect();
+    this.tabObserver = null;
     this.api?.dispose();
     this.api = null;
     this.knownSlots.clear();
@@ -158,7 +163,7 @@ class OmniDock extends LitElement {
     }
   }
 
-  private addPanel(spec: PanelSpec): void {
+  private addPanel(spec: PanelSpec, permanent = false): void {
     if (!this.api || this.knownSlots.has(spec.slot)) return;
 
     const options: AddPanelOptions = {
@@ -180,7 +185,7 @@ class OmniDock extends LitElement {
 
     this.api.addPanel(options);
     this.knownSlots.add(spec.slot);
-    this.permanentPanels.add(spec.id);
+    if (permanent) this.permanentPanels.add(spec.id);
 
     if (spec.hideHeader) {
       const group = this.api.groups.find((g) => g.panels.some((p) => p.id === spec.id));
@@ -193,7 +198,7 @@ class OmniDock extends LitElement {
 
   private initializePanels(): void {
     for (const spec of this.parsePanelSpecs()) {
-      this.addPanel(spec);
+      this.addPanel(spec, true);
     }
     requestAnimationFrame(() => {
       this.applyProportions();
@@ -211,8 +216,8 @@ class OmniDock extends LitElement {
       const panel = this.api.getPanel(id);
       if (panel?.title) permanentTitles.add(panel.title);
     }
-    this.shadowRoot.querySelectorAll(".dv-tab").forEach((tab) => {
-      const title = tab.querySelector(".dv-default-tab-content")?.textContent;
+    this.shadowRoot.querySelectorAll(".dv-tab:not([data-permanent])").forEach((tab) => {
+      const title = tab.querySelector(".dv-default-tab-content")?.textContent?.trim();
       if (title && permanentTitles.has(title)) {
         tab.setAttribute("data-permanent", "");
       }

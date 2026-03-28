@@ -27,7 +27,7 @@ export class OmniHarness extends LitElement {
   @property({ type: String }) theme: "light" | "dark" = "dark";
 
   private get iframeSrc(): string {
-    const url = new URL(this.src);
+    const url = new URL(this.src, window.location.href);
     url.searchParams.set("theme", this.theme);
     return url.toString();
   }

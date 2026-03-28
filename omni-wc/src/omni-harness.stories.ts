@@ -3,6 +3,8 @@ import { html } from "lit";
 import "./omni-harness.js";
 import type { OmniHarness } from "./omni-harness.js";
 
+const appSrc = import.meta.env.DEV ? "http://localhost:8080" : "./app/";
+
 const meta: Meta<OmniHarness> = {
   title: "Components/OmniHarness",
   component: "omni-harness",
@@ -19,7 +21,7 @@ type Story = StoryObj<OmniHarness>;
 
 export const Default: Story = {
   args: {
-    src: "http://localhost:8080",
+    src: appSrc,
     theme: "dark",
     agents: [{ url: "https://agent1.example.com/api", apiKey: "sk-fake-key-1" }],
   },
@@ -35,7 +37,7 @@ export const Default: Story = {
 
 export const Light: Story = {
   args: {
-    src: "http://localhost:8080",
+    src: appSrc,
     theme: "light",
     agents: [
       { url: "https://agent1.example.com/api", apiKey: "sk-fake-key-1" },

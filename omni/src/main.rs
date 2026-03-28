@@ -38,8 +38,8 @@ fn App() -> Element {
         document::Link { rel: "preconnect", href: "https://fonts.googleapis.com" }
         document::Link { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" }
         document::Link { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" }
-        document::Script { src: OMNI_DOCK_JS }
-        document::Script { src: OMNI_POPPER_JS }
+        document::Script { src: OMNI_DOCK_JS, r#type: "module" }
+        document::Script { src: OMNI_POPPER_JS, r#type: "module" }
 
         Router::<Route> {}
     }

@@ -30,9 +30,12 @@ fn main() {
 
         assert!(status.success(), "npm run build failed in {crate_rel}");
 
+        let public_dir = manifest_dir.join("public");
+        fs::create_dir_all(&public_dir)
+            .unwrap_or_else(|e| panic!("failed to create public dir: {e}"));
         fs::copy(
             crate_dir.join("dist").join(js_name),
-            manifest_dir.join("public").join(js_name),
+            public_dir.join(js_name),
         )
         .unwrap_or_else(|e| panic!("failed to copy {js_name}: {e}"));
     }

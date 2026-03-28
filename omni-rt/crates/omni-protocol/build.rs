@@ -28,6 +28,14 @@ fn main() {
         fs::write(&spec_path, &body)
             .unwrap_or_else(|e| panic!("Failed to write {}: {e}", spec_path.display()));
         eprintln!("Downloaded spec to {}", spec_path.display());
+
+        // Format the downloaded spec
+        let workspace_dir = manifest_dir.ancestors().nth(3).unwrap();
+        std::process::Command::new("npm")
+            .args(["run", "format:biome"])
+            .current_dir(workspace_dir)
+            .status()
+            .unwrap_or_else(|e| panic!("Failed to run npm run format:biome: {e}"));
     }
 
     // Validate JSON

@@ -4,14 +4,19 @@
   "description": "Omni is a harness that stays out of your way, compatible with LangGraph Agent Protocol.",
   "main": "index.js",
   "scripts": {
+    "install:wc": "npm ci --prefix omni-wc",
+    "install:dock": "npm ci --prefix omni-rt/crates/omni-dock",
+    "install:popper": "npm ci --prefix omni-rt/crates/omni-popper",
+    "postinstall": "npm-run-all --parallel install:*",
     "start": "cd omni && dx serve",
     "format:biome": "biome format --write",
     "format:cargo": "cargo fmt",
     "format": "npm-run-all --parallel format:*",
+    "act": "act",
     "build:dx": "cd omni && dx bundle --out-dir=../dist --release",
     "build": "npm-run-all build:*",
-    "wc:dev": "cd omni-wc && npm run dev",
-    "wc:build": "cd omni-wc && npm run build"
+    "wc:dev": "npm run dev --prefix omni-wc",
+    "wc:build": "npm run build --prefix omni-wc"
   },
   "repository": {
     "type": "git",
