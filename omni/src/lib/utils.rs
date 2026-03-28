@@ -1,15 +1,29 @@
-use chrono::Local;
-
-pub fn format_timestamp(timestamp: &str) -> String {
-    timestamp.chars().take(10).collect::<String>()
+pub fn cn(parts: &[&str]) -> String {
+    parts
+        .iter()
+        .filter(|s| !s.is_empty())
+        .copied()
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
-pub fn relative_time(timestamp: &str) -> String {
-    format!("just now")
+pub fn truncate(input: &str, max: usize) -> String {
+    if input.len() <= max {
+        return input.to_string();
+    }
+    format!("{}...", &input[..max])
 }
 
-pub mod css_utils {
-    pub fn cn(classes: &[&str]) -> String {
-        classes.join(" ")
+pub fn relative_time(input: &str) -> String {
+    input.to_string()
+}
+
+pub fn fmt_size(bytes: u64) -> String {
+    if bytes < 1000 {
+        format!("{}B", bytes)
+    } else if bytes < 1_000_000 {
+        format!("{:.1}KB", bytes as f64 / 1000.0)
+    } else {
+        format!("{:.1}MB", bytes as f64 / 1_000_000.0)
     }
 }

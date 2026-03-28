@@ -1,0 +1,15 @@
+{
+  "name": "@omni/omni-popper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/omni-popper.ts --bundle --format=iife --outfile=dist/omni-popper.js"
+  },
+  "dependencies": {
+    "@popperjs/core": "^2.11.8"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.2"
+  }
+}

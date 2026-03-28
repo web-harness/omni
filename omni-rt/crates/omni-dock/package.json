@@ -1,0 +1,16 @@
+{
+  "name": "@omni/omni-dock",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/omni-dock.ts --bundle --format=iife --outfile=dist/omni-dock.js --loader:.css=text",
+    "watch": "esbuild src/omni-dock.ts --bundle --format=iife --outfile=dist/omni-dock.js --loader:.css=text --watch"
+  },
+  "dependencies": {
+    "dockview-core": "^5.1.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.2"
+  }
+}

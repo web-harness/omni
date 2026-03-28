@@ -1,72 +1,314 @@
-/* App-wide styling */
+:root {
+  --background: #0d0d0f;
+  --background-elevated: #121218;
+  --background-interactive: #1a1a22;
+  --foreground: #e8e8ec;
+  --muted-foreground: #8f93a8;
+  --card: #14141a;
+  --border: #2a2a32;
+  --primary: #3b82f6;
+  --primary-foreground: #f8faff;
+  --secondary: #1f2435;
+  --secondary-foreground: #d0d5ec;
+  --destructive: #ef4444;
+  --destructive-foreground: #fff4f4;
+  --sidebar: #141418;
+  --sidebar-accent: #1d1d27;
+  --sidebar-accent-foreground: #f3f4ff;
+  --status-nominal: #22c55e;
+  --status-warning: #fb923c;
+  --status-critical: #f43f5e;
+  --status-info: #3b82f6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+[role="button"],
+a,
+summary {
+  cursor: pointer;
+}
+
+/* Hide dockview panel close buttons */
+.dv-default-tab-action {
+  display: none !important;
+}
+
+html,
+body,
+#main {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+}
+
 body {
-    background-color: #0f1116;
-    color: #ffffff;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    margin: 20px;
+  background: radial-gradient(circle at 20% -10%, #1a1b28 0%, #0d0d0f 45%);
+  color: var(--foreground);
+  font-family: "JetBrains Mono", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  letter-spacing: 0.01em;
 }
 
-#hero {
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
+.bg-background {
+  background: var(--background);
 }
 
-#links {
-    width: 400px;
-    text-align: left;
-    font-size: x-large;
-    color: white;
-    display: flex;
-    flex-direction: column;
+.bg-background-elevated {
+  background: var(--background-elevated);
 }
 
-#links a {
-    color: white;
-    text-decoration: none;
-    margin-top: 20px;
-    margin: 10px 0px;
-    border: white 1px solid;
-    border-radius: 5px;
-    padding: 10px;
+.bg-background-interactive {
+  background: var(--background-interactive);
 }
 
-#links a:hover {
-    background-color: #1f1f1f;
-    cursor: pointer;
+.bg-card {
+  background: var(--card);
 }
 
-#header {
-    max-width: 1200px;
+.bg-sidebar {
+  background: var(--sidebar);
 }
 
-/* Navbar */
-#navbar {
-    display: flex;
-    flex-direction: row;
-  }
-  
-#navbar a {
-    color: #ffffff;
-    margin-right: 20px;
-    text-decoration: none;
-    transition: color 0.2s ease;
+.bg-sidebar-accent {
+  background: var(--sidebar-accent);
 }
 
-#navbar a:hover {
-    cursor: pointer;
-    color: #91a4d2;
+.bg-primary {
+  background: var(--primary);
 }
 
-/* Blog page */
-#blog {
-    margin-top: 50px;
-  }
-  
-#blog a {
-    color: #ffffff;
-    margin-top: 50px;
+.bg-secondary {
+  background: var(--secondary);
 }
 
+.bg-destructive {
+  background: var(--destructive);
+}
+
+.text-foreground {
+  color: var(--foreground);
+}
+
+.text-muted-foreground {
+  color: var(--muted-foreground);
+}
+
+.text-primary {
+  color: var(--primary);
+}
+
+.text-primary-foreground {
+  color: var(--primary-foreground);
+}
+
+.text-secondary-foreground {
+  color: var(--secondary-foreground);
+}
+
+.text-destructive {
+  color: var(--destructive);
+}
+
+.text-destructive-foreground {
+  color: var(--destructive-foreground);
+}
+
+.text-sidebar-accent-foreground {
+  color: var(--sidebar-accent-foreground);
+}
+
+.text-status-nominal {
+  color: var(--status-nominal);
+}
+
+.text-status-warning {
+  color: var(--status-warning);
+}
+
+.text-status-critical {
+  color: var(--status-critical);
+}
+
+.text-status-info {
+  color: var(--status-info);
+}
+
+.border-border {
+  border-color: var(--border);
+}
+
+.border-primary {
+  border-color: var(--primary);
+}
+
+.border-status-info {
+  border-color: var(--status-info);
+}
+
+.border-status-nominal {
+  border-color: var(--status-nominal);
+}
+
+.border-status-warning {
+  border-color: var(--status-warning);
+}
+
+.border-status-critical {
+  border-color: var(--status-critical);
+}
+
+.bg-status-info {
+  background: var(--status-info);
+}
+
+.bg-status-nominal {
+  background: var(--status-nominal);
+}
+
+.bg-status-warning {
+  background: var(--status-warning);
+}
+
+.bg-status-critical {
+  background: var(--status-critical);
+}
+
+.bg-status-critical\/10 {
+  background: color-mix(in srgb, var(--status-critical) 10%, transparent);
+}
+
+.bg-primary\/10 {
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.bg-primary\/15 {
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
+}
+
+.bg-status-info\/15 {
+  background: color-mix(in srgb, var(--status-info) 15%, transparent);
+}
+
+.bg-status-nominal\/20 {
+  background: color-mix(in srgb, var(--status-nominal) 20%, transparent);
+}
+
+.bg-status-nominal\/30 {
+  background: color-mix(in srgb, var(--status-nominal) 30%, transparent);
+}
+
+.bg-status-warning\/20 {
+  background: color-mix(in srgb, var(--status-warning) 20%, transparent);
+}
+
+.bg-status-warning\/30 {
+  background: color-mix(in srgb, var(--status-warning) 30%, transparent);
+}
+
+.bg-status-critical\/20 {
+  background: color-mix(in srgb, var(--status-critical) 20%, transparent);
+}
+
+.bg-status-critical\/30 {
+  background: color-mix(in srgb, var(--status-critical) 30%, transparent);
+}
+
+.bg-status-info\/20 {
+  background: color-mix(in srgb, var(--status-info) 20%, transparent);
+}
+
+.bg-status-info\/30 {
+  background: color-mix(in srgb, var(--status-info) 30%, transparent);
+}
+
+/* Opacity variants */
+.border-border\/50 {
+  border-color: color-mix(in srgb, var(--border) 50%, transparent);
+}
+
+/* Hover states */
+.hover\:bg-background:hover {
+  background: var(--background);
+}
+
+.hover\:bg-background-elevated:hover {
+  background: var(--background-elevated);
+}
+
+.hover\:bg-background-interactive:hover {
+  background: var(--background-interactive);
+}
+
+.hover\:text-foreground:hover {
+  color: var(--foreground);
+}
+
+.hover\:text-status-critical:hover {
+  color: var(--status-critical);
+}
+
+.hover\:opacity-90:hover {
+  opacity: 0.9;
+}
+
+/* Disabled states */
+.disabled\:opacity-50:disabled {
+  opacity: 0.5;
+}
+
+.disabled\:pointer-events-none:disabled {
+  pointer-events: none;
+}
+
+/* Focus states */
+.focus\:border-primary:focus {
+  border-color: var(--primary);
+}
+
+.text-section-header {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--muted-foreground);
+}
+
+.app-badge {
+  display: inline-block;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--background-elevated) 90%, transparent);
+  color: var(--status-warning);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  padding: 6px 8px;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2a2f42;
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

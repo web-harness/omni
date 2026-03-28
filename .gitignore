@@ -27,3 +27,10 @@ target
 
 /omni/target
 /omni/assets/tailwind.css
+
+node_modules
+/omni/public/omni-*.js
+/dist
+dist/
+
+agent-protocol.json
