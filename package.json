@@ -9,7 +9,9 @@
     "format:cargo": "cargo fmt",
     "format": "npm-run-all --parallel format:*",
     "build:dx": "cd omni && dx bundle --out-dir=../dist --release",
-    "build": "npm-run-all build:*"
+    "build": "npm-run-all build:*",
+    "wc:dev": "cd omni-wc && npm run dev",
+    "wc:build": "cd omni-wc && npm run build"
   },
   "repository": {
     "type": "git",

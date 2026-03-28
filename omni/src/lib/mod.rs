@@ -633,7 +633,14 @@ impl DataProvider for MockDataProvider {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Theme {
+    Dark,
+    Light,
+}
+
 pub struct AppState {
+    pub theme: Theme,
     pub threads: Vec<UiThread>,
     pub active_thread_id: Option<String>,
     pub messages: HashMap<String, Vec<UiMessage>>,
@@ -694,7 +701,18 @@ impl AppState {
             .map(|m| m.id.clone())
             .unwrap_or_else(|| "gpt-5".to_string());
 
+        #[cfg(target_arch = "wasm32")]
+        let initial_theme = {
+            let search = web_sys::window()
+                .and_then(|w| w.location().search().ok())
+                .unwrap_or_default();
+            if search.contains("theme=light") { Theme::Light } else { Theme::Dark }
+        };
+        #[cfg(not(target_arch = "wasm32"))]
+        let initial_theme = Theme::Dark;
+
         Self {
+            theme: initial_theme,
             threads,
             active_thread_id,
             messages,

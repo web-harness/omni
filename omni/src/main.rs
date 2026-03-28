@@ -10,7 +10,7 @@ use components::{
     AgentsSection, Button, ButtonVariant, ChatContainer, Dialog, FilesSection, Input, KanbanView,
     TasksSection, ThreadSidebar,
 };
-use lib::{AppState, DataProvider, MockDataProvider};
+use lib::{AppState, DataProvider, MockDataProvider, Theme};
 use routes::Route;
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
@@ -60,8 +60,16 @@ pub fn AppLayout() -> Element {
       {"id":"agents","slot":"agents","title":"Agents","position":{"referencePanel":"files","direction":"below"}}
     ]"#;
 
+    let theme = if state.read().theme == Theme::Light {
+        "light"
+    } else {
+        "dark"
+    };
+
     rsx! {
-        div { class: "h-screen w-screen overflow-hidden bg-background text-foreground",
+        div {
+            class: "h-screen w-screen overflow-hidden bg-background text-foreground",
+            "data-theme": theme,
             omni-dock {
                 class: "h-screen w-screen",
                 "data-panels": panel_config,

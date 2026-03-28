@@ -1,10 +1,10 @@
 use dioxus::prelude::*;
 use dioxus_free_icons::icons::ld_icons::{
-    LdLayoutGrid, LdLoader, LdMessageSquare, LdPlus, LdTrash2, LdTriangleAlert,
+    LdLayoutGrid, LdLoader, LdMessageSquare, LdMoon, LdPlus, LdSun, LdTrash2, LdTriangleAlert,
 };
 use dioxus_free_icons::Icon;
 
-use crate::lib::{AppState, ThreadStatus};
+use crate::lib::{AppState, Theme, ThreadStatus};
 use crate::routes::Route;
 
 #[component]
@@ -41,9 +41,25 @@ pub fn ThreadSidebar() -> Element {
             }
 
             div {
-                class: "p-2 border-t border-border",
+                class: "p-2 border-t border-border flex gap-1",
                 button {
-                    class: "inline-flex w-full items-center justify-center gap-2 rounded-sm border border-border bg-background px-3 py-2 text-xs font-medium",
+                    class: "inline-flex items-center justify-center rounded-sm border border-border bg-background p-2 text-muted-foreground hover:text-foreground",
+                    title: "Toggle theme",
+                    onclick: move |_| {
+                        let next = match state.read().theme {
+                            Theme::Dark => Theme::Light,
+                            Theme::Light => Theme::Dark,
+                        };
+                        state.write().theme = next;
+                    },
+                    if state.read().theme == Theme::Dark {
+                        Icon { width: 14, height: 14, icon: LdSun }
+                    } else {
+                        Icon { width: 14, height: 14, icon: LdMoon }
+                    }
+                }
+                button {
+                    class: "inline-flex flex-1 items-center justify-center gap-2 rounded-sm border border-border bg-background px-3 py-2 text-xs font-medium",
                     onclick: move |_| {
                         state.write().show_kanban = true;
                         navigator.push(Route::Board {});

@@ -1,38 +1,46 @@
 import { createPopper, Instance, Placement } from "@popperjs/core";
+import { LitElement, html, css, type PropertyValues } from "lit";
+import { customElement, property } from "lit/decorators.js";
 
-class OmniPopper extends HTMLElement {
+@customElement("omni-popper")
+class OmniPopper extends LitElement {
+  static styles = css`
+    :host { display: inline-flex; position: relative; }
+    .popper-content { display: none; z-index: 110; }
+    .popper-content[data-show] { display: block; }
+  `;
+
+  @property({ type: Boolean, reflect: true }) open = false;
+  @property({ type: String }) placement: Placement = "bottom-start";
+  @property({ type: String }) offset = "0,8";
+  @property({ type: String }) strategy: "fixed" | "absolute" = "fixed";
+
   private popperInstance: Instance | null = null;
-  private contentEl: HTMLElement | null = null;
   private clickAway: ((e: MouseEvent) => void) | null = null;
   private keyUp: ((e: KeyboardEvent) => void) | null = null;
 
-  static get observedAttributes() {
-    return ["open", "placement", "offset", "strategy"];
-  }
-
-  connectedCallback() {
-    this.attachShadow({ mode: "open" });
-    this.shadowRoot!.innerHTML = `
-      <style>
-        :host { display: inline-flex; position: relative; }
-        .popper-content { display: none; z-index: 110; }
-        .popper-content[data-show] { display: block; }
-      </style>
+  render() {
+    return html`
       <slot name="trigger"></slot>
       <div class="popper-content">
         <slot name="content"></slot>
       </div>
     `;
-    this.contentEl = this.shadowRoot!.querySelector(".popper-content");
-    this.syncOpen();
+  }
+
+  updated(changedProps: PropertyValues) {
+    if (changedProps.has("open")) {
+      if (this.open) {
+        this.show();
+      } else {
+        this.hide();
+      }
+    }
   }
 
   disconnectedCallback() {
+    super.disconnectedCallback();
     this.cleanup();
-  }
-
-  attributeChangedCallback() {
-    if (this.shadowRoot) this.syncOpen();
   }
 
   private get triggerEl(): Element | null {
@@ -40,29 +48,22 @@ class OmniPopper extends HTMLElement {
     return slot?.assignedElements()[0] ?? null;
   }
 
-  private syncOpen() {
-    const isOpen = this.hasAttribute("open") && this.getAttribute("open") !== "";
-    if (isOpen) {
-      this.show();
-    } else {
-      this.hide();
-    }
+  private get contentEl(): HTMLElement | null {
+    return this.shadowRoot?.querySelector(".popper-content") ?? null;
   }
 
   private show() {
     if (!this.contentEl || !this.triggerEl) return;
     this.contentEl.setAttribute("data-show", "");
 
-    const placement = (this.getAttribute("placement") ?? "bottom-start") as Placement;
-    const strategy = (this.getAttribute("strategy") ?? "fixed") as "fixed" | "absolute";
-    const [ox, oy] = (this.getAttribute("offset") ?? "0,8").split(",").map(Number);
+    const [ox, oy] = this.offset.split(",").map(Number);
 
     if (this.popperInstance) {
       this.popperInstance.destroy();
     }
     this.popperInstance = createPopper(this.triggerEl as HTMLElement, this.contentEl, {
-      placement,
-      strategy,
+      placement: this.placement,
+      strategy: this.strategy,
       modifiers: [
         { name: "offset", options: { offset: [ox, oy] } },
         { name: "flip", enabled: true },
@@ -101,4 +102,6 @@ class OmniPopper extends HTMLElement {
   }
 }
 
-customElements.define("omni-popper", OmniPopper);
+if (!customElements.get("omni-popper")) {
+  customElements.define("omni-popper", OmniPopper);
+}

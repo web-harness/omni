@@ -7,6 +7,8 @@ import {
   type IContentRenderer,
   type AddPanelOptions,
 } from "dockview-core";
+import { LitElement, html, css, unsafeCSS, type PropertyValues } from "lit";
+import { customElement, property } from "lit/decorators.js";
 
 type PanelSpec = {
   id: string;
@@ -39,113 +41,105 @@ class SlotPanel implements IContentRenderer {
   dispose(): void {}
 }
 
-class OmniDock extends HTMLElement {
-  static observedAttributes = ["data-panels", "data-active-panel", "data-proportions"];
+@customElement("omni-dock")
+class OmniDock extends LitElement {
+  static styles = css`
+    ${unsafeCSS(cssText)}
+    :host {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .dock-root {
+      width: 100%;
+      height: 100%;
+    }
+    .dockview-theme-abyss {
+      --dv-background-color: var(--background);
+      --dv-group-view-background-color: var(--background-elevated);
+      --dv-tabs-and-actions-container-background-color: var(--sidebar);
+      --dv-activegroup-visiblepanel-tab-background-color: var(--sidebar);
+      --dv-inactivegroup-visiblepanel-tab-background-color: var(--sidebar);
+      --dv-activegroup-hiddenpanel-tab-background-color: var(--sidebar);
+      --dv-inactivegroup-hiddenpanel-tab-background-color: var(--sidebar);
+      --dv-activegroup-visiblepanel-tab-border-color: var(--border);
+      --dv-separator-border: var(--border);
+      --dv-tab-divider-color: var(--border);
+      --dv-sash-hover-background-color: var(--border);
+    }
+    .dv-sash {
+      border-color: var(--border) !important;
+    }
+    .dv-default-tab-content {
+      color: var(--foreground);
+    }
+    .dv-tab[data-permanent] .dv-default-tab-action {
+      display: none !important;
+    }
+    .dv-sash-container {
+      pointer-events: none;
+    }
+    .dv-sash-container > .dv-sash {
+      pointer-events: auto;
+    }
+    ::slotted(*) {
+      position: absolute;
+      inset: 0;
+      overflow: auto;
+    }
+  `;
+
+  @property({ attribute: "data-panels" }) dataPanels = "";
+  @property({ attribute: "data-active-panel" }) dataActivePanel = "";
+  @property({ attribute: "data-proportions" }) dataProportions = "";
 
   private api: DockviewApi | null = null;
-  private shadowRootRef: ShadowRoot | null = null;
-  private observer: MutationObserver | null = null;
-  private knownSlots = new Set<string>();
-  private permanentPanels = new Set<string>();
+  private slotObserver: MutationObserver | null = null;
+  private knownSlots: Set<string> = new Set();
+  private permanentPanels: Set<string> = new Set();
 
-  connectedCallback(): void {
-    if (this.api) {
-      return;
-    }
+  render() {
+    return html`<div class="dock-root"></div>`;
+  }
 
-    const shadow = this.attachShadow({ mode: "open" });
-    this.shadowRootRef = shadow;
-
-    const style = document.createElement("style");
-    style.textContent =
-      cssText +
-      `
-      :host {
-        display: block;
-        width: 100%;
-        height: 100%;
-      }
-      .dock-root {
-        width: 100%;
-        height: 100%;
-      }
-      .dockview-theme-abyss {
-        --dv-background-color: var(--background);
-        --dv-group-view-background-color: var(--background-elevated);
-        --dv-tabs-and-actions-container-background-color: var(--sidebar);
-        --dv-activegroup-visiblepanel-tab-background-color: var(--sidebar);
-        --dv-inactivegroup-visiblepanel-tab-background-color: var(--sidebar);
-        --dv-activegroup-hiddenpanel-tab-background-color: var(--sidebar);
-        --dv-inactivegroup-hiddenpanel-tab-background-color: var(--sidebar);
-        --dv-activegroup-visiblepanel-tab-border-color: var(--border);
-        --dv-separator-border: var(--border);
-        --dv-tab-divider-color: var(--border);
-        --dv-sash-hover-background-color: var(--border);
-      }
-      .dv-sash {
-        border-color: var(--border) !important;
-      }
-      .dv-tab[data-permanent] .dv-default-tab-action {
-        display: none !important;
-      }
-      .dv-sash-container {
-        pointer-events: none;
-      }
-      .dv-sash-container > .dv-sash {
-        pointer-events: auto;
-      }
-      ::slotted(*) {
-        position: absolute;
-        inset: 0;
-        overflow: auto;
-      }
-    `;
-    shadow.appendChild(style);
-
-    const container = document.createElement("div");
-    container.className = "dock-root";
-    shadow.appendChild(container);
-
+  firstUpdated() {
+    const container = this.shadowRoot!.querySelector<HTMLElement>(".dock-root")!;
     this.api = createDockview(container, {
       theme: themeAbyss,
       createComponent: (options) => new SlotPanel(options.name),
     });
-
     this.initializePanels();
     this.observeSlots();
   }
 
-  disconnectedCallback(): void {
-    this.observer?.disconnect();
-    this.observer = null;
+  updated(changedProps: PropertyValues) {
+    if (changedProps.has("dataPanels") && this.api) {
+      this.resetPanels();
+      this.initializePanels();
+    }
+    if (changedProps.has("dataActivePanel") && this.api && this.dataActivePanel) {
+      this.api.getPanel(this.dataActivePanel)?.api.setActive();
+    }
+    if (changedProps.has("dataProportions") && this.api) {
+      this.applyProportions();
+    }
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this.slotObserver?.disconnect();
+    this.slotObserver = null;
     this.api?.dispose();
     this.api = null;
     this.knownSlots.clear();
   }
 
-  attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null): void {
-    if (name === "data-panels" && this.api && newValue !== oldValue) {
-      this.resetPanels();
-      this.initializePanels();
-    } else if (name === "data-active-panel" && this.api) {
-      const panelId = this.getAttribute("data-active-panel");
-      if (panelId) {
-        const panel = this.api.getPanel(panelId);
-        panel?.api.setActive();
-      }
-    } else if (name === "data-proportions" && this.api && newValue !== oldValue) {
-      this.applyProportions();
-    }
-  }
-
   private resetPanels(): void {
-    if (!this.api) {
-      return;
-    }
+    if (!this.api) return;
     this.api.dispose();
     this.api = null;
     this.knownSlots.clear();
-    const container = this.shadowRootRef?.querySelector<HTMLElement>(".dock-root");
+    const container = this.shadowRoot?.querySelector<HTMLElement>(".dock-root");
     if (container) {
       this.api = createDockview(container, {
         theme: themeAbyss,
@@ -155,13 +149,9 @@ class OmniDock extends HTMLElement {
   }
 
   private parsePanelSpecs(): PanelSpec[] {
-    const raw = this.getAttribute("data-panels");
-    if (!raw) {
-      return [];
-    }
-
+    if (!this.dataPanels) return [];
     try {
-      const parsed = JSON.parse(raw) as PanelSpec[];
+      const parsed = JSON.parse(this.dataPanels) as PanelSpec[];
       return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
@@ -169,9 +159,7 @@ class OmniDock extends HTMLElement {
   }
 
   private addPanel(spec: PanelSpec): void {
-    if (!this.api || this.knownSlots.has(spec.slot)) {
-      return;
-    }
+    if (!this.api || this.knownSlots.has(spec.slot)) return;
 
     const options: AddPanelOptions = {
       id: spec.id,
@@ -190,7 +178,7 @@ class OmniDock extends HTMLElement {
       } as AddPanelOptions["position"];
     }
 
-    const panel = this.api.addPanel(options);
+    this.api.addPanel(options);
     this.knownSlots.add(spec.slot);
     this.permanentPanels.add(spec.id);
 
@@ -210,21 +198,20 @@ class OmniDock extends HTMLElement {
     requestAnimationFrame(() => {
       this.applyProportions();
       this.tagPermanentTabs();
-      const initActive = this.getAttribute("data-active-panel");
-      if (initActive) {
-        this.api?.getPanel(initActive)?.api.setActive();
+      if (this.dataActivePanel) {
+        this.api?.getPanel(this.dataActivePanel)?.api.setActive();
       }
     });
   }
 
   private tagPermanentTabs(): void {
-    if (!this.shadowRootRef || !this.api) return;
+    if (!this.shadowRoot || !this.api) return;
     const permanentTitles = new Set<string>();
     for (const id of this.permanentPanels) {
       const panel = this.api.getPanel(id);
       if (panel?.title) permanentTitles.add(panel.title);
     }
-    this.shadowRootRef.querySelectorAll(".dv-tab").forEach((tab) => {
+    this.shadowRoot.querySelectorAll(".dv-tab").forEach((tab) => {
       const title = tab.querySelector(".dv-default-tab-content")?.textContent;
       if (title && permanentTitles.has(title)) {
         tab.setAttribute("data-permanent", "");
@@ -234,17 +221,14 @@ class OmniDock extends HTMLElement {
 
   private applyProportions(): void {
     if (!this.api) return;
-    const propStr = this.getAttribute("data-proportions");
+    const propStr = this.dataProportions;
     if (!propStr) return;
 
     const proportions = propStr.split(",").map(Number);
-
-    // Ensure dockview knows its container size before reading layout
     const w = this.clientWidth || window.innerWidth;
     const h = this.clientHeight || window.innerHeight;
     this.api.layout(w, h);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const json = (this.api as any).toJSON();
     const rootChildren = json?.grid?.root?.data;
     if (!rootChildren || proportions.length !== rootChildren.length) return;
@@ -254,16 +238,13 @@ class OmniDock extends HTMLElement {
     for (let i = 0; i < rootChildren.length; i++) {
       rootChildren[i].size = Math.round((totalWidth * proportions[i]) / totalProp);
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (this.api as any).fromJSON(json);
   }
 
   private observeSlots(): void {
-    if (!this.api) {
-      return;
-    }
+    if (!this.api) return;
 
-    this.observer = new MutationObserver(() => {
+    this.slotObserver = new MutationObserver(() => {
       const slotted = Array.from(this.children)
         .map((el) => el.getAttribute("slot"))
         .filter((s): s is string => !!s);
@@ -281,14 +262,13 @@ class OmniDock extends HTMLElement {
 
       for (const existing of [...this.knownSlots]) {
         if (!slotted.includes(existing)) {
-          const panel = this.api?.getPanel(existing);
-          panel?.dispose();
+          this.api?.getPanel(existing)?.dispose();
           this.knownSlots.delete(existing);
         }
       }
     });
 
-    this.observer.observe(this, {
+    this.slotObserver.observe(this, {
       childList: true,
       subtree: false,
       attributes: true,
