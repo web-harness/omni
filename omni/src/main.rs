@@ -103,13 +103,13 @@ pub fn AppLayout() -> Element {
                     if thread_state.read().show_kanban {
                         KanbanView {}
                     } else {
-                        ChatContainer { thread_id }
+                        ChatContainer { thread_id: thread_id.clone() }
                     }
                 }
                 div { slot: "tasks", class: "h-full w-full overflow-auto", TasksSection {} }
                 div { slot: "files", class: "h-full w-full overflow-auto", FilesSection {} }
                 div { slot: "agents", class: "h-full w-full overflow-auto", AgentsSection {} }
-                for path in workspace_state.read().open_tabs.clone().into_iter().filter(|p| p != "chat") {
+                for path in workspace_state.read().open_tabs_for(&thread_id).into_iter().filter(|p: &String| p != "chat") {
                     div {
                         slot: path.clone(),
                         key: "{path}",
@@ -129,7 +129,7 @@ pub fn AppLayout() -> Element {
                 div { class: "mt-3 grid gap-2",
                     div { class: "rounded-sm border border-border bg-background p-2 text-xs", "Theme: Tactical Dark" }
                     div { class: "rounded-sm border border-border bg-background p-2 text-xs", "Font Size: 12px" }
-                    div { class: "rounded-sm border border-border bg-background p-2 text-xs", "Current Model: {model_state.read().selected_model}" }
+                    div { class: "rounded-sm border border-border bg-background p-2 text-xs", "Current Model: {model_state.read().selected_model_for(&thread_id)}" }
                 }
                 div { class: "mt-3",
                     Button {

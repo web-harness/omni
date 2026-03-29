@@ -698,18 +698,37 @@ impl TasksState {
 
 #[derive(Clone, PartialEq)]
 pub struct WorkspaceState {
-    pub workspace_path: String,
+    pub workspace_path: HashMap<String, String>,
     pub workspace_files: HashMap<String, Vec<FileInfo>>,
-    pub open_tabs: Vec<String>,
-    pub active_tab: String,
+    pub open_tabs: HashMap<String, Vec<String>>,
+    pub active_tab: HashMap<String, String>,
 }
 
 impl WorkspaceState {
-    pub fn files_for_workspace(&self) -> Vec<FileInfo> {
+    pub fn workspace_for(&self, thread_id: &str) -> String {
+        self.workspace_path
+            .get(thread_id)
+            .cloned()
+            .unwrap_or_else(|| "test".to_string())
+    }
+
+    pub fn files_for_thread(&self, thread_id: &str) -> Vec<FileInfo> {
+        let workspace = self.workspace_for(thread_id);
         self.workspace_files
-            .get(&self.workspace_path)
+            .get(&workspace)
             .cloned()
             .unwrap_or_default()
+    }
+
+    pub fn open_tabs_for(&self, thread_id: &str) -> Vec<String> {
+        self.open_tabs.get(thread_id).cloned().unwrap_or_default()
+    }
+
+    pub fn active_tab_for(&self, thread_id: &str) -> String {
+        self.active_tab
+            .get(thread_id)
+            .cloned()
+            .unwrap_or_else(|| "chat".to_string())
     }
 }
 
@@ -717,7 +736,17 @@ impl WorkspaceState {
 pub struct ModelState {
     pub providers: Vec<Provider>,
     pub models: Vec<ModelConfig>,
-    pub selected_model: String,
+    pub selected_model: HashMap<String, String>,
+}
+
+impl ModelState {
+    pub fn selected_model_for(&self, thread_id: &str) -> String {
+        self.selected_model
+            .get(thread_id)
+            .cloned()
+            .or_else(|| self.models.first().map(|m| m.id.clone()))
+            .unwrap_or_else(|| "gpt-5".to_string())
+    }
 }
 
 #[derive(Clone, PartialEq)]
@@ -778,10 +807,27 @@ pub fn bootstrap(
     }
 
     let models = provider.list_models();
-    let selected_model = models
+    let first_model = models
         .first()
         .map(|m| m.id.clone())
         .unwrap_or_else(|| "gpt-5".to_string());
+
+    let mut selected_model: HashMap<String, String> = HashMap::new();
+    let mut workspace_path: HashMap<String, String> = HashMap::new();
+    let mut open_tabs: HashMap<String, Vec<String>> = HashMap::new();
+    let mut active_tab: HashMap<String, String> = HashMap::new();
+
+    for (i, thread) in threads.iter().enumerate() {
+        selected_model.insert(thread.id.clone(), first_model.clone());
+        let ws = match i {
+            1 => "omni",
+            2 => "omni-rt",
+            _ => "test",
+        };
+        workspace_path.insert(thread.id.clone(), ws.to_string());
+        open_tabs.insert(thread.id.clone(), vec![]);
+        active_tab.insert(thread.id.clone(), "chat".to_string());
+    }
 
     #[cfg(target_arch = "wasm32")]
     let initial_theme = {
@@ -967,10 +1013,10 @@ pub fn bootstrap(
             tool_results,
         },
         WorkspaceState {
-            workspace_path: "test".to_string(),
+            workspace_path,
             workspace_files,
-            open_tabs: vec![],
-            active_tab: "chat".to_string(),
+            open_tabs,
+            active_tab,
         },
         ModelState {
             providers: provider.list_providers(),

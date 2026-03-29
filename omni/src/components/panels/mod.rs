@@ -144,8 +144,14 @@ pub fn TasksSection() -> Element {
 #[component]
 pub fn FilesSection() -> Element {
     let mut workspace_state = use_context::<Signal<WorkspaceState>>();
-    let files = workspace_state.read().files_for_workspace();
-    let workspace = workspace_state.read().workspace_path.clone();
+    let thread_state = use_context::<Signal<ThreadState>>();
+    let tid = thread_state
+        .read()
+        .active_thread_id
+        .clone()
+        .unwrap_or_default();
+    let files = workspace_state.read().files_for_thread(&tid);
+    let workspace = workspace_state.read().workspace_for(&tid);
 
     rsx! {
         div { class: "overflow-auto",
@@ -159,12 +165,15 @@ pub fn FilesSection() -> Element {
             }
             div { class: "py-1",
                 for file in files {
-                    FileRow { key: "{file.path}", file: file.clone(), on_open: move |path: String| {
-                        if !workspace_state.read().open_tabs.contains(&path) {
-                            workspace_state.write().open_tabs.push(path.clone());
-                            workspace_state.write().active_tab = path;
-                        }
-                    }}
+                    {
+                        let tid = tid.clone();
+                        rsx! { FileRow { key: "{file.path}", file: file.clone(), on_open: move |path: String| {
+                            if !workspace_state.read().open_tabs_for(&tid).contains(&path) {
+                                workspace_state.write().open_tabs.entry(tid.clone()).or_default().push(path.clone());
+                                workspace_state.write().active_tab.insert(tid.clone(), path);
+                            }
+                        }}}
+                    }
                 }
             }
         }

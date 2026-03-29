@@ -3,13 +3,19 @@ use dioxus_free_icons::icons::ld_icons::{LdBot, LdFileCode, LdFileJson, LdFileTe
 use dioxus_free_icons::Icon;
 
 use crate::components::chat::ChatContainer;
-use crate::lib::WorkspaceState;
+use crate::lib::{ThreadState, WorkspaceState};
 
 #[component]
 pub fn TabBar() -> Element {
     let workspace_state = use_context::<Signal<WorkspaceState>>();
-    let open_tabs = workspace_state.read().open_tabs.clone();
-    let active_tab = workspace_state.read().active_tab.clone();
+    let thread_state = use_context::<Signal<ThreadState>>();
+    let tid = thread_state
+        .read()
+        .active_thread_id
+        .clone()
+        .unwrap_or_default();
+    let open_tabs = workspace_state.read().open_tabs_for(&tid);
+    let active_tab = workspace_state.read().active_tab_for(&tid);
 
     rsx! {
         div { class: "flex items-center gap-1 border-b border-border bg-sidebar px-2 py-1",
@@ -27,6 +33,12 @@ pub fn TabBar() -> Element {
 #[component]
 fn TabChip(tab: String, active: bool) -> Element {
     let mut workspace_state = use_context::<Signal<WorkspaceState>>();
+    let thread_state = use_context::<Signal<ThreadState>>();
+    let tid = thread_state
+        .read()
+        .active_thread_id
+        .clone()
+        .unwrap_or_default();
     let tab_for_select = tab.clone();
     let tab_for_close = tab.clone();
     let class = if active {
@@ -38,7 +50,7 @@ fn TabChip(tab: String, active: bool) -> Element {
     rsx! {
         button {
             class: "{class}",
-            onclick: move |_| workspace_state.write().active_tab = tab_for_select.clone(),
+            onclick: move |_| { workspace_state.write().active_tab.insert(tid.clone(), tab_for_select.clone()); },
             if tab == "chat" {
                 Icon { width: 13, height: 13, icon: LdBot }
                 span { "Agent" }
@@ -47,11 +59,14 @@ fn TabChip(tab: String, active: bool) -> Element {
                 span { class: "max-w-[180px] truncate", "{tab}" }
                 button {
                     class: "rounded p-0.5 hover:bg-background",
-                    onclick: move |evt| {
-                        evt.stop_propagation();
-                        workspace_state.write().open_tabs.retain(|x| x != &tab_for_close);
-                        if workspace_state.read().active_tab == tab_for_close {
-                            workspace_state.write().active_tab = "chat".to_string();
+                    onclick: {
+                        let tid2 = tid.clone();
+                        move |evt: Event<MouseData>| {
+                            evt.stop_propagation();
+                            workspace_state.write().open_tabs.entry(tid2.clone()).or_default().retain(|x| x != &tab_for_close);
+                            if workspace_state.read().active_tab_for(&tid2) == tab_for_close {
+                                workspace_state.write().active_tab.insert(tid2.clone(), "chat".to_string());
+                            }
                         }
                     },
                     Icon { width: 11, height: 11, icon: LdX }

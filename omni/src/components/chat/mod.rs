@@ -317,7 +317,7 @@ fn ChatInput(thread_id: String, stream: Coroutine<StreamRequest>) -> Element {
                                             write.input_draft.clear();
                                             write.stream_buffer.clear();
                                         }
-                                        stream.send(StreamRequest { thread_id: thread_id.clone(), input, model_id: model_state.read().selected_model.clone() });
+                                        stream.send(StreamRequest { thread_id: thread_id.clone(), input, model_id: model_state.read().selected_model_for(&active_id) });
                                     }
                                 }
                             }
@@ -342,7 +342,7 @@ fn ChatInput(thread_id: String, stream: Coroutine<StreamRequest>) -> Element {
                                     write.input_draft.clear();
                                     write.stream_buffer.clear();
                                 }
-                                stream.send(StreamRequest { thread_id: thread_id.clone(), input, model_id: model_state.read().selected_model.clone() });
+                                stream.send(StreamRequest { thread_id: thread_id.clone(), input, model_id: model_state.read().selected_model_for(&active_id) });
                             }
                         },
                         Icon { width: 13, height: 13, icon: LdSend }
@@ -364,12 +364,18 @@ fn ChatInput(thread_id: String, stream: Coroutine<StreamRequest>) -> Element {
 pub fn ModelSwitcher() -> Element {
     let mut model_state = use_context::<Signal<ModelState>>();
     let mut ui_state = use_context::<Signal<UiState>>();
+    let thread_state = use_context::<Signal<ThreadState>>();
     let mut open = use_signal(|| false);
     let mut selected_provider = use_signal(|| crate::lib::ProviderId::Anthropic);
 
+    let tid = thread_state
+        .read()
+        .active_thread_id
+        .clone()
+        .unwrap_or_default();
     let providers = model_state.read().providers.clone();
     let models = model_state.read().models.clone();
-    let selected_model = model_state.read().selected_model.clone();
+    let selected_model = model_state.read().selected_model_for(&tid);
 
     let filtered_models: Vec<_> = models
         .iter()
@@ -430,12 +436,13 @@ pub fn ModelSwitcher() -> Element {
                                 "w-full rounded-sm px-2 py-1.5 text-left text-[11px] hover:bg-background-interactive text-muted-foreground"
                             };
                             let mid = model.id.clone();
+                            let tid_for_click = tid.clone();
                             rsx! {
                                 button {
                                     key: "{model.id}",
                                     class: "{btn_class}",
                                     onclick: move |_| {
-                                        model_state.write().selected_model = mid.clone();
+                                        model_state.write().selected_model.insert(tid_for_click.clone(), mid.clone());
                                         open.set(false);
                                     },
                                     "{model.name}"
@@ -452,12 +459,18 @@ pub fn ModelSwitcher() -> Element {
 #[component]
 pub fn WorkspacePicker() -> Element {
     let mut workspace_state = use_context::<Signal<WorkspaceState>>();
+    let thread_state = use_context::<Signal<ThreadState>>();
     let mut open = use_signal(|| false);
     let presets = vec![
         ("test", "/home/user/projects/test"),
         ("omni", "/home/user/projects/omni"),
         ("omni-rt", "/home/user/projects/omni-rt"),
     ];
+    let tid = thread_state
+        .read()
+        .active_thread_id
+        .clone()
+        .unwrap_or_default();
 
     rsx! {
         Popover {
@@ -468,7 +481,7 @@ pub fn WorkspacePicker() -> Element {
                     class: "flex items-center gap-1 rounded-sm border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-background-interactive",
                     onclick: move |_| open.set(!open()),
                     Icon { width: 10, height: 10, icon: LdFolder }
-                    span { class: "max-w-[160px] truncate", "{workspace_state.read().workspace_path}" }
+                    span { class: "max-w-[160px] truncate", "{workspace_state.read().workspace_for(&tid)}" }
                     Icon { width: 10, height: 10, icon: LdChevronDown }
                 }
             },
@@ -476,18 +489,19 @@ pub fn WorkspacePicker() -> Element {
                 div { class: "px-2 pb-1 text-[9px] font-semibold uppercase tracking-widest text-muted-foreground", "Select Workspace" }
                 for (name, path) in presets {
                     {
-                        let active = workspace_state.read().workspace_path == name;
+                        let active = workspace_state.read().workspace_for(&tid) == name;
                         let btn_class = if active {
                             "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left bg-primary/10 text-primary"
                         } else {
                             "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left hover:bg-background-interactive text-muted-foreground"
                         };
+                        let tid_for_click = tid.clone();
                         rsx! {
                             button {
                                 key: "{name}",
                                 class: "{btn_class}",
                                 onclick: move |_| {
-                                    workspace_state.write().workspace_path = name.to_string();
+                                    workspace_state.write().workspace_path.insert(tid_for_click.clone(), name.to_string());
                                     open.set(false);
                                 },
                                 Icon { width: 12, height: 12, icon: LdFolder, class: "shrink-0" }
