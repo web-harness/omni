@@ -63,7 +63,7 @@ jobs:
         run: sed -i '/\[web\.app\]/a base_path = "omni/app"' omni-ui/Dioxus.toml
 
       - name: Build Dioxus app
-        run: npm run build:dx
+        run: npm run build
 
       - name: Build Storybook
         run: BASE_PATH=/omni/ npm run wc:build

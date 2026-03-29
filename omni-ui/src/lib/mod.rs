@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
+pub mod file_types;
+pub mod fixtures;
 pub mod thread_context;
 pub mod utils;
 
@@ -892,6 +894,101 @@ pub fn bootstrap(
                     path: "server/todos.json".to_string(),
                     is_dir: false,
                     size: Some(314),
+                },
+                FileInfo {
+                    path: "fixtures".to_string(),
+                    is_dir: true,
+                    size: None,
+                },
+                FileInfo {
+                    path: "fixtures/sample.rs".to_string(),
+                    is_dir: false,
+                    size: Some(512),
+                },
+                FileInfo {
+                    path: "fixtures/sample.ts".to_string(),
+                    is_dir: false,
+                    size: Some(620),
+                },
+                FileInfo {
+                    path: "fixtures/sample.py".to_string(),
+                    is_dir: false,
+                    size: Some(580),
+                },
+                FileInfo {
+                    path: "fixtures/sample.sh".to_string(),
+                    is_dir: false,
+                    size: Some(410),
+                },
+                FileInfo {
+                    path: "fixtures/sample.md".to_string(),
+                    is_dir: false,
+                    size: Some(740),
+                },
+                FileInfo {
+                    path: "fixtures/sample.html".to_string(),
+                    is_dir: false,
+                    size: Some(890),
+                },
+                FileInfo {
+                    path: "fixtures/sample.css".to_string(),
+                    is_dir: false,
+                    size: Some(660),
+                },
+                FileInfo {
+                    path: "fixtures/sample.json".to_string(),
+                    is_dir: false,
+                    size: Some(520),
+                },
+                FileInfo {
+                    path: "fixtures/sample.toml".to_string(),
+                    is_dir: false,
+                    size: Some(280),
+                },
+                FileInfo {
+                    path: "fixtures/sample.txt".to_string(),
+                    is_dir: false,
+                    size: Some(940),
+                },
+                FileInfo {
+                    path: "fixtures/sample.svg".to_string(),
+                    is_dir: false,
+                    size: Some(480),
+                },
+                FileInfo {
+                    path: "fixtures/sample.png".to_string(),
+                    is_dir: false,
+                    size: Some(120),
+                },
+                FileInfo {
+                    path: "fixtures/sample.jpg".to_string(),
+                    is_dir: false,
+                    size: Some(120),
+                },
+                FileInfo {
+                    path: "fixtures/sample.pdf".to_string(),
+                    is_dir: false,
+                    size: Some(800),
+                },
+                FileInfo {
+                    path: "fixtures/sample.wav".to_string(),
+                    is_dir: false,
+                    size: Some(46),
+                },
+                FileInfo {
+                    path: "fixtures/sample.mp3".to_string(),
+                    is_dir: false,
+                    size: Some(64),
+                },
+                FileInfo {
+                    path: "fixtures/sample.mp4".to_string(),
+                    is_dir: false,
+                    size: Some(256),
+                },
+                FileInfo {
+                    path: "fixtures/sample.bin".to_string(),
+                    is_dir: false,
+                    size: Some(128),
                 },
             ],
         );

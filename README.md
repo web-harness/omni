@@ -4,12 +4,12 @@ Omni is a harness that stays out of your way, compatible with LangGraph Agent Pr
 
 [![Omni UI](./demo.png)](https://web-harness.github.io/omni/)
 
-Current Status: Mocked replica of the original OpenWork in the Dioxus framework.
+Current Status: Mocked replica of the original [OpenWork](https://github.com/web-harness/openwork) in the Dioxus framework.
 
 ## structure
 
 - [`omni-ui/`](./omni-ui) — Dioxus UI, compiled to WebAssembly and served as a static site. Contains the main app logic, components, and state management.
-- [`omni-rt/`](./omni-rt) — Rust runtime crates for protocol handling, dock management, file system, deep agents, etc.
+- [`omni-rt/`](./omni-rt/crates) — Rust runtime crates for protocol handling, dock management, file system, deep agents, etc.
 - [`omni-wc/`](./omni-wc) — Web Components version of the harness UI, for embedding in other applications.
 
 ## runtime

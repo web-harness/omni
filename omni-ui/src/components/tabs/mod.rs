@@ -1,9 +1,20 @@
 use dioxus::prelude::*;
-use dioxus_free_icons::icons::ld_icons::{LdBot, LdFileCode, LdFileJson, LdFileText, LdX};
+use dioxus_free_icons::icons::ld_icons::{
+    LdBot, LdFile, LdFileCode, LdFileImage, LdFileText, LdFileVideo, LdX,
+};
 use dioxus_free_icons::Icon;
 
 use crate::components::chat::ChatContainer;
-use crate::lib::{ThreadState, WorkspaceState};
+use crate::lib::{
+    file_types::{ext_to_mime_type, get_file_type, FileType},
+    fixtures::{fixture_b64, fixture_text},
+    ThreadState, WorkspaceState,
+};
+
+pub mod viewers;
+use viewers::{
+    BinaryViewer, CodeViewer, HtmlViewer, ImageViewer, MarkdownViewer, MediaViewer, PdfViewer,
+};
 
 #[component]
 pub fn TabBar() -> Element {
@@ -78,13 +89,18 @@ fn TabChip(tab: String, active: bool) -> Element {
 
 #[component]
 fn FileIcon(path: String) -> Element {
-    if path.ends_with(".rs") || path.ends_with(".ts") || path.ends_with(".tsx") {
-        return rsx! { Icon { width: 13, height: 13, icon: LdFileCode } };
+    match get_file_type(&path) {
+        FileType::Code => rsx! { Icon { width: 13, height: 13, icon: LdFileCode } },
+        FileType::Markdown | FileType::Text => {
+            rsx! { Icon { width: 13, height: 13, icon: LdFileText } }
+        }
+        FileType::Image => rsx! { Icon { width: 13, height: 13, icon: LdFileImage } },
+        FileType::Video | FileType::Audio => {
+            rsx! { Icon { width: 13, height: 13, icon: LdFileVideo } }
+        }
+        FileType::Html => rsx! { Icon { width: 13, height: 13, icon: LdFileCode } },
+        _ => rsx! { Icon { width: 13, height: 13, icon: LdFile } },
     }
-    if path.ends_with(".json") {
-        return rsx! { Icon { width: 13, height: 13, icon: LdFileJson } };
-    }
-    rsx! { Icon { width: 13, height: 13, icon: LdFileText } }
 }
 
 #[component]
@@ -96,18 +112,61 @@ pub fn TabbedPanel(thread_id: String) -> Element {
 
 #[component]
 pub fn FileViewer(path: String) -> Element {
-    rsx! {
-        div { class: "h-full overflow-auto p-4",
-            div { class: "mb-3 text-[11px] text-muted-foreground", "{path}" }
-            pre {
-                class: "rounded-sm border border-border bg-background p-3 font-mono text-[11px] leading-5 text-foreground",
-                "// Mocked file preview\n",
-                "fn main() -> ()\n",
-                "    println!(\"hello\");\n",
-                "end\n",
-                "\n",
-                "// path: {path}"
+    let ext = path.rsplit('.').next().unwrap_or("").to_string();
+    let mime = ext_to_mime_type(&ext).to_string();
+
+    let viewer = if ext == "svg" {
+        let svg = fixture_text(&path);
+        rsx! {
+            div {
+                class: "h-full w-full overflow-auto flex items-center justify-center bg-background p-4",
+                dangerous_inner_html: "{svg}",
             }
         }
+    } else {
+        match get_file_type(&path) {
+            FileType::Code | FileType::Text => rsx! {
+                CodeViewer { path: path.clone(), content: fixture_text(&path) }
+            },
+            FileType::Markdown => rsx! {
+                MarkdownViewer { path: path.clone(), content: fixture_text(&path) }
+            },
+            FileType::Html => rsx! {
+                HtmlViewer { path: path.clone(), content: fixture_text(&path) }
+            },
+            FileType::Image => rsx! {
+                ImageViewer {
+                    path: path.clone(),
+                    base64_content: fixture_b64(&path),
+                    mime_type: mime,
+                }
+            },
+            FileType::Video => rsx! {
+                MediaViewer {
+                    path: path.clone(),
+                    base64_content: fixture_b64(&path),
+                    mime_type: mime,
+                    media_type: "video".to_string(),
+                }
+            },
+            FileType::Audio => rsx! {
+                MediaViewer {
+                    path: path.clone(),
+                    base64_content: fixture_b64(&path),
+                    mime_type: mime,
+                    media_type: "audio".to_string(),
+                }
+            },
+            FileType::Pdf => rsx! {
+                PdfViewer { path: path.clone(), base64_content: fixture_b64(&path) }
+            },
+            FileType::Binary => rsx! {
+                BinaryViewer { path: path.clone(), size: None }
+            },
+        }
+    };
+
+    rsx! {
+        div { class: "h-full w-full", {viewer} }
     }
 }

@@ -1,0 +1,19 @@
+{
+  "name": "@omni/omni-pdfjs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/omni-pdfjs.js",
+  "module": "dist/omni-pdfjs.js",
+  "scripts": {
+    "build": "mkdir -p dist && cp node_modules/pdfjs-dist/build/pdf.worker.min.mjs dist/omni-pdfjs.worker.js && esbuild src/omni-pdfjs.ts --bundle --format=esm --outfile=dist/omni-pdfjs.js --loader:.css=text --loader:.ttf=file --loader:.woff=file --loader:.woff2=file",
+    "watch": "mkdir -p dist && cp node_modules/pdfjs-dist/build/pdf.worker.min.mjs dist/omni-pdfjs.worker.js && esbuild src/omni-pdfjs.ts --bundle --format=esm --outfile=dist/omni-pdfjs.js --loader:.css=text --loader:.ttf=file --loader:.woff=file --loader:.woff2=file --watch"
+  },
+  "dependencies": {
+    "lit": "^3.2.0",
+    "pdfjs-dist": "^4.10.38"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.2"
+  }
+}

@@ -25,6 +25,9 @@ const FONT_SEMIBOLD: Asset = asset!("/assets/fonts/JetBrainsMono-SemiBold.woff2"
 const FONT_BOLD: Asset = asset!("/assets/fonts/JetBrainsMono-Bold.woff2");
 const OMNI_DOCK_JS: Asset = asset!("/public/omni-dock.js");
 const OMNI_POPPER_JS: Asset = asset!("/public/omni-popper.js");
+const OMNI_MONACO_JS: Asset = asset!("/public/omni-monaco.js");
+const OMNI_MDX_JS: Asset = asset!("/public/omni-mdx.js");
+const OMNI_PDFJS_JS: Asset = asset!("/public/omni-pdfjs.js");
 
 fn main() {
     dioxus::launch(App);
@@ -56,6 +59,9 @@ fn App() -> Element {
         }
         document::Script { src: OMNI_DOCK_JS, r#type: "module", defer: true }
         document::Script { src: OMNI_POPPER_JS, r#type: "module", defer: true }
+        document::Script { src: OMNI_MONACO_JS, r#type: "module", defer: true }
+        document::Script { src: OMNI_MDX_JS, r#type: "module", defer: true }
+        document::Script { src: OMNI_PDFJS_JS, r#type: "module", defer: true }
 
         Router::<Route> {}
     }

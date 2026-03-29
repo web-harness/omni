@@ -170,8 +170,8 @@ pub fn FilesSection() -> Element {
                         rsx! { FileRow { key: "{file.path}", file: file.clone(), on_open: move |path: String| {
                             if !workspace_state.read().open_tabs_for(&tid).contains(&path) {
                                 workspace_state.write().open_tabs.entry(tid.clone()).or_default().push(path.clone());
-                                workspace_state.write().active_tab.insert(tid.clone(), path);
                             }
+                            workspace_state.write().active_tab.insert(tid.clone(), path);
                         }}}
                     }
                 }
