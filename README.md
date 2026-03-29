@@ -8,7 +8,7 @@ Current Status: Mocked replica of the original OpenWork in the Dioxus framework.
 
 ## structure
 
-- [`omni/`](./omni) — Dioxus UI, compiled to WebAssembly and served as a static site. Contains the main app logic, components, and state management.
+- [`omni-ui/`](./omni-ui) — Dioxus UI, compiled to WebAssembly and served as a static site. Contains the main app logic, components, and state management.
 - [`omni-rt/`](./omni-rt) — Rust runtime crates for protocol handling, dock management, file system, deep agents, etc.
 - [`omni-wc/`](./omni-wc) — Web Components version of the harness UI, for embedding in other applications.
 

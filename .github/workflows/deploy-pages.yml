@@ -60,7 +60,7 @@ jobs:
         run: npm ci
 
       - name: Set Dioxus base_path for GH Pages
-        run: sed -i '/\[web\.app\]/a base_path = "omni/app"' omni/Dioxus.toml
+        run: sed -i '/\[web\.app\]/a base_path = "omni/app"' omni-ui/Dioxus.toml
 
       - name: Build Dioxus app
         run: npm run build:dx

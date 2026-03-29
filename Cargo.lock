@@ -3606,23 +3606,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "omni"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dioxus",
- "dioxus-free-icons",
- "futures-util",
- "getrandom 0.2.17",
- "gloo-timers",
- "omni-rt",
- "serde",
- "serde_json",
- "uuid",
- "web-sys",
-]
-
-[[package]]
 name = "omni-bashkit"
 version = "0.1.0"
 dependencies = [
@@ -3662,6 +3645,23 @@ dependencies = [
  "omni-deepagents",
  "omni-protocol",
  "omni-zenfs",
+]
+
+[[package]]
+name = "omni-ui"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "dioxus",
+ "dioxus-free-icons",
+ "futures-util",
+ "getrandom 0.2.17",
+ "gloo-timers",
+ "omni-rt",
+ "serde",
+ "serde_json",
+ "uuid",
+ "web-sys",
 ]
 
 [[package]]

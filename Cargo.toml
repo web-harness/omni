@@ -1,6 +1,6 @@
 [workspace]
 members = [
-  "omni",
+  "omni-ui",
   "omni-rt/crates/omni-rt",
   "omni-rt/crates/omni-protocol",
   "omni-rt/crates/omni-bashkit",
