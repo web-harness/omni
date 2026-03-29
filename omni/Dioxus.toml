@@ -5,6 +5,12 @@
 # HTML title tag content
 title = "omni"
 
+[web]
+pre_compress = true
+
+[web.wasm_opt]
+level = "z"
+
 # include `assets` in web platform
 [web.resource]
 

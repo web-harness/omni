@@ -3,18 +3,19 @@ use dioxus_free_icons::icons::ld_icons::{LdBot, LdFileCode, LdFileJson, LdFileTe
 use dioxus_free_icons::Icon;
 
 use crate::components::chat::ChatContainer;
-use crate::lib::AppState;
+use crate::lib::WorkspaceState;
 
 #[component]
 pub fn TabBar() -> Element {
-    let state = use_context::<Signal<AppState>>();
-    let open_tabs = state.read().open_tabs.clone();
-    let active_tab = state.read().active_tab.clone();
+    let workspace_state = use_context::<Signal<WorkspaceState>>();
+    let open_tabs = workspace_state.read().open_tabs.clone();
+    let active_tab = workspace_state.read().active_tab.clone();
 
     rsx! {
         div { class: "flex items-center gap-1 border-b border-border bg-sidebar px-2 py-1",
             for tab in open_tabs {
                 TabChip {
+                    key: "{tab}",
                     tab: tab.clone(),
                     active: tab == active_tab,
                 }
@@ -25,7 +26,7 @@ pub fn TabBar() -> Element {
 
 #[component]
 fn TabChip(tab: String, active: bool) -> Element {
-    let mut state = use_context::<Signal<AppState>>();
+    let mut workspace_state = use_context::<Signal<WorkspaceState>>();
     let tab_for_select = tab.clone();
     let tab_for_close = tab.clone();
     let class = if active {
@@ -37,7 +38,7 @@ fn TabChip(tab: String, active: bool) -> Element {
     rsx! {
         button {
             class: "{class}",
-            onclick: move |_| state.write().active_tab = tab_for_select.clone(),
+            onclick: move |_| workspace_state.write().active_tab = tab_for_select.clone(),
             if tab == "chat" {
                 Icon { width: 13, height: 13, icon: LdBot }
                 span { "Agent" }
@@ -48,9 +49,9 @@ fn TabChip(tab: String, active: bool) -> Element {
                     class: "rounded p-0.5 hover:bg-background",
                     onclick: move |evt| {
                         evt.stop_propagation();
-                        state.write().open_tabs.retain(|x| x != &tab_for_close);
-                        if state.read().active_tab == tab_for_close {
-                            state.write().active_tab = "chat".to_string();
+                        workspace_state.write().open_tabs.retain(|x| x != &tab_for_close);
+                        if workspace_state.read().active_tab == tab_for_close {
+                            workspace_state.write().active_tab = "chat".to_string();
                         }
                     },
                     Icon { width: 11, height: 11, icon: LdX }

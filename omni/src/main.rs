@@ -10,12 +10,19 @@ use components::{
     AgentsSection, Button, ButtonVariant, ChatContainer, Dialog, FilesSection, Input, KanbanView,
     TasksSection, ThreadSidebar,
 };
-use lib::{AppState, DataProvider, MockDataProvider, Theme};
+use lib::{
+    bootstrap, DataProvider, MockDataProvider, ModelState, Theme, ThreadState, UiState,
+    WorkspaceState,
+};
 use routes::Route;
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
 const MAIN_CSS: Asset = asset!("/assets/main.css");
 const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
+const FONT_REGULAR: Asset = asset!("/assets/fonts/JetBrainsMono-Regular.woff2");
+const FONT_MEDIUM: Asset = asset!("/assets/fonts/JetBrainsMono-Medium.woff2");
+const FONT_SEMIBOLD: Asset = asset!("/assets/fonts/JetBrainsMono-SemiBold.woff2");
+const FONT_BOLD: Asset = asset!("/assets/fonts/JetBrainsMono-Bold.woff2");
 const OMNI_DOCK_JS: Asset = asset!("/public/omni-dock.js");
 const OMNI_POPPER_JS: Asset = asset!("/public/omni-popper.js");
 
@@ -26,20 +33,29 @@ fn main() {
 #[component]
 fn App() -> Element {
     let provider: Rc<dyn DataProvider> = Rc::new(MockDataProvider::new());
-    let state = AppState::bootstrap(provider.clone());
+    let (threads, chat, tasks, workspace, model, ui, subagents) = bootstrap(provider.clone());
 
     use_context_provider(|| provider);
-    use_context_provider(|| Signal::new(state));
+    use_context_provider(|| Signal::new(threads));
+    use_context_provider(|| Signal::new(chat));
+    use_context_provider(|| Signal::new(tasks));
+    use_context_provider(|| Signal::new(workspace));
+    use_context_provider(|| Signal::new(model));
+    use_context_provider(|| Signal::new(ui));
+    use_context_provider(|| Signal::new(subagents));
 
     rsx! {
         document::Link { rel: "icon", href: FAVICON }
         document::Link { rel: "stylesheet", href: MAIN_CSS }
         document::Link { rel: "stylesheet", href: TAILWIND_CSS }
-        document::Link { rel: "preconnect", href: "https://fonts.googleapis.com" }
-        document::Link { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" }
-        document::Link { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" }
-        document::Script { src: OMNI_DOCK_JS, r#type: "module" }
-        document::Script { src: OMNI_POPPER_JS, r#type: "module" }
+        document::Style {
+            "@font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:400;font-display:swap;src:url('{FONT_REGULAR}') format('woff2')}}
+            @font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:500;font-display:swap;src:url('{FONT_MEDIUM}') format('woff2')}}
+            @font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:600;font-display:swap;src:url('{FONT_SEMIBOLD}') format('woff2')}}
+            @font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:700;font-display:swap;src:url('{FONT_BOLD}') format('woff2')}}"
+        }
+        document::Script { src: OMNI_DOCK_JS, r#type: "module", defer: true }
+        document::Script { src: OMNI_POPPER_JS, r#type: "module", defer: true }
 
         Router::<Route> {}
     }
@@ -47,9 +63,16 @@ fn App() -> Element {
 
 #[component]
 pub fn AppLayout() -> Element {
-    let mut state = use_context::<Signal<AppState>>();
+    let thread_state = use_context::<Signal<ThreadState>>();
+    let mut ui_state = use_context::<Signal<UiState>>();
+    let workspace_state = use_context::<Signal<WorkspaceState>>();
+    let model_state = use_context::<Signal<ModelState>>();
 
-    let thread_id = state.read().active_thread_id.clone().unwrap_or_default();
+    let thread_id = thread_state
+        .read()
+        .active_thread_id
+        .clone()
+        .unwrap_or_default();
     let active_panel = "chat";
 
     let panel_config = r#"[
@@ -60,7 +83,7 @@ pub fn AppLayout() -> Element {
       {"id":"agents","slot":"agents","title":"Agents","position":{"referencePanel":"files","direction":"below"}}
     ]"#;
 
-    let theme = if state.read().theme == Theme::Light {
+    let theme = if ui_state.read().theme == Theme::Light {
         "light"
     } else {
         "dark"
@@ -77,7 +100,7 @@ pub fn AppLayout() -> Element {
                 "data-proportions": "20,60,20",
                 div { slot: "sidebar", class: "h-full w-full overflow-hidden", ThreadSidebar {} }
                 div { slot: "chat", class: "h-full w-full overflow-hidden",
-                    if state.read().show_kanban {
+                    if thread_state.read().show_kanban {
                         KanbanView {}
                     } else {
                         ChatContainer { thread_id }
@@ -86,7 +109,7 @@ pub fn AppLayout() -> Element {
                 div { slot: "tasks", class: "h-full w-full overflow-auto", TasksSection {} }
                 div { slot: "files", class: "h-full w-full overflow-auto", FilesSection {} }
                 div { slot: "agents", class: "h-full w-full overflow-auto", AgentsSection {} }
-                for path in state.read().open_tabs.clone().into_iter().filter(|p| p != "chat") {
+                for path in workspace_state.read().open_tabs.clone().into_iter().filter(|p| p != "chat") {
                     div {
                         slot: path.clone(),
                         key: "{path}",
@@ -96,50 +119,49 @@ pub fn AppLayout() -> Element {
                 }
             }
 
-            // Hidden outlet keeps URL routing alive for state sync
             div { class: "hidden", Outlet::<Route> {} }
 
             Dialog {
-                open: state.read().settings_open,
-                on_close: move |_| state.write().settings_open = false,
+                open: ui_state.read().settings_open,
+                on_close: move |_| ui_state.write().settings_open = false,
                 h3 { class: "text-sm font-semibold", "Settings" }
                 p { class: "mt-2 text-xs text-muted-foreground", "Workspace defaults, model preferences, and visual options." }
                 div { class: "mt-3 grid gap-2",
                     div { class: "rounded-sm border border-border bg-background p-2 text-xs", "Theme: Tactical Dark" }
                     div { class: "rounded-sm border border-border bg-background p-2 text-xs", "Font Size: 12px" }
-                    div { class: "rounded-sm border border-border bg-background p-2 text-xs", "Current Model: {state.read().selected_model}" }
+                    div { class: "rounded-sm border border-border bg-background p-2 text-xs", "Current Model: {model_state.read().selected_model}" }
                 }
                 div { class: "mt-3",
                     Button {
-                        onclick: move |_| state.write().settings_open = false,
+                        onclick: move |_| ui_state.write().settings_open = false,
                         "Close"
                     }
                 }
             }
 
             Dialog {
-                open: state.read().api_key_dialog_open,
-                on_close: move |_| state.write().api_key_dialog_open = false,
+                open: ui_state.read().api_key_dialog_open,
+                on_close: move |_| ui_state.write().api_key_dialog_open = false,
                 h3 { class: "text-sm font-semibold", "Provider API Key" }
                 p { class: "mt-2 text-xs text-muted-foreground", "Mocked dialog for API key setup." }
-                p { class: "mt-2 text-[11px]", "Provider: {state.read().api_key_provider:?}" }
+                p { class: "mt-2 text-[11px]", "Provider: {ui_state.read().api_key_provider:?}" }
                 Input {
-                    value: state.read().api_key_draft.clone(),
+                    value: ui_state.read().api_key_draft.clone(),
                     placeholder: "sk-...".to_string(),
-                    oninput: move |evt: Event<FormData>| state.write().api_key_draft = evt.value(),
+                    oninput: move |evt: Event<FormData>| ui_state.write().api_key_draft = evt.value(),
                 }
                 div { class: "mt-3 flex justify-end gap-2",
                     Button {
                         variant: ButtonVariant::Secondary,
                         onclick: move |_| {
-                            state.write().api_key_draft.clear();
-                            state.write().api_key_dialog_open = false;
+                            ui_state.write().api_key_draft.clear();
+                            ui_state.write().api_key_dialog_open = false;
                         },
                         "Cancel"
                     }
                     Button {
                         onclick: move |_| {
-                            state.write().api_key_dialog_open = false;
+                            ui_state.write().api_key_dialog_open = false;
                         },
                         "Save"
                     }
@@ -151,9 +173,9 @@ pub fn AppLayout() -> Element {
 
 #[component]
 pub fn Home() -> Element {
-    let state = use_context::<Signal<AppState>>();
+    let thread_state = use_context::<Signal<ThreadState>>();
     let navigator = use_navigator();
-    let first = state.read().threads.first().map(|t| t.id.clone());
+    let first = thread_state.read().threads.first().map(|t| t.id.clone());
 
     use_effect(move || {
         if let Some(id) = first.clone() {
@@ -166,28 +188,33 @@ pub fn Home() -> Element {
 
 #[component]
 pub fn ThreadView(id: String) -> Element {
-    let mut state = use_context::<Signal<AppState>>();
+    let mut thread_state = use_context::<Signal<ThreadState>>();
     let id_clone = id.clone();
     use_effect(move || {
-        let mut s = state.write();
-        s.active_thread_id = Some(id_clone.clone());
-        s.show_kanban = false;
+        let current = thread_state.read().active_thread_id.clone();
+        if current.as_deref() != Some(&id_clone) || thread_state.read().show_kanban {
+            let mut s = thread_state.write();
+            s.active_thread_id = Some(id_clone.clone());
+            s.show_kanban = false;
+        }
     });
     rsx! { div {} }
 }
 
 #[component]
 pub fn Board() -> Element {
-    let mut state = use_context::<Signal<AppState>>();
+    let mut thread_state = use_context::<Signal<ThreadState>>();
     use_effect(move || {
-        state.write().show_kanban = true;
+        if !thread_state.read().show_kanban {
+            thread_state.write().show_kanban = true;
+        }
     });
     rsx! { div {} }
 }
 
 #[component]
 pub fn Settings() -> Element {
-    let mut state = use_context::<Signal<AppState>>();
+    let mut ui_state = use_context::<Signal<UiState>>();
 
     rsx! {
         div { class: "h-full overflow-auto p-4",
@@ -198,7 +225,7 @@ pub fn Settings() -> Element {
                 }
                 button {
                     class: "rounded-sm border border-border px-3 py-2 text-xs",
-                    onclick: move |_| state.write().settings_open = true,
+                    onclick: move |_| ui_state.write().settings_open = true,
                     "Open Settings Dialog"
                 }
             }

@@ -2,12 +2,13 @@ use dioxus::prelude::*;
 use dioxus_free_icons::icons::ld_icons::{LdCircleDot, LdGitBranch};
 use dioxus_free_icons::Icon;
 
-use crate::lib::{AppState, SubagentStatus, ThreadStatus, UiThread};
+use crate::lib::{SubagentState, SubagentStatus, ThreadState, ThreadStatus, UiThread};
 use crate::routes::Route;
 
 #[component]
 pub fn KanbanView() -> Element {
-    let state = use_context::<Signal<AppState>>();
+    let thread_state = use_context::<Signal<ThreadState>>();
+    let subagent_state = use_context::<Signal<SubagentState>>();
     let show_subagents = use_signal(|| true);
 
     let mut pending = vec![];
@@ -15,7 +16,7 @@ pub fn KanbanView() -> Element {
     let mut blocked = vec![];
     let mut done = vec![];
 
-    for thread in state.read().threads.clone() {
+    for thread in thread_state.read().threads.clone() {
         match thread.status {
             ThreadStatus::Idle => pending.push(thread),
             ThreadStatus::Busy => progress.push(thread),
@@ -23,6 +24,13 @@ pub fn KanbanView() -> Element {
             ThreadStatus::Done => done.push(thread),
         }
     }
+
+    let tid = thread_state
+        .read()
+        .active_thread_id
+        .clone()
+        .unwrap_or_default();
+    let agents = subagent_state.read().subagents_for(&tid);
 
     rsx! {
         div { class: "flex h-full min-h-0 flex-col",
@@ -37,8 +45,8 @@ pub fn KanbanView() -> Element {
                 div { class: "border-t border-border px-3 py-2",
                     div { class: "mb-2 text-[10px] font-semibold text-muted-foreground", "SUBAGENTS" }
                     div { class: "grid grid-cols-2 gap-2",
-                        for agent in state.read().subagents_for_active() {
-                            SubagentKanbanCard { agent }
+                        for agent in agents {
+                            SubagentKanbanCard { key: "{agent.id}", agent }
                         }
                     }
                 }
@@ -49,8 +57,8 @@ pub fn KanbanView() -> Element {
 
 #[component]
 pub fn KanbanHeader(show_subagents: Signal<bool>) -> Element {
-    let state = use_context::<Signal<AppState>>();
-    let active = state
+    let thread_state = use_context::<Signal<ThreadState>>();
+    let active = thread_state
         .read()
         .threads
         .iter()
@@ -87,7 +95,7 @@ pub fn KanbanColumn(title: String, tone: String, threads: Vec<UiThread>) -> Elem
             }
             div { class: "space-y-2 p-2",
                 for thread in threads {
-                    KanbanCard { thread }
+                    KanbanCard { key: "{thread.id}", thread }
                 }
             }
         }

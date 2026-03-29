@@ -639,310 +639,354 @@ pub enum Theme {
     Light,
 }
 
-pub struct AppState {
-    pub theme: Theme,
+#[derive(Clone, PartialEq)]
+pub struct ThreadState {
     pub threads: Vec<UiThread>,
     pub active_thread_id: Option<String>,
-    pub messages: HashMap<String, Vec<UiMessage>>,
-    pub todos: HashMap<String, Vec<Todo>>,
-    pub files: HashMap<String, Vec<FileInfo>>,
-    pub workspace_files: HashMap<String, Vec<FileInfo>>,
-    pub subagents: HashMap<String, Vec<Subagent>>,
-    pub providers: Vec<Provider>,
-    pub models: Vec<ModelConfig>,
-    pub selected_model: String,
-    pub open_tabs: Vec<String>,
-    pub active_tab: String,
     pub show_kanban: bool,
-    pub workspace_path: String,
-    pub is_streaming: bool,
-    pub stream_buffer: String,
-    pub tool_calls: HashMap<String, Vec<ToolCall>>,
-    pub tool_results: HashMap<String, Vec<ToolResult>>,
-    pub input_draft: String,
-    pub settings_open: bool,
-    pub api_key_dialog_open: bool,
-    pub api_key_provider: ProviderId,
-    pub api_key_draft: String,
-    pub error: Option<String>,
-    pub pending_hitl: Option<HITLRequest>,
 }
 
-impl AppState {
-    pub fn bootstrap(provider: Rc<dyn DataProvider>) -> Self {
-        let threads = provider.list_threads();
-        let active_thread_id = threads.first().map(|t| t.id.clone());
-
-        let mut messages = HashMap::new();
-        let mut todos = HashMap::new();
-        let mut files = HashMap::new();
-        let mut subagents = HashMap::new();
-
-        let mut tool_calls = HashMap::new();
-        let mut tool_results = HashMap::new();
-        for thread in &threads {
-            messages.insert(thread.id.clone(), provider.get_thread_messages(&thread.id));
-            todos.insert(thread.id.clone(), provider.list_todos(&thread.id));
-            files.insert(thread.id.clone(), provider.list_workspace_files(&thread.id));
-            subagents.insert(thread.id.clone(), provider.list_subagents(&thread.id));
-            tool_calls.insert(
-                thread.id.clone(),
-                provider.get_thread_tool_calls(&thread.id),
-            );
-            tool_results.insert(
-                thread.id.clone(),
-                provider.get_thread_tool_results(&thread.id),
-            );
-        }
-
-        let models = provider.list_models();
-        let selected_model = models
-            .first()
-            .map(|m| m.id.clone())
-            .unwrap_or_else(|| "gpt-5".to_string());
-
-        #[cfg(target_arch = "wasm32")]
-        let initial_theme = {
-            let search = web_sys::window()
-                .and_then(|w| w.location().search().ok())
-                .unwrap_or_default();
-            if search.contains("theme=light") {
-                Theme::Light
-            } else {
-                Theme::Dark
-            }
-        };
-        #[cfg(not(target_arch = "wasm32"))]
-        let initial_theme = Theme::Dark;
-
-        Self {
-            theme: initial_theme,
-            threads,
-            active_thread_id,
-            messages,
-            todos,
-            files,
-            workspace_files: {
-                let mut wf = HashMap::new();
-                wf.insert(
-                    "test".to_string(),
-                    vec![
-                        FileInfo {
-                            path: "public".to_string(),
-                            is_dir: true,
-                            size: None,
-                        },
-                        FileInfo {
-                            path: "public/app.js".to_string(),
-                            is_dir: false,
-                            size: Some(2_600),
-                        },
-                        FileInfo {
-                            path: "public/index.html".to_string(),
-                            is_dir: false,
-                            size: Some(6_900),
-                        },
-                        FileInfo {
-                            path: "public/styles.css".to_string(),
-                            is_dir: false,
-                            size: Some(3_400),
-                        },
-                        FileInfo {
-                            path: "scripts".to_string(),
-                            is_dir: true,
-                            size: None,
-                        },
-                        FileInfo {
-                            path: "scripts/flush_todos.js".to_string(),
-                            is_dir: false,
-                            size: Some(381),
-                        },
-                        FileInfo {
-                            path: "server".to_string(),
-                            is_dir: true,
-                            size: None,
-                        },
-                        FileInfo {
-                            path: "server/server.js".to_string(),
-                            is_dir: false,
-                            size: Some(850),
-                        },
-                        FileInfo {
-                            path: "server/todos.json".to_string(),
-                            is_dir: false,
-                            size: Some(314),
-                        },
-                    ],
-                );
-                wf.insert(
-                    "omni".to_string(),
-                    vec![
-                        FileInfo {
-                            path: "src".to_string(),
-                            is_dir: true,
-                            size: None,
-                        },
-                        FileInfo {
-                            path: "src/main.rs".to_string(),
-                            is_dir: false,
-                            size: Some(9_612),
-                        },
-                        FileInfo {
-                            path: "src/components".to_string(),
-                            is_dir: true,
-                            size: None,
-                        },
-                        FileInfo {
-                            path: "src/components/chat/mod.rs".to_string(),
-                            is_dir: false,
-                            size: Some(14_020),
-                        },
-                        FileInfo {
-                            path: "src/components/sidebar/mod.rs".to_string(),
-                            is_dir: false,
-                            size: Some(3_400),
-                        },
-                        FileInfo {
-                            path: "src/lib".to_string(),
-                            is_dir: true,
-                            size: None,
-                        },
-                        FileInfo {
-                            path: "src/lib/mod.rs".to_string(),
-                            is_dir: false,
-                            size: Some(7_903),
-                        },
-                        FileInfo {
-                            path: "Cargo.toml".to_string(),
-                            is_dir: false,
-                            size: Some(1_200),
-                        },
-                        FileInfo {
-                            path: "README.md".to_string(),
-                            is_dir: false,
-                            size: Some(4_089),
-                        },
-                    ],
-                );
-                wf.insert(
-                    "omni-rt".to_string(),
-                    vec![
-                        FileInfo {
-                            path: "crates".to_string(),
-                            is_dir: true,
-                            size: None,
-                        },
-                        FileInfo {
-                            path: "crates/omni-protocol".to_string(),
-                            is_dir: true,
-                            size: None,
-                        },
-                        FileInfo {
-                            path: "crates/omni-protocol/src/lib.rs".to_string(),
-                            is_dir: false,
-                            size: Some(5_120),
-                        },
-                        FileInfo {
-                            path: "crates/omni-rt".to_string(),
-                            is_dir: true,
-                            size: None,
-                        },
-                        FileInfo {
-                            path: "crates/omni-rt/src/main.rs".to_string(),
-                            is_dir: false,
-                            size: Some(3_800),
-                        },
-                        FileInfo {
-                            path: "crates/omni-dock".to_string(),
-                            is_dir: true,
-                            size: None,
-                        },
-                        FileInfo {
-                            path: "crates/omni-dock/src/omni-dock.ts".to_string(),
-                            is_dir: false,
-                            size: Some(8_200),
-                        },
-                        FileInfo {
-                            path: "Cargo.toml".to_string(),
-                            is_dir: false,
-                            size: Some(980),
-                        },
-                    ],
-                );
-                wf
-            },
-            subagents,
-            providers: provider.list_providers(),
-            models,
-            selected_model,
-            open_tabs: vec![],
-            active_tab: "chat".to_string(),
-            show_kanban: false,
-            workspace_path: "test".to_string(),
-            is_streaming: false,
-            stream_buffer: String::new(),
-            tool_calls,
-            tool_results,
-            input_draft: String::new(),
-            settings_open: false,
-            api_key_dialog_open: false,
-            api_key_provider: ProviderId::Anthropic,
-            api_key_draft: String::new(),
-            error: None,
-            pending_hitl: None,
-        }
-    }
-
+impl ThreadState {
     pub fn current_thread_id(&self) -> Option<&str> {
         self.active_thread_id.as_deref()
     }
+}
 
-    pub fn messages_for_active(&self) -> Vec<UiMessage> {
-        self.current_thread_id()
-            .and_then(|id| self.messages.get(id))
+#[derive(Clone, PartialEq)]
+pub struct ChatState {
+    pub messages: HashMap<String, Vec<UiMessage>>,
+    pub input_draft: String,
+    pub is_streaming: bool,
+    pub stream_buffer: String,
+    pub error: Option<String>,
+}
+
+impl ChatState {
+    pub fn messages_for(&self, thread_id: &str) -> Vec<UiMessage> {
+        self.messages.get(thread_id).cloned().unwrap_or_default()
+    }
+}
+
+#[derive(Clone, PartialEq)]
+pub struct TasksState {
+    pub todos: HashMap<String, Vec<Todo>>,
+    pub files: HashMap<String, Vec<FileInfo>>,
+    pub tool_calls: HashMap<String, Vec<ToolCall>>,
+    pub tool_results: HashMap<String, Vec<ToolResult>>,
+}
+
+impl TasksState {
+    pub fn todos_for(&self, thread_id: &str) -> Vec<Todo> {
+        self.todos.get(thread_id).cloned().unwrap_or_default()
+    }
+
+    pub fn files_for(&self, thread_id: &str) -> Vec<FileInfo> {
+        self.files.get(thread_id).cloned().unwrap_or_default()
+    }
+
+    pub fn tool_calls_for(&self, thread_id: &str) -> Vec<ToolCall> {
+        self.tool_calls.get(thread_id).cloned().unwrap_or_default()
+    }
+
+    pub fn tool_results_for(&self, thread_id: &str) -> Vec<ToolResult> {
+        self.tool_results
+            .get(thread_id)
             .cloned()
             .unwrap_or_default()
     }
+}
 
-    pub fn todos_for_active(&self) -> Vec<Todo> {
-        self.current_thread_id()
-            .and_then(|id| self.todos.get(id))
-            .cloned()
-            .unwrap_or_default()
-    }
+#[derive(Clone, PartialEq)]
+pub struct WorkspaceState {
+    pub workspace_path: String,
+    pub workspace_files: HashMap<String, Vec<FileInfo>>,
+    pub open_tabs: Vec<String>,
+    pub active_tab: String,
+}
 
-    pub fn files_for_active(&self) -> Vec<FileInfo> {
-        self.current_thread_id()
-            .and_then(|id| self.files.get(id))
-            .cloned()
-            .unwrap_or_default()
-    }
-
+impl WorkspaceState {
     pub fn files_for_workspace(&self) -> Vec<FileInfo> {
         self.workspace_files
             .get(&self.workspace_path)
             .cloned()
             .unwrap_or_default()
     }
+}
 
-    pub fn subagents_for_active(&self) -> Vec<Subagent> {
-        self.current_thread_id()
-            .and_then(|id| self.subagents.get(id))
-            .cloned()
-            .unwrap_or_default()
+#[derive(Clone, PartialEq)]
+pub struct ModelState {
+    pub providers: Vec<Provider>,
+    pub models: Vec<ModelConfig>,
+    pub selected_model: String,
+}
+
+#[derive(Clone, PartialEq)]
+pub struct UiState {
+    pub theme: Theme,
+    pub settings_open: bool,
+    pub api_key_dialog_open: bool,
+    pub api_key_provider: ProviderId,
+    pub api_key_draft: String,
+}
+
+#[derive(Clone, PartialEq)]
+pub struct SubagentState {
+    pub subagents: HashMap<String, Vec<Subagent>>,
+    pub pending_hitl: Option<HITLRequest>,
+}
+
+impl SubagentState {
+    pub fn subagents_for(&self, thread_id: &str) -> Vec<Subagent> {
+        self.subagents.get(thread_id).cloned().unwrap_or_default()
+    }
+}
+
+pub fn bootstrap(
+    provider: Rc<dyn DataProvider>,
+) -> (
+    ThreadState,
+    ChatState,
+    TasksState,
+    WorkspaceState,
+    ModelState,
+    UiState,
+    SubagentState,
+) {
+    let threads = provider.list_threads();
+    let active_thread_id = threads.first().map(|t| t.id.clone());
+
+    let mut messages = HashMap::new();
+    let mut todos = HashMap::new();
+    let mut files = HashMap::new();
+    let mut subagents = HashMap::new();
+    let mut tool_calls = HashMap::new();
+    let mut tool_results = HashMap::new();
+
+    for thread in &threads {
+        messages.insert(thread.id.clone(), provider.get_thread_messages(&thread.id));
+        todos.insert(thread.id.clone(), provider.list_todos(&thread.id));
+        files.insert(thread.id.clone(), provider.list_workspace_files(&thread.id));
+        subagents.insert(thread.id.clone(), provider.list_subagents(&thread.id));
+        tool_calls.insert(
+            thread.id.clone(),
+            provider.get_thread_tool_calls(&thread.id),
+        );
+        tool_results.insert(
+            thread.id.clone(),
+            provider.get_thread_tool_results(&thread.id),
+        );
     }
 
-    pub fn tool_calls_for_active(&self) -> Vec<ToolCall> {
-        self.current_thread_id()
-            .and_then(|id| self.tool_calls.get(id))
-            .cloned()
-            .unwrap_or_default()
-    }
+    let models = provider.list_models();
+    let selected_model = models
+        .first()
+        .map(|m| m.id.clone())
+        .unwrap_or_else(|| "gpt-5".to_string());
 
-    pub fn tool_results_for_active(&self) -> Vec<ToolResult> {
-        self.current_thread_id()
-            .and_then(|id| self.tool_results.get(id))
-            .cloned()
-            .unwrap_or_default()
-    }
+    #[cfg(target_arch = "wasm32")]
+    let initial_theme = {
+        let search = web_sys::window()
+            .and_then(|w| w.location().search().ok())
+            .unwrap_or_default();
+        if search.contains("theme=light") {
+            Theme::Light
+        } else {
+            Theme::Dark
+        }
+    };
+    #[cfg(not(target_arch = "wasm32"))]
+    let initial_theme = Theme::Dark;
+
+    let workspace_files = {
+        let mut wf = HashMap::new();
+        wf.insert(
+            "test".to_string(),
+            vec![
+                FileInfo {
+                    path: "public".to_string(),
+                    is_dir: true,
+                    size: None,
+                },
+                FileInfo {
+                    path: "public/app.js".to_string(),
+                    is_dir: false,
+                    size: Some(2_600),
+                },
+                FileInfo {
+                    path: "public/index.html".to_string(),
+                    is_dir: false,
+                    size: Some(6_900),
+                },
+                FileInfo {
+                    path: "public/styles.css".to_string(),
+                    is_dir: false,
+                    size: Some(3_400),
+                },
+                FileInfo {
+                    path: "scripts".to_string(),
+                    is_dir: true,
+                    size: None,
+                },
+                FileInfo {
+                    path: "scripts/flush_todos.js".to_string(),
+                    is_dir: false,
+                    size: Some(381),
+                },
+                FileInfo {
+                    path: "server".to_string(),
+                    is_dir: true,
+                    size: None,
+                },
+                FileInfo {
+                    path: "server/server.js".to_string(),
+                    is_dir: false,
+                    size: Some(850),
+                },
+                FileInfo {
+                    path: "server/todos.json".to_string(),
+                    is_dir: false,
+                    size: Some(314),
+                },
+            ],
+        );
+        wf.insert(
+            "omni".to_string(),
+            vec![
+                FileInfo {
+                    path: "src".to_string(),
+                    is_dir: true,
+                    size: None,
+                },
+                FileInfo {
+                    path: "src/main.rs".to_string(),
+                    is_dir: false,
+                    size: Some(9_612),
+                },
+                FileInfo {
+                    path: "src/components".to_string(),
+                    is_dir: true,
+                    size: None,
+                },
+                FileInfo {
+                    path: "src/components/chat/mod.rs".to_string(),
+                    is_dir: false,
+                    size: Some(14_020),
+                },
+                FileInfo {
+                    path: "src/components/sidebar/mod.rs".to_string(),
+                    is_dir: false,
+                    size: Some(3_400),
+                },
+                FileInfo {
+                    path: "src/lib".to_string(),
+                    is_dir: true,
+                    size: None,
+                },
+                FileInfo {
+                    path: "src/lib/mod.rs".to_string(),
+                    is_dir: false,
+                    size: Some(7_903),
+                },
+                FileInfo {
+                    path: "Cargo.toml".to_string(),
+                    is_dir: false,
+                    size: Some(1_200),
+                },
+                FileInfo {
+                    path: "README.md".to_string(),
+                    is_dir: false,
+                    size: Some(4_089),
+                },
+            ],
+        );
+        wf.insert(
+            "omni-rt".to_string(),
+            vec![
+                FileInfo {
+                    path: "crates".to_string(),
+                    is_dir: true,
+                    size: None,
+                },
+                FileInfo {
+                    path: "crates/omni-protocol".to_string(),
+                    is_dir: true,
+                    size: None,
+                },
+                FileInfo {
+                    path: "crates/omni-protocol/src/lib.rs".to_string(),
+                    is_dir: false,
+                    size: Some(5_120),
+                },
+                FileInfo {
+                    path: "crates/omni-rt".to_string(),
+                    is_dir: true,
+                    size: None,
+                },
+                FileInfo {
+                    path: "crates/omni-rt/src/main.rs".to_string(),
+                    is_dir: false,
+                    size: Some(3_800),
+                },
+                FileInfo {
+                    path: "crates/omni-dock".to_string(),
+                    is_dir: true,
+                    size: None,
+                },
+                FileInfo {
+                    path: "crates/omni-dock/src/omni-dock.ts".to_string(),
+                    is_dir: false,
+                    size: Some(8_200),
+                },
+                FileInfo {
+                    path: "Cargo.toml".to_string(),
+                    is_dir: false,
+                    size: Some(980),
+                },
+            ],
+        );
+        wf
+    };
+
+    (
+        ThreadState {
+            threads,
+            active_thread_id,
+            show_kanban: false,
+        },
+        ChatState {
+            messages,
+            input_draft: String::new(),
+            is_streaming: false,
+            stream_buffer: String::new(),
+            error: None,
+        },
+        TasksState {
+            todos,
+            files,
+            tool_calls,
+            tool_results,
+        },
+        WorkspaceState {
+            workspace_path: "test".to_string(),
+            workspace_files,
+            open_tabs: vec![],
+            active_tab: "chat".to_string(),
+        },
+        ModelState {
+            providers: provider.list_providers(),
+            models,
+            selected_model,
+        },
+        UiState {
+            theme: initial_theme,
+            settings_open: false,
+            api_key_dialog_open: false,
+            api_key_provider: ProviderId::Anthropic,
+            api_key_draft: String::new(),
+        },
+        SubagentState {
+            subagents,
+            pending_hitl: None,
+        },
+    )
 }

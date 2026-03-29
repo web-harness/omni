@@ -9,7 +9,10 @@ use futures_util::StreamExt;
 
 use crate::components::ui::{Badge, BadgeVariant, Popover};
 use crate::lib::thread_context::apply_stream_event;
-use crate::lib::{AppState, DataProvider, Role, ToolCall, ToolResult};
+use crate::lib::{
+    ChatState, DataProvider, ModelState, Role, TasksState, ThreadState, ToolCall, ToolResult,
+    UiState, WorkspaceState,
+};
 
 #[derive(Clone)]
 struct StreamRequest {
@@ -20,27 +23,42 @@ struct StreamRequest {
 
 #[component]
 pub fn ChatContainer(thread_id: String) -> Element {
-    let state = use_context::<Signal<AppState>>();
+    let thread_state = use_context::<Signal<ThreadState>>();
+    let mut chat_state = use_context::<Signal<ChatState>>();
+    let mut tasks_state = use_context::<Signal<TasksState>>();
     let provider = use_context::<Rc<dyn DataProvider>>();
 
     let stream = use_coroutine(move |mut rx: UnboundedReceiver<StreamRequest>| {
         let provider = provider.clone();
-        let mut state = state;
         async move {
             while let Some(req) = rx.next().await {
-                state.write().is_streaming = true;
+                chat_state.write().is_streaming = true;
                 let mut events =
                     provider.stream_response(&req.thread_id, &req.input, &req.model_id);
                 while let Some(event) = events.next().await {
-                    apply_stream_event(&mut state.write(), event);
+                    let active_tid = thread_state.read().active_thread_id.clone();
+                    apply_stream_event(
+                        active_tid.as_deref(),
+                        &mut chat_state.write(),
+                        &mut tasks_state.write(),
+                        event,
+                    );
                 }
             }
         }
     });
 
-    let messages = state.read().messages_for_active();
-    let tool_calls = state.read().tool_calls_for_active();
-    let tool_results = state.read().tool_results_for_active();
+    let chat_state = use_context::<Signal<ChatState>>();
+    let tasks_state = use_context::<Signal<TasksState>>();
+    let thread_state = use_context::<Signal<ThreadState>>();
+    let tid = thread_state
+        .read()
+        .active_thread_id
+        .clone()
+        .unwrap_or_default();
+    let messages = chat_state.read().messages_for(&tid);
+    let tool_calls = tasks_state.read().tool_calls_for(&tid);
+    let tool_results = tasks_state.read().tool_results_for(&tid);
 
     rsx! {
         div { class: "flex h-full flex-col",
@@ -53,21 +71,21 @@ pub fn ChatContainer(thread_id: String) -> Element {
                         }
                     }
                     for msg in &messages {
-                        MessageBubble { message: msg.clone() }
+                        MessageBubble { key: "{msg.id}", message: msg.clone() }
                     }
                     for call in tool_calls {
                         {
                             let result = tool_results.iter().find(|r| r.tool_call_id == call.id).cloned();
-                            rsx! { ToolCallRenderer { call, result } }
+                            rsx! { ToolCallRenderer { key: "{call.id}", call, result } }
                         }
                     }
-                    if state.read().is_streaming {
+                    if chat_state.read().is_streaming {
                         div { class: "rounded-sm border border-border bg-background p-3 text-[11px]",
                             div { class: "mb-1 text-muted-foreground", "Agent is working..." }
-                            pre { class: "whitespace-pre-wrap", "{state.read().stream_buffer}" }
+                            pre { class: "whitespace-pre-wrap", "{chat_state.read().stream_buffer}" }
                         }
                     }
-                    if let Some(err) = state.read().error.clone() {
+                    if let Some(err) = chat_state.read().error.clone() {
                         div { class: "rounded-sm border border-status-critical bg-status-critical/10 p-2 text-[11px] text-status-critical", "{err}" }
                     }
                 }
@@ -267,7 +285,9 @@ fn GenericToolCallRenderer(call: ToolCall, result: Option<ToolResult>) -> Elemen
 
 #[component]
 fn ChatInput(thread_id: String, stream: Coroutine<StreamRequest>) -> Element {
-    let mut state = use_context::<Signal<AppState>>();
+    let mut chat_state = use_context::<Signal<ChatState>>();
+    let thread_state = use_context::<Signal<ThreadState>>();
+    let model_state = use_context::<Signal<ModelState>>();
 
     rsx! {
         div { class: "border-t border-border px-4 py-3",
@@ -276,18 +296,18 @@ fn ChatInput(thread_id: String, stream: Coroutine<StreamRequest>) -> Element {
                     input {
                         class: "flex-1 bg-transparent text-[12px] outline-none placeholder:text-muted-foreground",
                         placeholder: "Message...",
-                        value: "{state.read().input_draft}",
-                        oninput: move |evt: Event<FormData>| state.write().input_draft = evt.value(),
+                        value: "{chat_state.read().input_draft}",
+                        oninput: move |evt: Event<FormData>| chat_state.write().input_draft = evt.value(),
                         onkeydown: {
                             let thread_id = thread_id.clone();
                             move |evt: Event<KeyboardData>| {
                                 if evt.key() == Key::Enter && !evt.modifiers().contains(Modifiers::SHIFT) {
-                                    let input = state.read().input_draft.trim().to_string();
+                                    let input = chat_state.read().input_draft.trim().to_string();
                                     if input.is_empty() { return; }
-                                    let active_id = state.read().active_thread_id.clone();
+                                    let active_id = thread_state.read().active_thread_id.clone();
                                     if let Some(active_id) = active_id {
                                         {
-                                            let mut write = state.write();
+                                            let mut write = chat_state.write();
                                             let msg_count = write.messages.get(&active_id).map(|v| v.len()).unwrap_or(0);
                                             write.messages.entry(active_id.clone()).or_default().push(crate::lib::UiMessage {
                                                 id: format!("u-{}", msg_count + 1),
@@ -297,7 +317,7 @@ fn ChatInput(thread_id: String, stream: Coroutine<StreamRequest>) -> Element {
                                             write.input_draft.clear();
                                             write.stream_buffer.clear();
                                         }
-                                        stream.send(StreamRequest { thread_id: thread_id.clone(), input, model_id: state.read().selected_model.clone() });
+                                        stream.send(StreamRequest { thread_id: thread_id.clone(), input, model_id: model_state.read().selected_model.clone() });
                                     }
                                 }
                             }
@@ -305,14 +325,14 @@ fn ChatInput(thread_id: String, stream: Coroutine<StreamRequest>) -> Element {
                     }
                     button {
                         class: "shrink-0 rounded bg-primary p-1.5 text-primary-foreground hover:opacity-90 disabled:opacity-50",
-                        disabled: state.read().input_draft.trim().is_empty() || state.read().is_streaming,
+                        disabled: chat_state.read().input_draft.trim().is_empty() || chat_state.read().is_streaming,
                         onclick: move |_| {
-                            let input = state.read().input_draft.trim().to_string();
+                            let input = chat_state.read().input_draft.trim().to_string();
                             if input.is_empty() { return; }
-                            let active_id = state.read().active_thread_id.clone();
+                            let active_id = thread_state.read().active_thread_id.clone();
                             if let Some(active_id) = active_id {
                                 {
-                                    let mut write = state.write();
+                                    let mut write = chat_state.write();
                                     let msg_count = write.messages.get(&active_id).map(|v| v.len()).unwrap_or(0);
                                     write.messages.entry(active_id.clone()).or_default().push(crate::lib::UiMessage {
                                         id: format!("u-{}", msg_count + 1),
@@ -322,7 +342,7 @@ fn ChatInput(thread_id: String, stream: Coroutine<StreamRequest>) -> Element {
                                     write.input_draft.clear();
                                     write.stream_buffer.clear();
                                 }
-                                stream.send(StreamRequest { thread_id: thread_id.clone(), input, model_id: state.read().selected_model.clone() });
+                                stream.send(StreamRequest { thread_id: thread_id.clone(), input, model_id: model_state.read().selected_model.clone() });
                             }
                         },
                         Icon { width: 13, height: 13, icon: LdSend }
@@ -342,13 +362,14 @@ fn ChatInput(thread_id: String, stream: Coroutine<StreamRequest>) -> Element {
 
 #[component]
 pub fn ModelSwitcher() -> Element {
-    let mut state = use_context::<Signal<AppState>>();
+    let mut model_state = use_context::<Signal<ModelState>>();
+    let mut ui_state = use_context::<Signal<UiState>>();
     let mut open = use_signal(|| false);
     let mut selected_provider = use_signal(|| crate::lib::ProviderId::Anthropic);
 
-    let providers = state.read().providers.clone();
-    let models = state.read().models.clone();
-    let selected_model = state.read().selected_model.clone();
+    let providers = model_state.read().providers.clone();
+    let models = model_state.read().models.clone();
+    let selected_model = model_state.read().selected_model.clone();
 
     let filtered_models: Vec<_> = models
         .iter()
@@ -381,6 +402,7 @@ pub fn ModelSwitcher() -> Element {
                             let pid = p.id.clone();
                             rsx! {
                                 button {
+                                    key: "{p.name}",
                                     class: "{btn_class}",
                                     onclick: move |_| selected_provider.set(pid.clone()),
                                     div { class: "h-1.5 w-1.5 rounded-full {dot_class} shrink-0" }
@@ -392,8 +414,8 @@ pub fn ModelSwitcher() -> Element {
                     button {
                         class: "mt-1 w-full rounded-sm border border-border px-2 py-1 text-left text-[10px] text-muted-foreground hover:bg-background-interactive",
                         onclick: move |_| {
-                            state.write().api_key_provider = selected_provider();
-                            state.write().api_key_dialog_open = true;
+                            ui_state.write().api_key_provider = selected_provider();
+                            ui_state.write().api_key_dialog_open = true;
                             open.set(false);
                         },
                         "API Keys"
@@ -410,9 +432,10 @@ pub fn ModelSwitcher() -> Element {
                             let mid = model.id.clone();
                             rsx! {
                                 button {
+                                    key: "{model.id}",
                                     class: "{btn_class}",
                                     onclick: move |_| {
-                                        state.write().selected_model = mid.clone();
+                                        model_state.write().selected_model = mid.clone();
                                         open.set(false);
                                     },
                                     "{model.name}"
@@ -428,7 +451,7 @@ pub fn ModelSwitcher() -> Element {
 
 #[component]
 pub fn WorkspacePicker() -> Element {
-    let mut state = use_context::<Signal<AppState>>();
+    let mut workspace_state = use_context::<Signal<WorkspaceState>>();
     let mut open = use_signal(|| false);
     let presets = vec![
         ("test", "/home/user/projects/test"),
@@ -445,7 +468,7 @@ pub fn WorkspacePicker() -> Element {
                     class: "flex items-center gap-1 rounded-sm border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-background-interactive",
                     onclick: move |_| open.set(!open()),
                     Icon { width: 10, height: 10, icon: LdFolder }
-                    span { class: "max-w-[160px] truncate", "{state.read().workspace_path}" }
+                    span { class: "max-w-[160px] truncate", "{workspace_state.read().workspace_path}" }
                     Icon { width: 10, height: 10, icon: LdChevronDown }
                 }
             },
@@ -453,7 +476,7 @@ pub fn WorkspacePicker() -> Element {
                 div { class: "px-2 pb-1 text-[9px] font-semibold uppercase tracking-widest text-muted-foreground", "Select Workspace" }
                 for (name, path) in presets {
                     {
-                        let active = state.read().workspace_path == name;
+                        let active = workspace_state.read().workspace_path == name;
                         let btn_class = if active {
                             "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left bg-primary/10 text-primary"
                         } else {
@@ -461,9 +484,10 @@ pub fn WorkspacePicker() -> Element {
                         };
                         rsx! {
                             button {
+                                key: "{name}",
                                 class: "{btn_class}",
                                 onclick: move |_| {
-                                    state.write().workspace_path = name.to_string();
+                                    workspace_state.write().workspace_path = name.to_string();
                                     open.set(false);
                                 },
                                 Icon { width: 12, height: 12, icon: LdFolder, class: "shrink-0" }

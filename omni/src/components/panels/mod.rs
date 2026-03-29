@@ -7,7 +7,9 @@ use dioxus_free_icons::Icon;
 
 use crate::components::ui::{Badge, BadgeVariant};
 use crate::lib::utils::fmt_size;
-use crate::lib::{AppState, FileInfo, SubagentStatus, TodoStatus};
+use crate::lib::{
+    FileInfo, SubagentState, SubagentStatus, TasksState, ThreadState, TodoStatus, WorkspaceState,
+};
 
 #[component]
 pub fn RightPanel() -> Element {
@@ -15,10 +17,18 @@ pub fn RightPanel() -> Element {
     let mut files_open = use_signal(|| true);
     let mut agents_open = use_signal(|| true);
 
-    let state = use_context::<Signal<AppState>>();
-    let todos = state.read().todos_for_active();
-    let files = state.read().files_for_active();
-    let agents = state.read().subagents_for_active();
+    let thread_state = use_context::<Signal<ThreadState>>();
+    let tasks_state = use_context::<Signal<TasksState>>();
+    let subagent_state = use_context::<Signal<SubagentState>>();
+    let tid = thread_state
+        .read()
+        .active_thread_id
+        .clone()
+        .unwrap_or_default();
+
+    let todos = tasks_state.read().todos_for(&tid);
+    let files = tasks_state.read().files_for(&tid);
+    let agents = subagent_state.read().subagents_for(&tid);
 
     let todo_count = todos.len();
     let file_count = files.iter().filter(|f| !f.is_dir).count();
@@ -28,7 +38,6 @@ pub fn RightPanel() -> Element {
         aside {
             class: "h-full w-full border-l border-border bg-sidebar flex flex-col overflow-auto text-[11px]",
 
-            // TASKS
             button {
                 class: "flex w-full items-center gap-2 px-3 py-2 text-section-header border-b border-border hover:bg-background-interactive",
                 onclick: move |_| tasks_open.set(!tasks_open()),
@@ -45,7 +54,6 @@ pub fn RightPanel() -> Element {
                 TasksSection {}
             }
 
-            // FILES
             button {
                 class: "flex w-full items-center gap-2 px-3 py-2 text-section-header border-b border-t border-border hover:bg-background-interactive",
                 onclick: move |_| files_open.set(!files_open()),
@@ -62,7 +70,6 @@ pub fn RightPanel() -> Element {
                 FilesSection {}
             }
 
-            // AGENTS
             button {
                 class: "flex w-full items-center gap-2 px-3 py-2 text-section-header border-b border-t border-border hover:bg-background-interactive",
                 onclick: move |_| agents_open.set(!agents_open()),
@@ -84,8 +91,14 @@ pub fn RightPanel() -> Element {
 
 #[component]
 pub fn TasksSection() -> Element {
-    let state = use_context::<Signal<AppState>>();
-    let todos = state.read().todos_for_active();
+    let thread_state = use_context::<Signal<ThreadState>>();
+    let tasks_state = use_context::<Signal<TasksState>>();
+    let tid = thread_state
+        .read()
+        .active_thread_id
+        .clone()
+        .unwrap_or_default();
+    let todos = tasks_state.read().todos_for(&tid);
     let total = todos.len();
     let done = todos
         .iter()
@@ -100,7 +113,7 @@ pub fn TasksSection() -> Element {
             }
             div { class: "py-1",
                 for todo in todos {
-                    div { class: "flex items-start gap-2 px-3 py-2 border-b border-border/50 hover:bg-background-interactive",
+                    div { key: "{todo.id}", class: "flex items-start gap-2 px-3 py-2 border-b border-border/50 hover:bg-background-interactive",
                         {
                             let (dot_class, ring_class) = match todo.status {
                                 TodoStatus::InProgress => ("bg-status-info", "border-status-info"),
@@ -130,9 +143,9 @@ pub fn TasksSection() -> Element {
 
 #[component]
 pub fn FilesSection() -> Element {
-    let mut state = use_context::<Signal<AppState>>();
-    let files = state.read().files_for_workspace();
-    let workspace = state.read().workspace_path.clone();
+    let mut workspace_state = use_context::<Signal<WorkspaceState>>();
+    let files = workspace_state.read().files_for_workspace();
+    let workspace = workspace_state.read().workspace_path.clone();
 
     rsx! {
         div { class: "overflow-auto",
@@ -146,10 +159,10 @@ pub fn FilesSection() -> Element {
             }
             div { class: "py-1",
                 for file in files {
-                    FileRow { file: file.clone(), on_open: move |path: String| {
-                        if !state.read().open_tabs.contains(&path) {
-                            state.write().open_tabs.push(path.clone());
-                            state.write().active_tab = path;
+                    FileRow { key: "{file.path}", file: file.clone(), on_open: move |path: String| {
+                        if !workspace_state.read().open_tabs.contains(&path) {
+                            workspace_state.write().open_tabs.push(path.clone());
+                            workspace_state.write().active_tab = path;
                         }
                     }}
                 }
@@ -214,13 +227,19 @@ fn FileRow(file: FileInfo, on_open: EventHandler<String>) -> Element {
 
 #[component]
 pub fn AgentsSection() -> Element {
-    let state = use_context::<Signal<AppState>>();
-    let subagents = state.read().subagents_for_active();
+    let thread_state = use_context::<Signal<ThreadState>>();
+    let subagent_state = use_context::<Signal<SubagentState>>();
+    let tid = thread_state
+        .read()
+        .active_thread_id
+        .clone()
+        .unwrap_or_default();
+    let subagents = subagent_state.read().subagents_for(&tid);
 
     rsx! {
         div { class: "overflow-auto py-1",
             for agent in subagents {
-                div { class: "px-3 py-2 border-b border-border/50",
+                div { key: "{agent.id}", class: "px-3 py-2 border-b border-border/50",
                     div { class: "flex items-center gap-2 mb-1",
                         Icon { width: 12, height: 12, icon: LdBot, class: "text-status-info shrink-0" }
                         span { class: "flex-1 text-[11px] font-semibold truncate", "{agent.name}" }

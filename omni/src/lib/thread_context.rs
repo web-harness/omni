@@ -1,46 +1,58 @@
-use crate::lib::{AppState, Role, StreamEvent, UiMessage};
+use crate::lib::{ChatState, Role, StreamEvent, TasksState, UiMessage};
 
-pub fn apply_stream_event(state: &mut AppState, event: StreamEvent) {
+pub fn apply_stream_event(
+    active_thread_id: Option<&str>,
+    chat: &mut ChatState,
+    tasks: &mut TasksState,
+    event: StreamEvent,
+) {
     match event {
         StreamEvent::Token(token) => {
-            state.stream_buffer.push_str(&token);
+            chat.stream_buffer.push_str(&token);
         }
         StreamEvent::ToolCall(call) => {
-            if let Some(thread_id) = state.current_thread_id().map(ToOwned::to_owned) {
-                state.tool_calls.entry(thread_id).or_default().push(call);
+            if let Some(thread_id) = active_thread_id {
+                tasks
+                    .tool_calls
+                    .entry(thread_id.to_owned())
+                    .or_default()
+                    .push(call);
             }
         }
         StreamEvent::ToolResult(result) => {
-            if let Some(thread_id) = state.current_thread_id().map(ToOwned::to_owned) {
-                state
+            if let Some(thread_id) = active_thread_id {
+                tasks
                     .tool_results
-                    .entry(thread_id)
+                    .entry(thread_id.to_owned())
                     .or_default()
                     .push(result);
             }
         }
         StreamEvent::Todos(todos) => {
-            if let Some(thread_id) = state.current_thread_id().map(ToOwned::to_owned) {
-                state.todos.insert(thread_id, todos);
+            if let Some(thread_id) = active_thread_id {
+                tasks.todos.insert(thread_id.to_owned(), todos);
             }
         }
         StreamEvent::Done => {
-            if let Some(thread_id) = state.current_thread_id().map(ToOwned::to_owned) {
-                if !state.stream_buffer.is_empty() {
+            if let Some(thread_id) = active_thread_id {
+                if !chat.stream_buffer.is_empty() {
                     let message = UiMessage {
-                        id: format!("asst-{}", state.messages_for_active().len()),
+                        id: format!("asst-{}", chat.messages_for(thread_id).len()),
                         role: Role::Assistant,
-                        content: state.stream_buffer.clone(),
+                        content: chat.stream_buffer.clone(),
                     };
-                    state.messages.entry(thread_id).or_default().push(message);
+                    chat.messages
+                        .entry(thread_id.to_owned())
+                        .or_default()
+                        .push(message);
                 }
             }
-            state.stream_buffer.clear();
-            state.is_streaming = false;
+            chat.stream_buffer.clear();
+            chat.is_streaming = false;
         }
         StreamEvent::Error(err) => {
-            state.error = Some(err);
-            state.is_streaming = false;
+            chat.error = Some(err);
+            chat.is_streaming = false;
         }
     }
 }

@@ -4,12 +4,13 @@ use dioxus_free_icons::icons::ld_icons::{
 };
 use dioxus_free_icons::Icon;
 
-use crate::lib::{AppState, Theme, ThreadStatus};
+use crate::lib::{Theme, ThreadState, ThreadStatus, UiState};
 use crate::routes::Route;
 
 #[component]
 pub fn ThreadSidebar() -> Element {
-    let mut state = use_context::<Signal<AppState>>();
+    let mut thread_state = use_context::<Signal<ThreadState>>();
+    let mut ui_state = use_context::<Signal<UiState>>();
     let navigator = use_navigator();
 
     rsx! {
@@ -19,14 +20,14 @@ pub fn ThreadSidebar() -> Element {
                 button {
                     class: "inline-flex w-full items-center justify-center gap-2 rounded-sm bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground",
                     onclick: move |_| {
-                        let new_id = format!("thread-{}", state.read().threads.len() + 1);
-                        state.write().threads.insert(0, crate::lib::UiThread {
+                        let new_id = format!("thread-{}", thread_state.read().threads.len() + 1);
+                        thread_state.write().threads.insert(0, crate::lib::UiThread {
                             id: new_id.clone(),
                             title: "New Thread".to_string(),
                             status: ThreadStatus::Idle,
                             updated_at: "now".to_string(),
                         });
-                        state.write().active_thread_id = Some(new_id.clone());
+                        thread_state.write().active_thread_id = Some(new_id.clone());
                         navigator.push(Route::ThreadView { id: new_id });
                     },
                     Icon { width: 14, height: 14, icon: LdPlus }
@@ -35,8 +36,8 @@ pub fn ThreadSidebar() -> Element {
             }
 
             div { class: "flex-1 overflow-auto p-2 space-y-1",
-                for thread in state.read().threads.clone() {
-                    ThreadRow { thread }
+                for thread in thread_state.read().threads.clone() {
+                    ThreadRow { key: "{thread.id}", thread }
                 }
             }
 
@@ -46,13 +47,13 @@ pub fn ThreadSidebar() -> Element {
                     class: "inline-flex items-center justify-center rounded-sm border border-border bg-background p-2 text-muted-foreground hover:text-foreground",
                     title: "Toggle theme",
                     onclick: move |_| {
-                        let next = match state.read().theme {
+                        let next = match ui_state.read().theme {
                             Theme::Dark => Theme::Light,
                             Theme::Light => Theme::Dark,
                         };
-                        state.write().theme = next;
+                        ui_state.write().theme = next;
                     },
-                    if state.read().theme == Theme::Dark {
+                    if ui_state.read().theme == Theme::Dark {
                         Icon { width: 14, height: 14, icon: LdSun }
                     } else {
                         Icon { width: 14, height: 14, icon: LdMoon }
@@ -61,7 +62,7 @@ pub fn ThreadSidebar() -> Element {
                 button {
                     class: "inline-flex flex-1 items-center justify-center gap-2 rounded-sm border border-border bg-background px-3 py-2 text-xs font-medium",
                     onclick: move |_| {
-                        state.write().show_kanban = true;
+                        thread_state.write().show_kanban = true;
                         navigator.push(Route::Board {});
                     },
                     Icon { width: 14, height: 14, icon: LdLayoutGrid }
@@ -74,11 +75,11 @@ pub fn ThreadSidebar() -> Element {
 
 #[component]
 fn ThreadRow(thread: crate::lib::UiThread) -> Element {
-    let mut state = use_context::<Signal<AppState>>();
+    let mut thread_state = use_context::<Signal<ThreadState>>();
     let navigator = use_navigator();
     let thread_id_for_open = thread.id.clone();
     let thread_id_for_delete = thread.id.clone();
-    let active = state
+    let active = thread_state
         .read()
         .active_thread_id
         .as_ref()
@@ -94,8 +95,8 @@ fn ThreadRow(thread: crate::lib::UiThread) -> Element {
         button {
             class: "{class}",
             onclick: move |_| {
-                state.write().active_thread_id = Some(thread_id_for_open.clone());
-                state.write().show_kanban = false;
+                thread_state.write().active_thread_id = Some(thread_id_for_open.clone());
+                thread_state.write().show_kanban = false;
                 navigator.push(Route::ThreadView { id: thread_id_for_open.clone() });
             },
             div { class: "flex items-center gap-2",
@@ -108,9 +109,9 @@ fn ThreadRow(thread: crate::lib::UiThread) -> Element {
                     class: "rounded px-1 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-status-critical transition-opacity",
                     onclick: move |evt| {
                         evt.stop_propagation();
-                        state.write().threads.retain(|t| t.id != thread_id_for_delete);
-                        if state.read().threads.is_empty() {
-                            state.write().active_thread_id = None;
+                        thread_state.write().threads.retain(|t| t.id != thread_id_for_delete);
+                        if thread_state.read().threads.is_empty() {
+                            thread_state.write().active_thread_id = None;
                         }
                     },
                     Icon { width: 12, height: 12, icon: LdTrash2 }
