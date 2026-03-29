@@ -113,6 +113,11 @@ class OmniDock extends LitElement {
     this.tabObserver.observe(container, { childList: true, subtree: true });
     this.initializePanels();
     this.observeSlots();
+    this.api.onDidRemovePanel((panel) => {
+      if (!this.permanentPanels.has(panel.id)) {
+        this.knownSlots.delete(panel.id);
+      }
+    });
   }
 
   updated(changedProps: PropertyValues) {
@@ -256,6 +261,14 @@ class OmniDock extends LitElement {
 
       for (const slot of slotted) {
         if (!this.knownSlots.has(slot)) {
+          this.addPanel({
+            id: slot,
+            slot,
+            title: slot,
+            position: { referencePanel: "chat", direction: "within" },
+          });
+        } else if (!this.permanentPanels.has(slot) && !this.api?.getPanel(slot)) {
+          this.knownSlots.delete(slot);
           this.addPanel({
             id: slot,
             slot,

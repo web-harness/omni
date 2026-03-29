@@ -116,11 +116,16 @@ pub fn AppLayout() -> Element {
                 div { slot: "files", class: "h-full w-full overflow-auto", FilesSection {} }
                 div { slot: "agents", class: "h-full w-full overflow-auto", AgentsSection {} }
                 for path in workspace_state.read().open_tabs_for(&thread_id).into_iter().filter(|p: &String| p != "chat") {
-                    div {
-                        slot: path.clone(),
-                        key: "{path}",
-                        class: "h-full w-full overflow-hidden",
-                        components::FileViewer { path: path.clone() }
+                    {
+                        let gen = workspace_state.read().tab_generation.get(&path).copied().unwrap_or(0);
+                        rsx! {
+                            div {
+                                slot: path.clone(),
+                                key: "{path}-{gen}",
+                                class: "h-full w-full overflow-hidden",
+                                components::FileViewer { path: path.clone() }
+                            }
+                        }
                     }
                 }
             }

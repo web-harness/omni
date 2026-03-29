@@ -704,6 +704,7 @@ pub struct WorkspaceState {
     pub workspace_files: HashMap<String, Vec<FileInfo>>,
     pub open_tabs: HashMap<String, Vec<String>>,
     pub active_tab: HashMap<String, String>,
+    pub tab_generation: HashMap<String, u64>,
 }
 
 impl WorkspaceState {
@@ -1114,6 +1115,7 @@ pub fn bootstrap(
             workspace_files,
             open_tabs,
             active_tab,
+            tab_generation: HashMap::new(),
         },
         ModelState {
             providers: provider.list_providers(),
