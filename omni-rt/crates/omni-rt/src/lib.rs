@@ -1,6 +1,6 @@
 pub use omni_protocol as protocol;
 
-#[cfg(feature = "native")]
+#[cfg(any(feature = "native", feature = "wasm"))]
 pub use omni_bashkit as bashkit;
 
 #[cfg(feature = "wasm")]

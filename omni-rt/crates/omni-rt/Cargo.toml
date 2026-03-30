@@ -13,4 +13,4 @@ omni-deepagents = { path = "../omni-deepagents", optional = true }
 [features]
 default = []
 native = ["omni-bashkit"]
-wasm = ["omni-zenfs", "omni-deepagents"]
+wasm = ["omni-zenfs", "omni-deepagents", "omni-bashkit"]

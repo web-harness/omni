@@ -1,63 +1,61 @@
-pub use bashkit::{Bash, BashTool, ExecutionLimits, GitConfig};
+pub mod zenfs_backend;
+pub use bashkit::{Bash, BashTool, ExecutionLimits};
+pub use zenfs_backend::ZenFsBackend;
 
-pub struct BashkitBuilder {
-    username: Option<String>,
-    hostname: Option<String>,
-    python_enabled: bool,
-    git_enabled: bool,
+use bashkit::PosixFs;
+use std::sync::Arc;
+
+pub fn build_bash() -> Bash {
+    let fs = Arc::new(PosixFs::new(ZenFsBackend));
+    Bash::builder().fs(fs).build()
 }
 
-impl BashkitBuilder {
-    pub fn new() -> Self {
-        Self {
-            username: None,
-            hostname: None,
-            python_enabled: false,
-            git_enabled: false,
-        }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wasm_bindgen_test::*;
+
+    wasm_bindgen_test_configure!(run_in_browser);
+
+    async fn bash() -> Bash {
+        omni_zenfs::init().await.expect("zenfs init failed");
+        build_bash()
     }
 
-    pub fn username(mut self, username: &str) -> Self {
-        self.username = Some(username.to_string());
-        self
+    #[wasm_bindgen_test]
+    async fn test_bash_echo() {
+        let mut b = bash().await;
+        let result = b.exec("echo hello").await.unwrap();
+        assert_eq!(result.stdout.trim(), "hello");
     }
 
-    pub fn hostname(mut self, hostname: &str) -> Self {
-        self.hostname = Some(hostname.to_string());
-        self
+    #[wasm_bindgen_test]
+    async fn test_bash_write_read() {
+        let mut b = bash().await;
+        b.exec("echo data > /tmp/bk_test.txt").await.unwrap();
+        let result = b.exec("cat /tmp/bk_test.txt").await.unwrap();
+        assert_eq!(result.stdout.trim(), "data");
     }
 
-    pub fn with_python(mut self, enabled: bool) -> Self {
-        self.python_enabled = enabled;
-        self
+    #[wasm_bindgen_test]
+    async fn test_bash_mkdir_ls() {
+        let mut b = bash().await;
+        b.exec("mkdir -p /tmp/bk_dir").await.unwrap();
+        let result = b.exec("ls /tmp").await.unwrap();
+        assert!(result.stdout.contains("bk_dir"));
     }
 
-    pub fn with_git(mut self, enabled: bool) -> Self {
-        self.git_enabled = enabled;
-        self
+    #[wasm_bindgen_test]
+    async fn test_bash_pipe() {
+        let mut b = bash().await;
+        let result = b.exec("echo hello | cat").await.unwrap();
+        assert_eq!(result.stdout.trim(), "hello");
     }
 
-    pub fn build(self) -> Bash {
-        let mut builder = Bash::builder();
-
-        if let Some(username) = self.username {
-            builder = builder.username(&username);
-        }
-
-        if let Some(hostname) = self.hostname {
-            builder = builder.hostname(&hostname);
-        }
-
-        if self.git_enabled {
-            builder = builder.git(GitConfig::new());
-        }
-
-        builder.build()
-    }
-}
-
-impl Default for BashkitBuilder {
-    fn default() -> Self {
-        Self::new()
+    #[wasm_bindgen_test]
+    async fn test_bash_env() {
+        let mut b = bash().await;
+        let result = b.exec("export X=42 && echo $X").await.unwrap();
+        assert_eq!(result.stdout.trim(), "42");
     }
 }

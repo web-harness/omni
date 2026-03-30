@@ -28,6 +28,6 @@ ndarray = "0.17"
 
 [features]
 default = ["web"]
-web = ["dioxus/web"]
-desktop = ["dioxus/desktop"]
+web = ["dioxus/web", "omni-rt/wasm"]
+desktop = ["dioxus/desktop", "omni-rt/native"]
 mobile = ["dioxus/mobile"]

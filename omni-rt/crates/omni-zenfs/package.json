@@ -1,0 +1,16 @@
+{
+  "name": "@omni/omni-zenfs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/omni-zenfs.ts --bundle --format=iife --global-name=__zenfs --outfile=dist/omni-zenfs.js"
+  },
+  "dependencies": {
+    "@zenfs/core": "^2.3.11",
+    "@zenfs/dom": "^1.2.7"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.2"
+  }
+}

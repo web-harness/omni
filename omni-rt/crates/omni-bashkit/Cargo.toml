@@ -5,6 +5,12 @@ edition.workspace = true
 authors.workspace = true
 
 [dependencies]
-bashkit = { git = "https://github.com/everruns/bashkit", features = ["python", "git"] }
-tokio = { version = "1", features = ["full"] }
-anyhow = "1.0"
+bashkit = { git = "https://github.com/everruns/bashkit" }
+omni-zenfs = { path = "../omni-zenfs" }
+async-trait = "0.1"
+wasm-bindgen-futures = "0.4"
+futures-channel = "0.3"
+tokio = { version = "1", features = ["sync", "macros", "io-util", "rt", "time"] }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"

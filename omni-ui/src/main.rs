@@ -31,6 +31,7 @@ const OMNI_MDX_JS: Asset = asset!("/public/omni-mdx.js");
 const OMNI_PDFJS_JS: Asset = asset!("/public/omni-pdfjs.js");
 const OMNI_PDFJS_WORKER_JS: Asset = asset!("/public/omni-pdfjs.worker.js");
 const OMNI_PLYR_JS: Asset = asset!("/public/omni-plyr.js");
+const OMNI_ZENFS_JS: Asset = asset!("/public/omni-zenfs.js");
 
 fn main() {
     dioxus::launch(App);
@@ -67,6 +68,7 @@ fn App() -> Element {
         document::Meta { name: "omni-pdfjs-worker", content: "{OMNI_PDFJS_WORKER_JS}" }
         document::Script { src: OMNI_PDFJS_JS, r#type: "module", defer: true }
         document::Script { src: OMNI_PLYR_JS, r#type: "module", defer: true }
+        document::Script { src: OMNI_ZENFS_JS }
 
         Router::<Route> {}
     }
