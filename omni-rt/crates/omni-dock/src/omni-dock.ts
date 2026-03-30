@@ -1,14 +1,23 @@
 import cssText from "dockview-core/dist/styles/dockview.css";
+import xSvg from "./icons/x.svg";
+
 import {
   createDockview,
   themeAbyss,
   type DockviewApi,
+  type DockviewGroupPanel,
   type GroupPanelPartInitParameters,
   type IContentRenderer,
+  type ITabRenderer,
+  type TabPartInitParameters,
   type AddPanelOptions,
+  type AddGroupOptions,
+  type CreateComponentOptions,
 } from "dockview-core";
 import { LitElement, html, css, unsafeCSS, type PropertyValues } from "lit";
 import { customElement, property } from "lit/decorators.js";
+
+const PERMANENT_PANELS = new Set(["sidebar", "chat", "tasks", "files", "agents"]);
 
 type PanelSpec = {
   id: string;
@@ -26,7 +35,7 @@ class SlotPanel implements IContentRenderer {
 
   constructor(slotName: string) {
     this.container = document.createElement("div");
-    this.container.style.cssText = "position:relative;width:100%;height:100%;overflow:hidden;";
+    this.container.classList.add("slot-panel");
     const slot = document.createElement("slot");
     slot.name = slotName;
     this.container.appendChild(slot);
@@ -39,6 +48,36 @@ class SlotPanel implements IContentRenderer {
   init(_parameters: GroupPanelPartInitParameters): void {}
 
   dispose(): void {}
+}
+
+class OmniTab implements ITabRenderer {
+  private readonly el: HTMLElement;
+
+  constructor() {
+    this.el = document.createElement("div");
+    this.el.classList.add("tab-row");
+  }
+
+  get element(): HTMLElement {
+    return this.el;
+  }
+
+  init(params: TabPartInitParameters): void {
+    const title = document.createElement("span");
+    title.textContent = params.title ?? "";
+    this.el.appendChild(title);
+
+    if (!PERMANENT_PANELS.has(params.api.id)) {
+      const btn = document.createElement("button");
+      btn.classList.add("tab-close");
+      btn.innerHTML = xSvg;
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        params.api.close();
+      });
+      this.el.appendChild(btn);
+    }
+  }
 }
 
 @customElement("omni-dock")
@@ -70,17 +109,41 @@ class OmniDock extends LitElement {
     .dv-sash {
       border-color: var(--border) !important;
     }
-    .dv-default-tab-content {
-      color: var(--foreground);
-    }
-    .dv-tab[data-permanent] .dv-default-tab-action {
-      display: none !important;
-    }
     .dv-sash-container {
       pointer-events: none;
     }
     .dv-sash-container > .dv-sash {
       pointer-events: auto;
+    }
+    .slot-panel {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    .tab-row {
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      height: 100%;
+      color: var(--foreground);
+      gap: 6px;
+    }
+    .tab-close {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px;
+      height: 14px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      color: inherit;
+      padding: 0;
+      opacity: 0.6;
+    }
+    .tab-close:hover {
+      opacity: 1;
     }
     ::slotted(*) {
       position: absolute;
@@ -94,11 +157,8 @@ class OmniDock extends LitElement {
   @property({ attribute: "data-proportions" }) dataProportions = "";
 
   private api: DockviewApi | null = null;
-  private slotObserver: MutationObserver | null = null;
-  private tabObserver: MutationObserver | null = null;
-  private knownSlots: Set<string> = new Set();
-  private permanentPanels: Set<string> = new Set();
-  private closedByUser: Set<string> = new Set();
+  private _programmaticClose = false;
+  value = "";
 
   render() {
     return html`<div class="dock-root"></div>`;
@@ -108,56 +168,38 @@ class OmniDock extends LitElement {
     const container = this.shadowRoot!.querySelector<HTMLElement>(".dock-root")!;
     this.api = createDockview(container, {
       theme: themeAbyss,
-      createComponent: (options) => new SlotPanel(options.name),
+      createComponent: (options: CreateComponentOptions) => new SlotPanel(options.name),
+      createTabComponent: (_options: CreateComponentOptions) => new OmniTab(),
     });
-    this.tabObserver = new MutationObserver(() => this.tagPermanentTabs());
-    this.tabObserver.observe(container, { childList: true, subtree: true });
-    this.initializePanels();
-    this.observeSlots();
     this.api.onDidRemovePanel((panel) => {
-      if (!this.permanentPanels.has(panel.id)) {
-        this.knownSlots.delete(panel.id);
-        this.closedByUser.add(panel.id);
+      if (!this._programmaticClose) {
+        const relay = this.querySelector<HTMLInputElement>("[data-dock-relay]");
+        if (relay) {
+          relay.value = panel.id;
+          relay.dispatchEvent(new Event("input", { bubbles: true }));
+        }
       }
     });
+    this.initializePanels();
   }
 
   updated(changedProps: PropertyValues) {
-    if (changedProps.has("dataPanels") && this.api) {
-      this.resetPanels();
-      this.initializePanels();
+    if (!this.api) return;
+    if (changedProps.has("dataPanels")) {
+      this.diffPanels();
     }
-    if (changedProps.has("dataActivePanel") && this.api && this.dataActivePanel) {
+    if (changedProps.has("dataActivePanel") && this.dataActivePanel) {
       this.api.getPanel(this.dataActivePanel)?.api.setActive();
     }
-    if (changedProps.has("dataProportions") && this.api) {
+    if (changedProps.has("dataProportions")) {
       this.applyProportions();
     }
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    this.slotObserver?.disconnect();
-    this.slotObserver = null;
-    this.tabObserver?.disconnect();
-    this.tabObserver = null;
     this.api?.dispose();
     this.api = null;
-    this.knownSlots.clear();
-  }
-
-  private resetPanels(): void {
-    if (!this.api) return;
-    this.api.dispose();
-    this.api = null;
-    this.knownSlots.clear();
-    const container = this.shadowRoot?.querySelector<HTMLElement>(".dock-root");
-    if (container) {
-      this.api = createDockview(container, {
-        theme: themeAbyss,
-        createComponent: (options) => new SlotPanel(options.name),
-      });
-    }
   }
 
   private parsePanelSpecs(): PanelSpec[] {
@@ -170,132 +212,109 @@ class OmniDock extends LitElement {
     }
   }
 
-  private addPanel(spec: PanelSpec, permanent = false): void {
-    if (!this.api || this.knownSlots.has(spec.slot)) return;
-
-    const options: AddPanelOptions = {
-      id: spec.id,
-      component: spec.slot,
-      title: spec.title ?? spec.id,
-    };
-
-    if (spec.position?.direction && spec.position.referencePanel) {
-      options.position = {
-        direction: spec.position.direction,
-        referencePanel: spec.position.referencePanel,
-      } as AddPanelOptions["position"];
-    } else if (spec.position?.direction) {
-      options.position = {
-        direction: spec.position.direction,
-      } as AddPanelOptions["position"];
-    }
-
-    this.api.addPanel(options);
-    this.knownSlots.add(spec.slot);
-    if (permanent) this.permanentPanels.add(spec.id);
+  private addPanelFromSpec(spec: PanelSpec): void {
+    if (!this.api) return;
 
     if (spec.hideHeader) {
-      const group = this.api.groups.find((g) => g.panels.some((p) => p.id === spec.id));
-      if (group) {
-        (group.model as any).header.hidden = true;
-        group.locked = true;
+      const groupOpts: AddGroupOptions = { hideHeader: true } as AddGroupOptions;
+      if (spec.position?.direction && spec.position.referencePanel) {
+        (groupOpts as any).referencePanel = spec.position.referencePanel;
+        (groupOpts as any).direction = spec.position.direction;
+      } else if (spec.position?.direction) {
+        (groupOpts as any).direction = spec.position.direction;
       }
+      const group: DockviewGroupPanel = this.api.addGroup(groupOpts);
+      this.api.addPanel({
+        id: spec.id,
+        component: spec.slot,
+        tabComponent: "omni-tab",
+        title: spec.title ?? spec.id,
+        position: { referenceGroup: group.id },
+      });
+      group.locked = true;
+    } else {
+      const options: AddPanelOptions = {
+        id: spec.id,
+        component: spec.slot,
+        tabComponent: "omni-tab",
+        title: spec.title ?? spec.id,
+      };
+      if (spec.position?.direction && spec.position.referencePanel) {
+        options.position = {
+          direction: spec.position.direction,
+          referencePanel: spec.position.referencePanel,
+        } as AddPanelOptions["position"];
+      } else if (spec.position?.direction) {
+        options.position = {
+          direction: spec.position.direction,
+        } as AddPanelOptions["position"];
+      }
+      this.api.addPanel(options);
     }
   }
 
   private initializePanels(): void {
     for (const spec of this.parsePanelSpecs()) {
-      this.addPanel(spec, true);
+      this.addPanelFromSpec(spec);
     }
-    requestAnimationFrame(() => {
+    setTimeout(() => {
+      const container = this.shadowRoot!.querySelector<HTMLElement>(".dock-root")!;
+      this.api?.layout(container.offsetWidth, container.offsetHeight);
       this.applyProportions();
-      this.tagPermanentTabs();
       if (this.dataActivePanel) {
         this.api?.getPanel(this.dataActivePanel)?.api.setActive();
       }
-    });
+    }, 0);
   }
 
-  private tagPermanentTabs(): void {
-    if (!this.shadowRoot || !this.api) return;
-    const permanentTitles = new Set<string>();
-    for (const id of this.permanentPanels) {
-      const panel = this.api.getPanel(id);
-      if (panel?.title) permanentTitles.add(panel.title);
-    }
-    this.shadowRoot.querySelectorAll(".dv-tab:not([data-permanent])").forEach((tab) => {
-      const title = tab.querySelector(".dv-default-tab-content")?.textContent?.trim();
-      if (title && permanentTitles.has(title)) {
-        tab.setAttribute("data-permanent", "");
+  private diffPanels(): void {
+    if (!this.api) return;
+    const specs = this.parsePanelSpecs();
+    const specIds = new Set(specs.map((s) => s.id));
+    const existingIds = new Set(this.api.panels.map((p) => p.id));
+
+    for (const panel of [...this.api.panels]) {
+      if (!specIds.has(panel.id)) {
+        this._programmaticClose = true;
+        panel.api.close();
+        this._programmaticClose = false;
       }
-    });
+    }
+
+    for (const spec of specs) {
+      if (!existingIds.has(spec.id)) {
+        this.addPanelFromSpec(spec);
+      }
+    }
   }
 
   private applyProportions(): void {
     if (!this.api) return;
     const propStr = this.dataProportions;
     if (!propStr) return;
-
-    const proportions = propStr.split(",").map(Number);
-    const w = this.clientWidth || window.innerWidth;
-    const h = this.clientHeight || window.innerHeight;
+    const proportions = propStr
+      .split(",")
+      .map(Number)
+      .filter((n) => !isNaN(n) && n > 0);
+    if (proportions.length === 0) return;
+    const total = proportions.reduce((a, b) => a + b, 0);
+    const container = this.shadowRoot!.querySelector<HTMLElement>(".dock-root")!;
+    const w = container.offsetWidth || this.clientWidth || window.innerWidth;
+    const h = container.offsetHeight || this.clientHeight || window.innerHeight;
     this.api.layout(w, h);
 
-    const json = (this.api as any).toJSON();
-    const rootChildren = json?.grid?.root?.data;
-    if (!rootChildren || proportions.length !== rootChildren.length) return;
-
-    const totalWidth = json.grid.width;
-    const totalProp = proportions.reduce((a: number, b: number) => a + b, 0);
-    for (let i = 0; i < rootChildren.length; i++) {
-      rootChildren[i].size = Math.round((totalWidth * proportions[i]) / totalProp);
+    const specs = this.parsePanelSpecs();
+    const anchors = specs.slice(0, proportions.length);
+    const seen = new Set<string>();
+    for (let i = 0; i < anchors.length; i++) {
+      const panel = this.api.getPanel(anchors[i].id);
+      if (!panel) continue;
+      const groupId = panel.group.id;
+      if (seen.has(groupId)) continue;
+      seen.add(groupId);
+      const width = Math.round((w * proportions[i]) / total);
+      panel.group.api.setSize({ width });
     }
-    (this.api as any).fromJSON(json);
-  }
-
-  private observeSlots(): void {
-    if (!this.api) return;
-
-    this.slotObserver = new MutationObserver(() => {
-      const slotted = Array.from(this.children)
-        .map((el) => el.getAttribute("slot"))
-        .filter((s): s is string => !!s);
-
-      for (const slot of slotted) {
-        if (!this.knownSlots.has(slot) && !this.closedByUser.has(slot)) {
-          this.addPanel({
-            id: slot,
-            slot,
-            title: slot,
-            position: { referencePanel: "chat", direction: "within" },
-          });
-        } else if (!this.permanentPanels.has(slot) && !this.api?.getPanel(slot) && !this.closedByUser.has(slot)) {
-          // Panel was removed from dockview (user closed it) but Dioxus slot still exists.
-          // Mark as closed so future mutations don't re-add it.
-          this.knownSlots.delete(slot);
-          this.closedByUser.add(slot);
-        }
-      }
-
-      for (const existing of [...this.knownSlots]) {
-        if (!slotted.includes(existing)) {
-          this.api?.getPanel(existing)?.dispose();
-          this.knownSlots.delete(existing);
-        }
-      }
-      for (const closed of [...this.closedByUser]) {
-        if (!slotted.includes(closed)) {
-          this.closedByUser.delete(closed);
-        }
-      }
-    });
-
-    this.slotObserver.observe(this, {
-      childList: true,
-      subtree: false,
-      attributes: true,
-      attributeFilter: ["slot"],
-    });
   }
 }
 

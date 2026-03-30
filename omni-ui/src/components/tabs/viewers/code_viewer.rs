@@ -10,11 +10,11 @@ pub fn CodeViewer(path: String, content: String) -> Element {
     rsx! {
         div { class: "h-full w-full",
             omni-monaco {
+                class: "block w-full h-full",
                 "data-value": "{content}",
                 "data-language": "{lang}",
                 "data-readonly": "true",
                 "data-theme": "vs-dark",
-                style: "display:block;width:100%;height:100%;"
             }
         }
     }

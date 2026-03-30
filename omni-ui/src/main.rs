@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
 use dioxus::prelude::*;
+use serde_json::json;
 
 mod components;
 mod lib;
@@ -75,7 +76,7 @@ fn App() -> Element {
 pub fn AppLayout() -> Element {
     let thread_state = use_context::<Signal<ThreadState>>();
     let mut ui_state = use_context::<Signal<UiState>>();
-    let workspace_state = use_context::<Signal<WorkspaceState>>();
+    let mut workspace_state = use_context::<Signal<WorkspaceState>>();
     let model_state = use_context::<Signal<ModelState>>();
 
     let thread_id = thread_state
@@ -85,13 +86,26 @@ pub fn AppLayout() -> Element {
         .unwrap_or_default();
     let active_panel = "chat";
 
-    let panel_config = r#"[
-      {"id":"sidebar","slot":"sidebar","title":"Threads","position":{"direction":"left"}},
-      {"id":"chat","slot":"chat","title":"Chat","position":{"referencePanel":"sidebar","direction":"right"}},
-      {"id":"tasks","slot":"tasks","title":"Tasks","position":{"referencePanel":"chat","direction":"right"}},
-      {"id":"files","slot":"files","title":"Files","position":{"referencePanel":"tasks","direction":"below"}},
-      {"id":"agents","slot":"agents","title":"Agents","position":{"referencePanel":"files","direction":"below"}}
-    ]"#;
+    let open_tabs = workspace_state.read().open_tabs_for(&thread_id);
+    let mut panels = vec![
+        json!({"id":"sidebar","slot":"sidebar","title":"Threads","position":{"direction":"left"}}),
+        json!({"id":"chat","slot":"chat","title":"Chat","position":{"referencePanel":"sidebar","direction":"right"}}),
+        json!({"id":"tasks","slot":"tasks","title":"Tasks","position":{"referencePanel":"chat","direction":"right"}}),
+        json!({"id":"files","slot":"files","title":"Files","position":{"referencePanel":"tasks","direction":"below"}}),
+        json!({"id":"agents","slot":"agents","title":"Agents","position":{"referencePanel":"files","direction":"below"}}),
+    ];
+    for path in &open_tabs {
+        if path.as_str() != "chat" {
+            let title = path.rsplit('/').next().unwrap_or(path.as_str());
+            panels.push(json!({
+                "id": path,
+                "slot": path,
+                "title": title,
+                "position": {"referencePanel": "chat", "direction": "within"},
+            }));
+        }
+    }
+    let panel_config = serde_json::to_string(&panels).unwrap_or_default();
 
     let theme = if ui_state.read().theme == Theme::Light {
         "light"
@@ -108,6 +122,17 @@ pub fn AppLayout() -> Element {
                 "data-panels": panel_config,
                 "data-active-panel": active_panel,
                 "data-proportions": "20,60,20",
+                input {
+                    r#type: "hidden",
+                    "data-dock-relay": "true",
+                    oninput: move |evt: Event<FormData>| {
+                        let panel_id = evt.value();
+                        if !panel_id.is_empty() {
+                            let tid = thread_state.read().active_thread_id.clone().unwrap_or_default();
+                            workspace_state.write().open_tabs.entry(tid).or_default().retain(|x| x != &panel_id);
+                        }
+                    },
+                },
                 div { slot: "sidebar", class: "h-full w-full overflow-hidden", ThreadSidebar {} }
                 div { slot: "chat", class: "h-full w-full overflow-hidden",
                     if thread_state.read().show_kanban {
@@ -119,15 +144,15 @@ pub fn AppLayout() -> Element {
                 div { slot: "tasks", class: "h-full w-full overflow-auto", TasksSection {} }
                 div { slot: "files", class: "h-full w-full overflow-auto", FilesSection {} }
                 div { slot: "agents", class: "h-full w-full overflow-auto", AgentsSection {} }
-                for path in workspace_state.read().open_tabs_for(&thread_id).into_iter().filter(|p: &String| p != "chat") {
+                for path in open_tabs.iter().filter(|p| p.as_str() != "chat") {
                     {
-                        let gen = workspace_state.read().tab_generation.get(&path).copied().unwrap_or(0);
+                        let gen = workspace_state.read().tab_generation.get(path).copied().unwrap_or(0);
                         rsx! {
                             div {
                                 slot: path.clone(),
                                 key: "{path}-{gen}",
                                 class: "h-full w-full overflow-hidden",
-                                components::FileViewer { path: path.clone() }
+                                components::FileViewer { path: path.clone(), thread_id: thread_id.clone() }
                             }
                         }
                     }

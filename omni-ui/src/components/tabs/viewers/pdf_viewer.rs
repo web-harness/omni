@@ -11,9 +11,9 @@ pub fn PdfViewer(path: String, base64_content: String) -> Element {
 
     rsx! {
         omni-pdfjs {
+            class: "flex w-full h-full",
             "data-src": "{src}",
             "data-filename": "{filename}",
-            style: "display:flex;width:100%;height:100%;"
         }
     }
 }

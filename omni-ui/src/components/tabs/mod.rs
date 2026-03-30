@@ -111,9 +111,12 @@ pub fn TabbedPanel(thread_id: String) -> Element {
 }
 
 #[component]
-pub fn FileViewer(path: String) -> Element {
+pub fn FileViewer(path: String, thread_id: String) -> Element {
+    let mut workspace_state = use_context::<Signal<WorkspaceState>>();
     let ext = path.rsplit('.').next().unwrap_or("").to_string();
     let mime = ext_to_mime_type(&ext).to_string();
+    let path_for_close = path.clone();
+    let tid_for_close = thread_id.clone();
 
     let viewer = if ext == "svg" {
         let svg = fixture_text(&path);
@@ -165,6 +168,23 @@ pub fn FileViewer(path: String) -> Element {
     };
 
     rsx! {
-        div { class: "h-full w-full", {viewer} }
+        div { class: "h-full w-full flex flex-col",
+            div { class: "flex items-center justify-between px-3 py-1 bg-sidebar border-b border-border text-[11px] shrink-0",
+                span { class: "text-muted-foreground truncate", "{path}" }
+                button {
+                    class: "ml-2 text-muted-foreground hover:text-foreground leading-none",
+                    onclick: move |_| {
+                        workspace_state
+                            .write()
+                            .open_tabs
+                            .entry(tid_for_close.clone())
+                            .or_default()
+                            .retain(|x| x != &path_for_close);
+                    },
+                    "×"
+                }
+            }
+            div { class: "flex-1 overflow-hidden relative", {viewer} }
+        }
     }
 }

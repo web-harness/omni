@@ -11,10 +11,10 @@ pub fn MediaViewer(path: String, base64_content: String, mime_type: String) -> E
     rsx! {
         div { class: "flex h-full items-center justify-center bg-background p-4",
             omni-plyr {
+                class: "w-full h-full",
                 "data-base64": "{base64_content}",
                 "data-mime": "{mime_type}",
                 "data-type": "{media_type}",
-                style: "width:100%;height:100%;"
             }
         }
     }
