@@ -23,6 +23,10 @@ getrandom = { version = "0.2", features = ["js"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 web-sys = { version = "0.3", features = ["Window", "Location"] }
 
+[build-dependencies]
+video-rs = { version = "0.11", features = ["ndarray"] }
+ndarray = "0.17"
+
 [features]
 default = ["web"]
 web = ["dioxus/web"]

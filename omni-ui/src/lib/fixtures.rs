@@ -24,10 +24,7 @@ pub fn get_fixture(path: &str) -> FixtureContent {
             FixtureContent::Base64(FIXTURE_PNG_B64)
         }
         "wav" | "mp3" | "ogg" | "flac" | "aac" | "m4a" => FixtureContent::Base64(FIXTURE_WAV_B64),
-        "mp4" | "webm" | "ogv" | "mov" | "avi" => {
-            // No real video fixture — return empty so the viewer shows a placeholder
-            FixtureContent::Base64("")
-        }
+        "mp4" | "webm" | "ogv" | "mov" | "avi" => FixtureContent::Base64(FIXTURE_MP4_B64),
         "pdf" => FixtureContent::Base64(FIXTURE_PDF_B64),
         _ => FixtureContent::Text(""),
     }

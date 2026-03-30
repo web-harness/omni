@@ -98,6 +98,7 @@ class OmniDock extends LitElement {
   private tabObserver: MutationObserver | null = null;
   private knownSlots: Set<string> = new Set();
   private permanentPanels: Set<string> = new Set();
+  private closedByUser: Set<string> = new Set();
 
   render() {
     return html`<div class="dock-root"></div>`;
@@ -116,6 +117,7 @@ class OmniDock extends LitElement {
     this.api.onDidRemovePanel((panel) => {
       if (!this.permanentPanels.has(panel.id)) {
         this.knownSlots.delete(panel.id);
+        this.closedByUser.add(panel.id);
       }
     });
   }
@@ -260,21 +262,18 @@ class OmniDock extends LitElement {
         .filter((s): s is string => !!s);
 
       for (const slot of slotted) {
-        if (!this.knownSlots.has(slot)) {
+        if (!this.knownSlots.has(slot) && !this.closedByUser.has(slot)) {
           this.addPanel({
             id: slot,
             slot,
             title: slot,
             position: { referencePanel: "chat", direction: "within" },
           });
-        } else if (!this.permanentPanels.has(slot) && !this.api?.getPanel(slot)) {
+        } else if (!this.permanentPanels.has(slot) && !this.api?.getPanel(slot) && !this.closedByUser.has(slot)) {
+          // Panel was removed from dockview (user closed it) but Dioxus slot still exists.
+          // Mark as closed so future mutations don't re-add it.
           this.knownSlots.delete(slot);
-          this.addPanel({
-            id: slot,
-            slot,
-            title: slot,
-            position: { referencePanel: "chat", direction: "within" },
-          });
+          this.closedByUser.add(slot);
         }
       }
 
@@ -282,6 +281,11 @@ class OmniDock extends LitElement {
         if (!slotted.includes(existing)) {
           this.api?.getPanel(existing)?.dispose();
           this.knownSlots.delete(existing);
+        }
+      }
+      for (const closed of [...this.closedByUser]) {
+        if (!slotted.includes(closed)) {
+          this.closedByUser.delete(closed);
         }
       }
     });

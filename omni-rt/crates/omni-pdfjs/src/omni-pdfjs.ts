@@ -2,7 +2,9 @@ import * as pdfjsLib from "pdfjs-dist";
 import { LitElement, html, css } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL("./omni-pdfjs.worker.js", import.meta.url).href;
+const _workerMeta = document.querySelector<HTMLMetaElement>('meta[name="omni-pdfjs-worker"]');
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  _workerMeta?.content ?? new URL("./omni-pdfjs.worker.js", import.meta.url).href;
 
 @customElement("omni-pdfjs")
 export class OmniPdfjs extends LitElement {

@@ -28,6 +28,8 @@ const OMNI_POPPER_JS: Asset = asset!("/public/omni-popper.js");
 const OMNI_MONACO_JS: Asset = asset!("/public/omni-monaco.js");
 const OMNI_MDX_JS: Asset = asset!("/public/omni-mdx.js");
 const OMNI_PDFJS_JS: Asset = asset!("/public/omni-pdfjs.js");
+const OMNI_PDFJS_WORKER_JS: Asset = asset!("/public/omni-pdfjs.worker.js");
+const OMNI_PLYR_JS: Asset = asset!("/public/omni-plyr.js");
 
 fn main() {
     dioxus::launch(App);
@@ -61,7 +63,9 @@ fn App() -> Element {
         document::Script { src: OMNI_POPPER_JS, r#type: "module", defer: true }
         document::Script { src: OMNI_MONACO_JS, r#type: "module", defer: true }
         document::Script { src: OMNI_MDX_JS, r#type: "module", defer: true }
+        document::Meta { name: "omni-pdfjs-worker", content: "{OMNI_PDFJS_WORKER_JS}" }
         document::Script { src: OMNI_PDFJS_JS, r#type: "module", defer: true }
+        document::Script { src: OMNI_PLYR_JS, r#type: "module", defer: true }
 
         Router::<Route> {}
     }

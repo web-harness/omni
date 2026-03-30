@@ -146,7 +146,6 @@ pub fn FileViewer(path: String) -> Element {
                     path: path.clone(),
                     base64_content: fixture_b64(&path),
                     mime_type: mime,
-                    media_type: "video".to_string(),
                 }
             },
             FileType::Audio => rsx! {
@@ -154,7 +153,6 @@ pub fn FileViewer(path: String) -> Element {
                     path: path.clone(),
                     base64_content: fixture_b64(&path),
                     mime_type: mime,
-                    media_type: "audio".to_string(),
                 }
             },
             FileType::Pdf => rsx! {

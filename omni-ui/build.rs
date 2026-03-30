@@ -17,6 +17,7 @@ fn main() {
             "omni-pdfjs.js",
             Some("omni-pdfjs.worker.js"),
         ),
+        ("omni-rt/crates/omni-plyr", "omni-plyr.js", None),
     ];
 
     for (crate_rel, js_name, extra_file) in &wcs {
@@ -60,11 +61,13 @@ fn generate_fixtures(out_dir: &PathBuf) {
     let png_b64 = b64(&make_png());
     let wav_b64 = b64(&make_wav());
     let pdf_b64 = b64(&make_pdf());
+    let mp4_b64 = b64(&make_mp4());
 
     let code = format!(
         "pub const FIXTURE_PNG_B64: &str = \"{png_b64}\";\n\
          pub const FIXTURE_WAV_B64: &str = \"{wav_b64}\";\n\
-         pub const FIXTURE_PDF_B64: &str = \"{pdf_b64}\";\n"
+         pub const FIXTURE_PDF_B64: &str = \"{pdf_b64}\";\n\
+         pub const FIXTURE_MP4_B64: &str = \"{mp4_b64}\";\n"
     );
     fs::write(out_dir.join("fixtures.rs"), code).expect("failed to write fixtures.rs");
 
@@ -381,6 +384,29 @@ fn make_pdf() -> Vec<u8> {
         format!("trailer\n<</Size {n} /Root 1 0 R>>\nstartxref\n{xref_offset}\n%%EOF\n").as_bytes(),
     );
     body
+}
+
+fn make_mp4() -> Vec<u8> {
+    use ndarray::Array3;
+    use std::path::Path;
+    use video_rs::encode::{Encoder, Settings};
+    use video_rs::time::Time;
+
+    video_rs::init().expect("failed to init video-rs");
+
+    let tmp = std::env::temp_dir().join("omni_fixture.mp4");
+    let settings = Settings::preset_h264_yuv420p(320, 240, false);
+    let mut encoder =
+        Encoder::new(Path::new(&tmp), settings).expect("failed to create video encoder");
+
+    // 1-second black video at 1 fps (1 frame)
+    let frame: Array3<u8> = Array3::zeros((240, 320, 3));
+    encoder
+        .encode(&frame, Time::zero())
+        .expect("failed to encode frame");
+    encoder.finish().expect("failed to finish encoding");
+
+    fs::read(&tmp).expect("failed to read encoded mp4")
 }
 
 fn b64(bytes: &[u8]) -> String {
