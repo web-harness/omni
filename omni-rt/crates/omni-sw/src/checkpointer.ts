@@ -30,7 +30,7 @@ async function getDb(threadId: string): Promise<Database> {
     /* already configured */
   }
 
-  const SQL = await initSqlJs({ locateFile: () => "/public/sql-wasm.wasm" });
+  const SQL = await initSqlJs({ locateFile: () => "/sql-wasm.wasm" });
 
   const dbPath = `/home/checkpoints/${threadId}.sqlite`;
   let buffer: ArrayBuffer | null = null;

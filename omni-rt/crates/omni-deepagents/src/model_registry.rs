@@ -101,3 +101,27 @@ pub async fn list_providers_with_keys() -> Result<Vec<(Provider, bool)>, std::io
     }
     Ok(result)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{list_models, list_providers, ProviderId};
+
+    #[test]
+    fn list_models_returns_expected_catalog() {
+        let models = list_models();
+        assert!(models.len() >= 8);
+        assert!(models.iter().any(|m| m.id == "claude-3-7-sonnet"));
+        assert!(models.iter().any(|m| m.id == "gpt-5"));
+        assert!(models.iter().any(|m| m.id == "gemini-2.5-pro"));
+    }
+
+    #[test]
+    fn list_providers_returns_core_providers() {
+        let providers = list_providers();
+        assert_eq!(providers.len(), 4);
+        assert!(providers.iter().any(|p| p.id == ProviderId::Anthropic));
+        assert!(providers.iter().any(|p| p.id == ProviderId::OpenAI));
+        assert!(providers.iter().any(|p| p.id == ProviderId::Google));
+        assert!(providers.iter().any(|p| p.id == ProviderId::Ollama));
+    }
+}

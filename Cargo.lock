@@ -3654,12 +3654,15 @@ dependencies = [
  "dioxus-free-icons",
  "futures-util",
  "getrandom 0.2.17",
+ "js-sys",
  "ndarray",
  "omni-rt",
  "serde",
  "serde_json",
  "uuid",
  "video-rs",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
  "web-sys",
 ]
 

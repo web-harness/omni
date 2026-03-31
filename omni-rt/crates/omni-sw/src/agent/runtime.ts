@@ -3,16 +3,22 @@ import { ChatOpenAI } from "@langchain/openai";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { HumanMessage } from "@langchain/core/messages";
-import { StateGraph, MessagesAnnotation } from "@langchain/langgraph";
+import { createDeepAgent } from "deepagents";
 import { fs, configure } from "@zenfs/core";
 import { IndexedDB } from "@zenfs/dom";
 import { SqlJsSaver } from "../checkpointer.js";
 import { buildSystemPrompt } from "./system-prompt.js";
+import { BashkitSandboxBackend } from "./sandbox.js";
 
 interface RunRequest {
   thread_id: string;
-  message: string;
+  input?: string;
+  message?: string;
   model_id: string;
+}
+
+function getInputMessage(body: RunRequest): string {
+  return body.input?.trim() || body.message?.trim() || "";
 }
 
 async function ensureZenFs(): Promise<void> {
@@ -58,7 +64,7 @@ async function getWorkspacePath(threadId: string): Promise<string> {
   return "/home/workspace";
 }
 
-export function getModelInstance(modelId: string, apiKey: string): BaseChatModel {
+export function getModelInstance(modelId: string, apiKey?: string): BaseChatModel {
   if (modelId.startsWith("claude-")) {
     return new ChatAnthropic({ model: modelId, anthropicApiKey: apiKey, streaming: true });
   }
@@ -88,9 +94,22 @@ function sseChunk(data: string): Uint8Array {
   return new TextEncoder().encode(`data: ${data}\n\n`);
 }
 
+async function executeWithBashkit(_command: string, _cwd: string) {
+  return {
+    output: "Error: SW bashkit executor is not wired yet.",
+    exitCode: 1,
+    truncated: false,
+  };
+}
+
 export async function handleRunStream(request: Request): Promise<Response> {
   const body = (await request.json()) as RunRequest;
-  const { thread_id, message, model_id } = body;
+  const { thread_id, model_id } = body;
+  const message = getInputMessage(body);
+
+  if (!thread_id || !model_id || !message) {
+    return Response.json({ error: "Missing required fields: thread_id, model_id, input" }, { status: 400 });
+  }
 
   const workspacePath = await getWorkspacePath(thread_id);
   const provider = providerForModel(model_id);
@@ -100,24 +119,27 @@ export async function handleRunStream(request: Request): Promise<Response> {
     async start(controller) {
       try {
         if (!apiKey) {
-          controller.enqueue(sseChunk(JSON.stringify({ type: "error", data: `No API key for ${provider}` })));
-          controller.enqueue(sseChunk(JSON.stringify({ type: "done" })));
-          controller.close();
-          return;
+          if (provider === "ollama") {
+            // Ollama uses local OpenAI-compatible endpoint and does not require an API key.
+          } else {
+            controller.enqueue(sseChunk(JSON.stringify({ type: "error", data: `No API key for ${provider}` })));
+            controller.enqueue(sseChunk(JSON.stringify({ type: "done" })));
+            controller.close();
+            return;
+          }
         }
 
         const model = getModelInstance(model_id, apiKey);
+        const sandbox = new BashkitSandboxBackend(workspacePath, executeWithBashkit);
         const checkpointer = new SqlJsSaver();
         const systemPrompt = buildSystemPrompt(workspacePath);
 
-        const workflow = new StateGraph(MessagesAnnotation)
-          .addNode("agent", async (state) => {
-            const response = await model.invoke([{ role: "system", content: systemPrompt }, ...state.messages]);
-            return { messages: [response] };
-          })
-          .addEdge("__start__", "agent")
-          .addEdge("agent", "__end__")
-          .compile({ checkpointer });
+        const workflow = createDeepAgent({
+          model,
+          backend: sandbox,
+          checkpointer,
+          systemPrompt,
+        });
 
         const config = { configurable: { thread_id } };
         const result = await workflow.stream(
@@ -151,28 +173,32 @@ export async function handleRunStream(request: Request): Promise<Response> {
 
 export async function handleRunWait(request: Request): Promise<Response> {
   const body = (await request.json()) as RunRequest;
-  const { thread_id, message, model_id } = body;
+  const { thread_id, model_id } = body;
+  const message = getInputMessage(body);
+
+  if (!thread_id || !model_id || !message) {
+    return Response.json({ error: "Missing required fields: thread_id, model_id, input" }, { status: 400 });
+  }
 
   const workspacePath = await getWorkspacePath(thread_id);
   const provider = providerForModel(model_id);
   const apiKey = await getApiKey(provider);
 
-  if (!apiKey) {
+  if (!apiKey && provider !== "ollama") {
     return Response.json({ error: `No API key for ${provider}` }, { status: 400 });
   }
 
   const model = getModelInstance(model_id, apiKey);
-  const checkpointer = new SqlJsSaver(new JsonPlusSerializer());
+  const sandbox = new BashkitSandboxBackend(workspacePath, executeWithBashkit);
+  const checkpointer = new SqlJsSaver();
   const systemPrompt = buildSystemPrompt(workspacePath);
 
-  const workflow = new StateGraph(MessagesAnnotation)
-    .addNode("agent", async (state) => {
-      const response = await model.invoke([{ role: "system", content: systemPrompt }, ...state.messages]);
-      return { messages: [response] };
-    })
-    .addEdge("__start__", "agent")
-    .addEdge("agent", "__end__")
-    .compile({ checkpointer });
+  const workflow = createDeepAgent({
+    model,
+    backend: sandbox,
+    checkpointer,
+    systemPrompt,
+  });
 
   const config = { configurable: { thread_id } };
   const result = await workflow.invoke({ messages: [new HumanMessage(message)] }, config);

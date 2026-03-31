@@ -21,29 +21,20 @@ fn env_key(provider: &str) -> String {
     format!("{}_API_KEY", provider.to_uppercase())
 }
 
-pub async fn get_api_key(provider: &str) -> Result<Option<String>, std::io::Error> {
-    let env = read_env().await?;
-    let key = env_key(provider);
+fn find_key(env: &str, key: &str) -> Option<String> {
     for line in env.lines() {
         if let Some((k, v)) = line.split_once('=') {
             if k.trim() == key {
-                return Ok(Some(v.trim().to_string()));
+                return Some(v.trim().to_string());
             }
         }
     }
-    Ok(None)
+    None
 }
 
-pub async fn has_api_key(provider: &str) -> Result<bool, std::io::Error> {
-    Ok(get_api_key(provider).await?.is_some())
-}
-
-pub async fn set_api_key(provider: &str, key_value: &str) -> Result<(), std::io::Error> {
-    let mut env = read_env().await?;
-    let key = env_key(provider);
-    let new_line = format!("{}={}", key, key_value);
-
+fn set_key(env: &str, key: &str, value: &str) -> String {
     let mut lines: Vec<String> = env.lines().map(|l| l.to_string()).collect();
+    let new_line = format!("{}={}", key, value);
     let mut found = false;
     for line in &mut lines {
         if line.starts_with(&format!("{}=", key)) {
@@ -55,17 +46,35 @@ pub async fn set_api_key(provider: &str, key_value: &str) -> Result<(), std::io:
     if !found {
         lines.push(new_line);
     }
-    write_env(&lines.join("\n")).await
+    lines.join("\n")
+}
+
+fn delete_key(env: &str, key: &str) -> String {
+    env.lines()
+        .filter(|l| !l.starts_with(&format!("{}=", key)))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+pub async fn get_api_key(provider: &str) -> Result<Option<String>, std::io::Error> {
+    let env = read_env().await?;
+    Ok(find_key(&env, &env_key(provider)))
+}
+
+pub async fn has_api_key(provider: &str) -> Result<bool, std::io::Error> {
+    Ok(get_api_key(provider).await?.is_some())
+}
+
+pub async fn set_api_key(provider: &str, key_value: &str) -> Result<(), std::io::Error> {
+    let env = read_env().await?;
+    let key = env_key(provider);
+    write_env(&set_key(&env, &key, key_value)).await
 }
 
 pub async fn delete_api_key(provider: &str) -> Result<(), std::io::Error> {
     let env = read_env().await?;
     let key = env_key(provider);
-    let lines: Vec<&str> = env
-        .lines()
-        .filter(|l| !l.starts_with(&format!("{}=", key)))
-        .collect();
-    write_env(&lines.join("\n")).await
+    write_env(&delete_key(&env, &key)).await
 }
 
 pub async fn get_default_model() -> Result<String, std::io::Error> {
@@ -79,4 +88,36 @@ pub async fn get_default_model() -> Result<String, std::io::Error> {
 pub async fn set_default_model(model_id: &str) -> Result<(), std::io::Error> {
     zenfs::mkdir(CONFIG_DIR, true).await?;
     zenfs::write_file(DEFAULT_MODEL_FILE, model_id.as_bytes()).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{delete_key, find_key, set_key};
+
+    #[test]
+    fn finds_existing_key() {
+        let env = "OPENAI_API_KEY=abc\nANTHROPIC_API_KEY=xyz";
+        assert_eq!(find_key(env, "OPENAI_API_KEY"), Some("abc".to_string()));
+        assert_eq!(find_key(env, "MISSING"), None);
+    }
+
+    #[test]
+    fn sets_and_updates_key() {
+        let env = "OPENAI_API_KEY=abc";
+        let updated = set_key(env, "OPENAI_API_KEY", "def");
+        assert_eq!(updated, "OPENAI_API_KEY=def");
+
+        let appended = set_key(env, "ANTHROPIC_API_KEY", "xyz");
+        assert!(appended.contains("OPENAI_API_KEY=abc"));
+        assert!(appended.contains("ANTHROPIC_API_KEY=xyz"));
+    }
+
+    #[test]
+    fn deletes_key() {
+        let env = "OPENAI_API_KEY=abc\nANTHROPIC_API_KEY=xyz\nOTHER=1";
+        let out = delete_key(env, "ANTHROPIC_API_KEY");
+        assert!(out.contains("OPENAI_API_KEY=abc"));
+        assert!(!out.contains("ANTHROPIC_API_KEY=xyz"));
+        assert!(out.contains("OTHER=1"));
+    }
 }

@@ -28,3 +28,25 @@ fn truncate_title(s: &str) -> String {
         format!("{}...", &s[..max])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::generate_title;
+
+    #[test]
+    fn empty_input_falls_back_to_new_thread() {
+        assert_eq!(generate_title("   "), "New Thread");
+    }
+
+    #[test]
+    fn question_prefers_question_boundary() {
+        let title = generate_title("What is the best way to handle optimistic locking in sqlite?");
+        assert_eq!(title, "What is the best way to handle optimisti...");
+    }
+
+    #[test]
+    fn long_text_is_truncated() {
+        let title = generate_title("Implement a complete service worker architecture with checkpoint persistence and sandboxed execution support");
+        assert_eq!(title, "Implement a complete service worker arch...");
+    }
+}

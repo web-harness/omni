@@ -1,14 +1,28 @@
 // URL is injected by Dioxus via <meta name="omni-sw-url"> so the hashed asset path is correct
-const SW_URL = document.querySelector<HTMLMetaElement>('meta[name="omni-sw-url"]')?.content ?? "/omni-sw.js";
+const SW_URL =
+  typeof document !== "undefined"
+    ? (document.querySelector<HTMLMetaElement>('meta[name="omni-sw-url"]')?.content ?? "/omni-sw.js")
+    : "/omni-sw.js";
 const READY_CHANNEL = "omni-sw-ready";
 
-const channel = new BroadcastChannel(READY_CHANNEL);
+type RegisterEnv = {
+  navigator: Navigator;
+  channel: BroadcastChannel;
+  swUrl: string;
+  setReadyFlag: () => void;
+};
 
-async function register(): Promise<void> {
+function markReady(channel: BroadcastChannel, setReadyFlag: () => void): void {
+  setReadyFlag();
+  channel.postMessage({ type: "ready" });
+}
+
+export async function registerServiceWorker(env: RegisterEnv): Promise<void> {
+  const { navigator, channel, swUrl, setReadyFlag } = env;
   if (!("serviceWorker" in navigator)) return;
 
   try {
-    const registration = await navigator.serviceWorker.register(SW_URL, {
+    const registration = await navigator.serviceWorker.register(swUrl, {
       type: "module",
       scope: "/",
     });
@@ -16,7 +30,7 @@ async function register(): Promise<void> {
     const sw = registration.installing ?? registration.waiting ?? registration.active;
 
     if (sw && sw.state === "activated") {
-      channel.postMessage({ type: "ready" });
+      markReady(channel, setReadyFlag);
       return;
     }
 
@@ -24,7 +38,7 @@ async function register(): Promise<void> {
     if (target) {
       target.addEventListener("statechange", () => {
         if (target.state === "activated") {
-          channel.postMessage({ type: "ready" });
+          markReady(channel, setReadyFlag);
         }
       });
     }
@@ -34,6 +48,7 @@ async function register(): Promise<void> {
       if (!newSw) return;
       newSw.addEventListener("statechange", () => {
         if (newSw.state === "activated") {
+          setReadyFlag();
           channel.postMessage({ type: "update-available" });
         }
       });
@@ -43,4 +58,14 @@ async function register(): Promise<void> {
   }
 }
 
-register();
+if (typeof navigator !== "undefined" && typeof BroadcastChannel !== "undefined") {
+  const channel = new BroadcastChannel(READY_CHANNEL);
+  registerServiceWorker({
+    navigator,
+    channel,
+    swUrl: SW_URL,
+    setReadyFlag: () => {
+      (globalThis as Record<string, unknown>).__omni_sw_ready = true;
+    },
+  });
+}

@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
 
 pub mod file_types;
 pub mod fixtures;
@@ -268,6 +270,26 @@ impl SubagentState {
 }
 
 pub fn static_models() -> Vec<ModelConfig> {
+    #[cfg(target_arch = "wasm32")]
+    {
+        return omni_rt::deepagents::model_registry::list_models()
+            .into_iter()
+            .map(|m| ModelConfig {
+                id: m.id,
+                name: m.name,
+                provider: match m.provider {
+                    omni_rt::deepagents::model_registry::ProviderId::Anthropic => {
+                        ProviderId::Anthropic
+                    }
+                    omni_rt::deepagents::model_registry::ProviderId::OpenAI => ProviderId::OpenAI,
+                    omni_rt::deepagents::model_registry::ProviderId::Google => ProviderId::Google,
+                    omni_rt::deepagents::model_registry::ProviderId::Ollama => ProviderId::Ollama,
+                },
+            })
+            .collect();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     vec![
         ModelConfig {
             id: "claude-3-7-sonnet".into(),
@@ -313,6 +335,26 @@ pub fn static_models() -> Vec<ModelConfig> {
 }
 
 pub fn static_providers() -> Vec<Provider> {
+    #[cfg(target_arch = "wasm32")]
+    {
+        return omni_rt::deepagents::model_registry::list_providers()
+            .into_iter()
+            .map(|p| Provider {
+                id: match p.id {
+                    omni_rt::deepagents::model_registry::ProviderId::Anthropic => {
+                        ProviderId::Anthropic
+                    }
+                    omni_rt::deepagents::model_registry::ProviderId::OpenAI => ProviderId::OpenAI,
+                    omni_rt::deepagents::model_registry::ProviderId::Google => ProviderId::Google,
+                    omni_rt::deepagents::model_registry::ProviderId::Ollama => ProviderId::Ollama,
+                },
+                name: p.name,
+                has_api_key: false,
+            })
+            .collect();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     vec![
         Provider {
             id: ProviderId::Anthropic,
@@ -335,6 +377,72 @@ pub fn static_providers() -> Vec<Provider> {
             has_api_key: false,
         },
     ]
+}
+
+#[cfg(target_arch = "wasm32")]
+fn shell_quote_single(s: &str) -> String {
+    let escaped = s.replace('"', "\\\"");
+    format!("\"{}\"", escaped)
+}
+
+#[cfg(target_arch = "wasm32")]
+fn install_bashkit_bridge() {
+    use js_sys::{Function, Object, Promise, Reflect};
+    use wasm_bindgen::closure::Closure;
+    use wasm_bindgen::JsCast;
+    use wasm_bindgen_futures::future_to_promise;
+
+    let global = js_sys::global();
+    if let Ok(existing) = Reflect::get(&global, &"__omni_bashkit_execute_client".into()) {
+        if existing.is_function() {
+            return;
+        }
+    }
+
+    let callback = Closure::<dyn FnMut(JsValue, JsValue) -> Promise>::new(
+        move |command: JsValue, cwd: JsValue| {
+            let command = command.as_string().unwrap_or_default();
+            let cwd = cwd
+                .as_string()
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or_else(|| "/home/workspace".to_string());
+
+            future_to_promise(async move {
+                let mut bash = omni_rt::bashkit::build_bash();
+                let script = format!("cd {} && {}", shell_quote_single(&cwd), command);
+
+                let response = match bash.exec(&script).await {
+                    Ok(result) => {
+                        let mut output = result.stdout;
+                        if !result.stderr.is_empty() {
+                            output.push_str(&result.stderr);
+                        }
+                        (
+                            output,
+                            result.exit_code,
+                            result.stdout_truncated || result.stderr_truncated,
+                        )
+                    }
+                    Err(err) => (format!("Error: {err}"), 1, false),
+                };
+
+                let obj = Object::new();
+                Reflect::set(&obj, &"output".into(), &response.0.into()).ok();
+                Reflect::set(
+                    &obj,
+                    &"exitCode".into(),
+                    &JsValue::from_f64(response.1 as f64),
+                )
+                .ok();
+                Reflect::set(&obj, &"truncated".into(), &JsValue::from_bool(response.2)).ok();
+                Ok(obj.into())
+            })
+        },
+    );
+
+    let func: &Function = callback.as_ref().unchecked_ref();
+    Reflect::set(&global, &"__omni_bashkit_execute_client".into(), func).ok();
+    callback.forget();
 }
 
 pub fn default_states() -> (
@@ -415,12 +523,53 @@ pub async fn async_init(
 ) {
     use dioxus::signals::{ReadableExt, WritableExt};
     use omni_rt::deepagents::{
-        config_store, message_store, seed, subagent_store, thread_store, todo_store,
+        config_store, message_store, model_registry, seed, subagent_store, thread_store, todo_store,
     };
     use omni_rt::zenfs;
 
+    fn map_provider_id(id: model_registry::ProviderId) -> ProviderId {
+        match id {
+            model_registry::ProviderId::Anthropic => ProviderId::Anthropic,
+            model_registry::ProviderId::OpenAI => ProviderId::OpenAI,
+            model_registry::ProviderId::Google => ProviderId::Google,
+            model_registry::ProviderId::Ollama => ProviderId::Ollama,
+        }
+    }
+
     if zenfs::init().await.is_err() {
         return;
+    }
+
+    install_bashkit_bridge();
+
+    {
+        let models = model_registry::list_models()
+            .into_iter()
+            .map(|m| ModelConfig {
+                id: m.id,
+                name: m.name,
+                provider: map_provider_id(m.provider),
+            })
+            .collect::<Vec<_>>();
+
+        let providers = model_registry::list_providers_with_keys()
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(p, has_api_key)| Provider {
+                id: map_provider_id(p.id),
+                name: p.name,
+                has_api_key,
+            })
+            .collect::<Vec<_>>();
+
+        let mut ms = model_state.write();
+        if !models.is_empty() {
+            ms.models = models;
+        }
+        if !providers.is_empty() {
+            ms.providers = providers;
+        }
     }
 
     let _ = seed::seed_if_empty().await;
@@ -539,19 +688,5 @@ pub async fn async_init(
     }
     model_state.write().selected_model = selected_model;
 
-    let provider_map = [
-        (ProviderId::Anthropic, "anthropic"),
-        (ProviderId::OpenAI, "openai"),
-        (ProviderId::Google, "google"),
-        (ProviderId::Ollama, "ollama"),
-    ];
-    let mut providers = model_state.read().providers.clone();
-    for p in &mut providers {
-        for (pid, prefix) in &provider_map {
-            if p.id == *pid {
-                p.has_api_key = config_store::has_api_key(prefix).await.unwrap_or(false);
-            }
-        }
-    }
-    model_state.write().providers = providers;
+    let _ = config_store::get_default_model().await;
 }

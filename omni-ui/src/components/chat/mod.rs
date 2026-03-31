@@ -332,6 +332,17 @@ fn ChatInput(thread_id: String, stream: Coroutine<StreamRequest>) -> Element {
     let thread_state = use_context::<Signal<ThreadState>>();
     let model_state = use_context::<Signal<ModelState>>();
 
+    #[cfg(target_arch = "wasm32")]
+    let sw_ready = {
+        let global = js_sys::global();
+        js_sys::Reflect::get(&global, &"__omni_sw_ready".into())
+            .ok()
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+    };
+    #[cfg(not(target_arch = "wasm32"))]
+    let sw_ready = true;
+
     rsx! {
         div { class: "border-t border-border px-4 py-3",
             div { class: "mx-auto w-full max-w-3xl",
@@ -347,6 +358,10 @@ fn ChatInput(thread_id: String, stream: Coroutine<StreamRequest>) -> Element {
                                 if evt.key() == Key::Enter && !evt.modifiers().contains(Modifiers::SHIFT) {
                                     let input = chat_state.read().input_draft.trim().to_string();
                                     if input.is_empty() { return; }
+                                    if !sw_ready {
+                                        chat_state.write().error = Some("Service worker is not ready yet. Please wait a moment and retry.".to_string());
+                                        return;
+                                    }
                                     let active_id = thread_state.read().active_thread_id.clone();
                                     if let Some(active_id) = active_id {
                                         {
@@ -372,6 +387,10 @@ fn ChatInput(thread_id: String, stream: Coroutine<StreamRequest>) -> Element {
                         onclick: move |_| {
                             let input = chat_state.read().input_draft.trim().to_string();
                             if input.is_empty() { return; }
+                            if !sw_ready {
+                                chat_state.write().error = Some("Service worker is not ready yet. Please wait a moment and retry.".to_string());
+                                return;
+                            }
                             let active_id = thread_state.read().active_thread_id.clone();
                             if let Some(active_id) = active_id {
                                 {
