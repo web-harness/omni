@@ -7,51 +7,51 @@ mod raw {
     use js_sys::Promise;
     use wasm_bindgen::prelude::*;
 
-    #[wasm_bindgen]
+    #[wasm_bindgen(module = "/omni-zenfs.js")]
     extern "C" {
-        #[wasm_bindgen(js_namespace = __zenfs, catch)]
+        #[wasm_bindgen(catch)]
         pub fn init() -> Result<Promise, JsValue>;
 
-        #[wasm_bindgen(js_namespace = __zenfs, catch)]
+        #[wasm_bindgen(catch)]
         pub fn readFile(path: &str) -> Result<Promise, JsValue>;
 
-        #[wasm_bindgen(js_namespace = __zenfs, catch)]
+        #[wasm_bindgen(catch)]
         pub fn writeFile(path: &str, data: &[u8]) -> Result<Promise, JsValue>;
 
-        #[wasm_bindgen(js_namespace = __zenfs, catch)]
+        #[wasm_bindgen(catch)]
         pub fn appendFile(path: &str, data: &[u8]) -> Result<Promise, JsValue>;
 
-        #[wasm_bindgen(js_namespace = __zenfs, js_name = "mkdir", catch)]
+        #[wasm_bindgen(js_name = "mkdir", catch)]
         pub fn mkdir(path: &str, opts: JsValue) -> Result<Promise, JsValue>;
 
-        #[wasm_bindgen(js_namespace = __zenfs, catch)]
+        #[wasm_bindgen(catch)]
         pub fn rm(path: &str, opts: JsValue) -> Result<Promise, JsValue>;
 
-        #[wasm_bindgen(js_namespace = __zenfs, catch)]
+        #[wasm_bindgen(catch)]
         pub fn stat(path: &str) -> Result<Promise, JsValue>;
 
-        #[wasm_bindgen(js_namespace = __zenfs, catch)]
+        #[wasm_bindgen(catch)]
         pub fn lstat(path: &str) -> Result<Promise, JsValue>;
 
-        #[wasm_bindgen(js_namespace = __zenfs, catch)]
+        #[wasm_bindgen(catch)]
         pub fn readdir(path: &str) -> Result<Promise, JsValue>;
 
-        #[wasm_bindgen(js_namespace = __zenfs, catch)]
+        #[wasm_bindgen(catch)]
         pub fn exists(path: &str) -> Result<Promise, JsValue>;
 
-        #[wasm_bindgen(js_namespace = __zenfs, catch)]
+        #[wasm_bindgen(catch)]
         pub fn rename(from: &str, to: &str) -> Result<Promise, JsValue>;
 
-        #[wasm_bindgen(js_namespace = __zenfs, catch)]
+        #[wasm_bindgen(catch)]
         pub fn copyFile(from: &str, to: &str) -> Result<Promise, JsValue>;
 
-        #[wasm_bindgen(js_namespace = __zenfs, catch)]
+        #[wasm_bindgen(catch)]
         pub fn symlink(target: &str, path: &str) -> Result<Promise, JsValue>;
 
-        #[wasm_bindgen(js_namespace = __zenfs, catch)]
+        #[wasm_bindgen(catch)]
         pub fn readlink(path: &str) -> Result<Promise, JsValue>;
 
-        #[wasm_bindgen(js_namespace = __zenfs, js_name = "chmod", catch)]
+        #[wasm_bindgen(js_name = "chmod", catch)]
         pub fn chmod(path: &str, mode: u32) -> Result<Promise, JsValue>;
     }
 }

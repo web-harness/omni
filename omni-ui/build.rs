@@ -19,6 +19,11 @@ fn main() {
         ),
         ("omni-rt/crates/omni-plyr", "omni-plyr.js", None),
         ("omni-rt/crates/omni-zenfs", "omni-zenfs.js", None),
+        (
+            "omni-rt/crates/omni-sw",
+            "omni-sw.js",
+            Some("omni-sw-register.js"),
+        ),
     ];
 
     for (crate_rel, js_name, extra_file) in &wcs {
@@ -54,6 +59,13 @@ fn main() {
         if let Some(extra) = extra_file {
             fs::copy(crate_dir.join("dist").join(extra), public_dir.join(extra))
                 .unwrap_or_else(|e| panic!("failed to copy {extra}: {e}"));
+        }
+
+        // copy sql-wasm.wasm for omni-sw
+        let wasm_src = crate_dir.join("dist").join("sql-wasm.wasm");
+        if wasm_src.exists() {
+            fs::copy(&wasm_src, public_dir.join("sql-wasm.wasm"))
+                .unwrap_or_else(|e| panic!("failed to copy sql-wasm.wasm: {e}"));
         }
     }
 }

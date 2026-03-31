@@ -1,11 +1,6 @@
 use std::collections::HashMap;
-use std::pin::Pin;
-use std::rc::Rc;
 
-use futures_util::stream::{self, Stream};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-use uuid::Uuid;
 
 pub mod file_types;
 pub mod fixtures;
@@ -134,507 +129,6 @@ pub enum StreamEvent {
     Error(String),
 }
 
-pub trait DataProvider {
-    fn list_threads(&self) -> Vec<UiThread>;
-    fn create_thread(&self) -> UiThread;
-    fn delete_thread(&self, id: &str);
-    fn get_thread_messages(&self, id: &str) -> Vec<UiMessage>;
-    fn stream_response(
-        &self,
-        thread_id: &str,
-        message: &str,
-        model_id: &str,
-    ) -> Pin<Box<dyn Stream<Item = StreamEvent>>>;
-    fn list_models(&self) -> Vec<ModelConfig>;
-    fn list_providers(&self) -> Vec<Provider>;
-    fn list_workspace_files(&self, thread_id: &str) -> Vec<FileInfo>;
-    fn list_subagents(&self, thread_id: &str) -> Vec<Subagent>;
-    fn list_todos(&self, thread_id: &str) -> Vec<Todo>;
-    fn get_thread_tool_calls(&self, thread_id: &str) -> Vec<ToolCall>;
-    fn get_thread_tool_results(&self, thread_id: &str) -> Vec<ToolResult>;
-}
-
-#[derive(Default)]
-pub struct MockDataProvider;
-
-impl MockDataProvider {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl DataProvider for MockDataProvider {
-    fn list_threads(&self) -> Vec<UiThread> {
-        vec![
-            UiThread {
-                id: "thread-gtd".to_string(),
-                title: "Implement todo management sys...".to_string(),
-                status: ThreadStatus::Busy,
-                updated_at: "9m ago".to_string(),
-            },
-            UiThread {
-                id: "thread-auth".to_string(),
-                title: "Implement Auth Flow".to_string(),
-                status: ThreadStatus::Interrupted,
-                updated_at: "49m ago".to_string(),
-            },
-            UiThread {
-                id: "thread-db".to_string(),
-                title: "Database Migration".to_string(),
-                status: ThreadStatus::Idle,
-                updated_at: "52m ago".to_string(),
-            },
-            UiThread {
-                id: "thread-ci".to_string(),
-                title: "Setup CI Pipeline".to_string(),
-                status: ThreadStatus::Idle,
-                updated_at: "58m ago".to_string(),
-            },
-            UiThread {
-                id: "thread-idea".to_string(),
-                title: "What would be a good...".to_string(),
-                status: ThreadStatus::Idle,
-                updated_at: "1h ago".to_string(),
-            },
-        ]
-    }
-
-    fn create_thread(&self) -> UiThread {
-        UiThread {
-            id: format!("thread-{}", Uuid::new_v4().simple()),
-            title: "New Thread".to_string(),
-            status: ThreadStatus::Idle,
-            updated_at: "now".to_string(),
-        }
-    }
-
-    fn delete_thread(&self, _id: &str) {}
-
-    fn get_thread_messages(&self, id: &str) -> Vec<UiMessage> {
-        match id {
-            "thread-gtd" => vec![
-                UiMessage {
-                    id: "m1".to_string(),
-                    role: Role::User,
-                    content: "Build a todo management system with three modes: GTD (Getting Things Done), Kanban, and Chaos Mode (random prioritization). Research and implement all three.".to_string(),
-                },
-            ],
-            "thread-auth" => vec![
-                UiMessage {
-                    id: "m1".to_string(),
-                    role: Role::User,
-                    content: "Ship OAuth login with refresh rotation and audit trail.".to_string(),
-                },
-                UiMessage {
-                    id: "m2".to_string(),
-                    role: Role::Assistant,
-                    content: "Copy. I will update auth middleware, add token persistence, and run smoke tests."
-                        .to_string(),
-                },
-            ],
-            "thread-db" => vec![
-                UiMessage {
-                    id: "m1".to_string(),
-                    role: Role::User,
-                    content: "Need migration plan for v3 schema.".to_string(),
-                },
-                UiMessage {
-                    id: "m2".to_string(),
-                    role: Role::Assistant,
-                    content: "Migration paused pending approval to write production scripts."
-                        .to_string(),
-                },
-            ],
-            _ => vec![],
-        }
-    }
-
-    fn stream_response(
-        &self,
-        _thread_id: &str,
-        _message: &str,
-        _model_id: &str,
-    ) -> Pin<Box<dyn Stream<Item = StreamEvent>>> {
-        let events = vec![
-            StreamEvent::Token("Running plan.".to_string()),
-            StreamEvent::Token(" Reading workspace.".to_string()),
-            StreamEvent::Token(" Updating files.".to_string()),
-            StreamEvent::Token(" Verifying behavior.".to_string()),
-            StreamEvent::ToolCall(ToolCall {
-                id: "tc-1".to_string(),
-                name: "read_file".to_string(),
-                args: json!({ "path": "src/main.rs" }),
-            }),
-            StreamEvent::ToolResult(ToolResult {
-                tool_call_id: "tc-1".to_string(),
-                content: "Read successfully".to_string(),
-                is_error: false,
-            }),
-            StreamEvent::Todos(vec![
-                Todo {
-                    id: "todo-1".to_string(),
-                    content: "Port layout".to_string(),
-                    status: TodoStatus::InProgress,
-                },
-                Todo {
-                    id: "todo-2".to_string(),
-                    content: "Wire streaming".to_string(),
-                    status: TodoStatus::Pending,
-                },
-            ]),
-            StreamEvent::Done,
-        ];
-
-        Box::pin(stream::iter(events))
-    }
-
-    fn list_models(&self) -> Vec<ModelConfig> {
-        vec![
-            ModelConfig {
-                id: "claude-3-7-sonnet".to_string(),
-                name: "Claude 3.7 Sonnet".to_string(),
-                provider: ProviderId::Anthropic,
-            },
-            ModelConfig {
-                id: "claude-3-5-haiku".to_string(),
-                name: "Claude 3.5 Haiku".to_string(),
-                provider: ProviderId::Anthropic,
-            },
-            ModelConfig {
-                id: "gpt-5".to_string(),
-                name: "GPT-5".to_string(),
-                provider: ProviderId::OpenAI,
-            },
-            ModelConfig {
-                id: "gpt-4o".to_string(),
-                name: "GPT-4o".to_string(),
-                provider: ProviderId::OpenAI,
-            },
-            ModelConfig {
-                id: "gemini-2.5-pro".to_string(),
-                name: "Gemini 2.5 Pro".to_string(),
-                provider: ProviderId::Google,
-            },
-            ModelConfig {
-                id: "gemini-2.0-flash".to_string(),
-                name: "Gemini 2.0 Flash".to_string(),
-                provider: ProviderId::Google,
-            },
-            ModelConfig {
-                id: "llama-3.3-70b".to_string(),
-                name: "Llama 3.3 70B".to_string(),
-                provider: ProviderId::Ollama,
-            },
-            ModelConfig {
-                id: "deepseek-r1".to_string(),
-                name: "DeepSeek R1".to_string(),
-                provider: ProviderId::Ollama,
-            },
-        ]
-    }
-
-    fn list_providers(&self) -> Vec<Provider> {
-        vec![
-            Provider {
-                id: ProviderId::Anthropic,
-                name: "Anthropic".to_string(),
-                has_api_key: true,
-            },
-            Provider {
-                id: ProviderId::OpenAI,
-                name: "OpenAI".to_string(),
-                has_api_key: false,
-            },
-            Provider {
-                id: ProviderId::Google,
-                name: "Google".to_string(),
-                has_api_key: false,
-            },
-            Provider {
-                id: ProviderId::Ollama,
-                name: "Ollama".to_string(),
-                has_api_key: true,
-            },
-        ]
-    }
-
-    fn list_workspace_files(&self, thread_id: &str) -> Vec<FileInfo> {
-        match thread_id {
-            "thread-gtd" => vec![
-                FileInfo {
-                    path: "public".to_string(),
-                    is_dir: true,
-                    size: None,
-                },
-                FileInfo {
-                    path: "public/app.js".to_string(),
-                    is_dir: false,
-                    size: Some(2_600),
-                },
-                FileInfo {
-                    path: "public/index.html".to_string(),
-                    is_dir: false,
-                    size: Some(6_900),
-                },
-                FileInfo {
-                    path: "public/styles.css".to_string(),
-                    is_dir: false,
-                    size: Some(3_400),
-                },
-                FileInfo {
-                    path: "scripts".to_string(),
-                    is_dir: true,
-                    size: None,
-                },
-                FileInfo {
-                    path: "scripts/flush_todos_node_script.js".to_string(),
-                    is_dir: false,
-                    size: Some(381),
-                },
-                FileInfo {
-                    path: "server".to_string(),
-                    is_dir: true,
-                    size: None,
-                },
-                FileInfo {
-                    path: "server/server.js".to_string(),
-                    is_dir: false,
-                    size: Some(850),
-                },
-                FileInfo {
-                    path: "server/todos.json".to_string(),
-                    is_dir: false,
-                    size: Some(314),
-                },
-                FileInfo {
-                    path: "test2".to_string(),
-                    is_dir: true,
-                    size: None,
-                },
-                FileInfo {
-                    path: "test2/hello_french.txt".to_string(),
-                    is_dir: false,
-                    size: Some(78),
-                },
-            ],
-            _ => vec![
-                FileInfo {
-                    path: "src".to_string(),
-                    is_dir: true,
-                    size: None,
-                },
-                FileInfo {
-                    path: "src/main.rs".to_string(),
-                    is_dir: false,
-                    size: Some(9_612),
-                },
-                FileInfo {
-                    path: "src/components/chat/mod.rs".to_string(),
-                    is_dir: false,
-                    size: Some(14_020),
-                },
-                FileInfo {
-                    path: "src/lib/mod.rs".to_string(),
-                    is_dir: false,
-                    size: Some(7_903),
-                },
-                FileInfo {
-                    path: "README.md".to_string(),
-                    is_dir: false,
-                    size: Some(4_089),
-                },
-            ],
-        }
-    }
-
-    fn list_subagents(&self, thread_id: &str) -> Vec<Subagent> {
-        match thread_id {
-            "thread-gtd" => vec![
-                Subagent {
-                    id: "sa-gtd-1".to_string(),
-                    name: "General Purpose Agent".to_string(),
-                    description: "Research the GTD (Getting Things Done) methodology by David Allen. I need you to provide a comprehensive report covering: 1. Core principles and philosophy of GTD 2. The key components: Inbox, Next Actions, Projects, Waiting For, Someday/Maybe, Contexts 3. The 5 stages of workflow: Capture, Clarify, Organize, Reflect, Engage".to_string(),
-                    status: SubagentStatus::Running,
-                },
-                Subagent {
-                    id: "sa-gtd-2".to_string(),
-                    name: "General Purpose Agent".to_string(),
-                    description: "Research the Kanban methodology for task management. I need you to provide a comprehensive report covering the core principles, board setup, WIP limits, and flow metrics.".to_string(),
-                    status: SubagentStatus::Running,
-                },
-                Subagent {
-                    id: "sa-gtd-3".to_string(),
-                    name: "General Purpose Agent".to_string(),
-                    description: "Research and design a Chaos Mode todo management system based on random prioritization and unpredictable task ordering. I need you to provide a creative report...".to_string(),
-                    status: SubagentStatus::Pending,
-                },
-            ],
-            _ => vec![
-                Subagent {
-                id: "sa-1".to_string(),
-                name: "Spec Auditor".to_string(),
-                description: "Cross-checks implementation against phase plan".to_string(),
-                status: SubagentStatus::Running,
-            },
-            Subagent {
-                id: "sa-2".to_string(),
-                name: "Test Synth".to_string(),
-                description: "Generates verification tests for touched modules".to_string(),
-                status: SubagentStatus::Completed,
-            },
-            ],
-        }
-    }
-
-    fn list_todos(&self, thread_id: &str) -> Vec<Todo> {
-        match thread_id {
-            "thread-gtd" => vec![
-                Todo {
-                    id: "t1".to_string(),
-                    content: "Research GTD (Getting Things Done) methodology using subagent"
-                        .to_string(),
-                    status: TodoStatus::InProgress,
-                },
-                Todo {
-                    id: "t2".to_string(),
-                    content: "Research Kanban methodology using subagent".to_string(),
-                    status: TodoStatus::InProgress,
-                },
-                Todo {
-                    id: "t3".to_string(),
-                    content: "Research Chaos Mode (random prioritization) approach using subagent"
-                        .to_string(),
-                    status: TodoStatus::Pending,
-                },
-                Todo {
-                    id: "t4".to_string(),
-                    content:
-                        "Design data structure and API endpoints for three todo management systems"
-                            .to_string(),
-                    status: TodoStatus::Pending,
-                },
-                Todo {
-                    id: "t5".to_string(),
-                    content: "Implement GTD backend endpoints and logic in server.js".to_string(),
-                    status: TodoStatus::Pending,
-                },
-                Todo {
-                    id: "t6".to_string(),
-                    content: "Implement Kanban backend endpoints and logic in server.js"
-                        .to_string(),
-                    status: TodoStatus::Pending,
-                },
-                Todo {
-                    id: "t7".to_string(),
-                    content: "Implement Chaos Mode backend endpoints and logic in server.js"
-                        .to_string(),
-                    status: TodoStatus::Pending,
-                },
-                Todo {
-                    id: "t8".to_string(),
-                    content: "Create frontend UI for GTD system".to_string(),
-                    status: TodoStatus::Pending,
-                },
-                Todo {
-                    id: "t9".to_string(),
-                    content: "Create frontend UI for Kanban system".to_string(),
-                    status: TodoStatus::Pending,
-                },
-                Todo {
-                    id: "t10".to_string(),
-                    content: "Create frontend UI for Chaos Mode system".to_string(),
-                    status: TodoStatus::Pending,
-                },
-                Todo {
-                    id: "t11".to_string(),
-                    content: "Update README.md with documentation for new systems".to_string(),
-                    status: TodoStatus::Pending,
-                },
-            ],
-            _ => vec![
-                Todo {
-                    id: "t1".to_string(),
-                    content: "Wire dock slots".to_string(),
-                    status: TodoStatus::Completed,
-                },
-                Todo {
-                    id: "t2".to_string(),
-                    content: "Port sidebar interactions".to_string(),
-                    status: TodoStatus::InProgress,
-                },
-                Todo {
-                    id: "t3".to_string(),
-                    content: "Implement model switcher".to_string(),
-                    status: TodoStatus::Pending,
-                },
-                Todo {
-                    id: "t4".to_string(),
-                    content: "File viewer tabs".to_string(),
-                    status: TodoStatus::Pending,
-                },
-                Todo {
-                    id: "t5".to_string(),
-                    content: "Settings dialog".to_string(),
-                    status: TodoStatus::Pending,
-                },
-            ],
-        }
-    }
-
-    fn get_thread_tool_calls(&self, thread_id: &str) -> Vec<ToolCall> {
-        if thread_id != "thread-gtd" {
-            return vec![];
-        }
-        vec![
-            ToolCall {
-                id: "tc-todos".to_string(),
-                name: "update_todos".to_string(),
-                args: json!({
-                    "todos": [
-                        {"content": "Research GTD (Getting Things Done) methodology using subagent", "status": "in_progress"},
-                        {"content": "Research Kanban methodology using subagent", "status": "in_progress"},
-                        {"content": "Research Chaos Mode (random prioritization) approach using subagent", "status": "pending"},
-                        {"content": "Design data structure and API endpoints for three todo management systems", "status": "pending"},
-                        {"content": "Implement GTD backend endpoints and logic in server.js", "status": "pending"},
-                        {"content": "Implement Kanban backend endpoints and logic in server.js", "status": "pending"},
-                        {"content": "Implement Chaos Mode backend endpoints and logic in server.js", "status": "pending"},
-                        {"content": "Create frontend UI for GTD system", "status": "pending"},
-                        {"content": "Create frontend UI for Kanban system", "status": "pending"},
-                        {"content": "Create frontend UI for Chaos Mode system", "status": "pending"},
-                        {"content": "Update README.md with documentation for new systems", "status": "pending"}
-                    ]
-                }),
-            },
-            ToolCall {
-                id: "tc-sa1".to_string(),
-                name: "dispatch_subagent".to_string(),
-                args: json!({ "task": "Research the GTD (Getting Things Done) methodology by David Allen. I need you to provide a comprehensive report covering: 1. Core principles and philosophy of GTD 2. The key components: Inbox, Next Actions, Projects, Waiting For, Someday/Maybe, Contexts 3. The 5 stages of workflow: Capture, Clarify, Organize, Reflect, Engage" }),
-            },
-            ToolCall {
-                id: "tc-sa2".to_string(),
-                name: "dispatch_subagent".to_string(),
-                args: json!({ "task": "Research the Kanban methodology for task management. I need you to provide a comprehensive report covering: 1. Core principles and philosophy of Kanban 2. The..." }),
-            },
-            ToolCall {
-                id: "tc-sa3".to_string(),
-                name: "dispatch_subagent".to_string(),
-                args: json!({ "task": "Research and design a \"Chaos Mode\" todo management system based on random prioritization and unpredictable task ordering. I need you to provide a creative repor..." }),
-            },
-        ]
-    }
-
-    fn get_thread_tool_results(&self, thread_id: &str) -> Vec<ToolResult> {
-        if thread_id != "thread-gtd" {
-            return vec![];
-        }
-        vec![ToolResult {
-            tool_call_id: "tc-todos".to_string(),
-            content: "Synced".to_string(),
-            is_error: false,
-        }]
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Theme {
     Dark,
@@ -712,7 +206,7 @@ impl WorkspaceState {
         self.workspace_path
             .get(thread_id)
             .cloned()
-            .unwrap_or_else(|| "test".to_string())
+            .unwrap_or_else(|| "/home/workspace".to_string())
     }
 
     pub fn files_for_thread(&self, thread_id: &str) -> Vec<FileInfo> {
@@ -748,7 +242,7 @@ impl ModelState {
             .get(thread_id)
             .cloned()
             .or_else(|| self.models.first().map(|m| m.id.clone()))
-            .unwrap_or_else(|| "gpt-5".to_string())
+            .unwrap_or_else(|| "claude-3-7-sonnet".to_string())
     }
 }
 
@@ -773,9 +267,77 @@ impl SubagentState {
     }
 }
 
-pub fn bootstrap(
-    provider: Rc<dyn DataProvider>,
-) -> (
+pub fn static_models() -> Vec<ModelConfig> {
+    vec![
+        ModelConfig {
+            id: "claude-3-7-sonnet".into(),
+            name: "Claude 3.7 Sonnet".into(),
+            provider: ProviderId::Anthropic,
+        },
+        ModelConfig {
+            id: "claude-3-5-haiku".into(),
+            name: "Claude 3.5 Haiku".into(),
+            provider: ProviderId::Anthropic,
+        },
+        ModelConfig {
+            id: "gpt-5".into(),
+            name: "GPT-5".into(),
+            provider: ProviderId::OpenAI,
+        },
+        ModelConfig {
+            id: "gpt-4o".into(),
+            name: "GPT-4o".into(),
+            provider: ProviderId::OpenAI,
+        },
+        ModelConfig {
+            id: "gemini-2.5-pro".into(),
+            name: "Gemini 2.5 Pro".into(),
+            provider: ProviderId::Google,
+        },
+        ModelConfig {
+            id: "gemini-2.0-flash".into(),
+            name: "Gemini 2.0 Flash".into(),
+            provider: ProviderId::Google,
+        },
+        ModelConfig {
+            id: "llama-3.3-70b".into(),
+            name: "Llama 3.3 70B".into(),
+            provider: ProviderId::Ollama,
+        },
+        ModelConfig {
+            id: "deepseek-r1".into(),
+            name: "DeepSeek R1".into(),
+            provider: ProviderId::Ollama,
+        },
+    ]
+}
+
+pub fn static_providers() -> Vec<Provider> {
+    vec![
+        Provider {
+            id: ProviderId::Anthropic,
+            name: "Anthropic".into(),
+            has_api_key: false,
+        },
+        Provider {
+            id: ProviderId::OpenAI,
+            name: "OpenAI".into(),
+            has_api_key: false,
+        },
+        Provider {
+            id: ProviderId::Google,
+            name: "Google".into(),
+            has_api_key: false,
+        },
+        Provider {
+            id: ProviderId::Ollama,
+            name: "Ollama".into(),
+            has_api_key: false,
+        },
+    ]
+}
+
+pub fn default_states() -> (
     ThreadState,
     ChatState,
     TasksState,
@@ -784,54 +346,6 @@ pub fn bootstrap(
     UiState,
     SubagentState,
 ) {
-    let threads = provider.list_threads();
-    let active_thread_id = threads.first().map(|t| t.id.clone());
-
-    let mut messages = HashMap::new();
-    let mut todos = HashMap::new();
-    let mut files = HashMap::new();
-    let mut subagents = HashMap::new();
-    let mut tool_calls = HashMap::new();
-    let mut tool_results = HashMap::new();
-
-    for thread in &threads {
-        messages.insert(thread.id.clone(), provider.get_thread_messages(&thread.id));
-        todos.insert(thread.id.clone(), provider.list_todos(&thread.id));
-        files.insert(thread.id.clone(), provider.list_workspace_files(&thread.id));
-        subagents.insert(thread.id.clone(), provider.list_subagents(&thread.id));
-        tool_calls.insert(
-            thread.id.clone(),
-            provider.get_thread_tool_calls(&thread.id),
-        );
-        tool_results.insert(
-            thread.id.clone(),
-            provider.get_thread_tool_results(&thread.id),
-        );
-    }
-
-    let models = provider.list_models();
-    let first_model = models
-        .first()
-        .map(|m| m.id.clone())
-        .unwrap_or_else(|| "gpt-5".to_string());
-
-    let mut selected_model: HashMap<String, String> = HashMap::new();
-    let mut workspace_path: HashMap<String, String> = HashMap::new();
-    let mut open_tabs: HashMap<String, Vec<String>> = HashMap::new();
-    let mut active_tab: HashMap<String, String> = HashMap::new();
-
-    for (i, thread) in threads.iter().enumerate() {
-        selected_model.insert(thread.id.clone(), first_model.clone());
-        let ws = match i {
-            1 => "omni",
-            2 => "omni-rt",
-            _ => "test",
-        };
-        workspace_path.insert(thread.id.clone(), ws.to_string());
-        open_tabs.insert(thread.id.clone(), vec![]);
-        active_tab.insert(thread.id.clone(), "chat".to_string());
-    }
-
     #[cfg(target_arch = "wasm32")]
     let initial_theme = {
         let search = web_sys::window()
@@ -846,281 +360,36 @@ pub fn bootstrap(
     #[cfg(not(target_arch = "wasm32"))]
     let initial_theme = Theme::Dark;
 
-    let workspace_files = {
-        let mut wf = HashMap::new();
-        wf.insert(
-            "test".to_string(),
-            vec![
-                FileInfo {
-                    path: "public".to_string(),
-                    is_dir: true,
-                    size: None,
-                },
-                FileInfo {
-                    path: "public/app.js".to_string(),
-                    is_dir: false,
-                    size: Some(2_600),
-                },
-                FileInfo {
-                    path: "public/index.html".to_string(),
-                    is_dir: false,
-                    size: Some(6_900),
-                },
-                FileInfo {
-                    path: "public/styles.css".to_string(),
-                    is_dir: false,
-                    size: Some(3_400),
-                },
-                FileInfo {
-                    path: "scripts".to_string(),
-                    is_dir: true,
-                    size: None,
-                },
-                FileInfo {
-                    path: "scripts/flush_todos.js".to_string(),
-                    is_dir: false,
-                    size: Some(381),
-                },
-                FileInfo {
-                    path: "server".to_string(),
-                    is_dir: true,
-                    size: None,
-                },
-                FileInfo {
-                    path: "server/server.js".to_string(),
-                    is_dir: false,
-                    size: Some(850),
-                },
-                FileInfo {
-                    path: "server/todos.json".to_string(),
-                    is_dir: false,
-                    size: Some(314),
-                },
-                FileInfo {
-                    path: "fixtures".to_string(),
-                    is_dir: true,
-                    size: None,
-                },
-                FileInfo {
-                    path: "fixtures/sample.rs".to_string(),
-                    is_dir: false,
-                    size: Some(512),
-                },
-                FileInfo {
-                    path: "fixtures/sample.ts".to_string(),
-                    is_dir: false,
-                    size: Some(620),
-                },
-                FileInfo {
-                    path: "fixtures/sample.py".to_string(),
-                    is_dir: false,
-                    size: Some(580),
-                },
-                FileInfo {
-                    path: "fixtures/sample.sh".to_string(),
-                    is_dir: false,
-                    size: Some(410),
-                },
-                FileInfo {
-                    path: "fixtures/sample.md".to_string(),
-                    is_dir: false,
-                    size: Some(740),
-                },
-                FileInfo {
-                    path: "fixtures/sample.html".to_string(),
-                    is_dir: false,
-                    size: Some(890),
-                },
-                FileInfo {
-                    path: "fixtures/sample.css".to_string(),
-                    is_dir: false,
-                    size: Some(660),
-                },
-                FileInfo {
-                    path: "fixtures/sample.json".to_string(),
-                    is_dir: false,
-                    size: Some(520),
-                },
-                FileInfo {
-                    path: "fixtures/sample.toml".to_string(),
-                    is_dir: false,
-                    size: Some(280),
-                },
-                FileInfo {
-                    path: "fixtures/sample.txt".to_string(),
-                    is_dir: false,
-                    size: Some(940),
-                },
-                FileInfo {
-                    path: "fixtures/sample.svg".to_string(),
-                    is_dir: false,
-                    size: Some(480),
-                },
-                FileInfo {
-                    path: "fixtures/sample.png".to_string(),
-                    is_dir: false,
-                    size: Some(120),
-                },
-                FileInfo {
-                    path: "fixtures/sample.jpg".to_string(),
-                    is_dir: false,
-                    size: Some(120),
-                },
-                FileInfo {
-                    path: "fixtures/sample.pdf".to_string(),
-                    is_dir: false,
-                    size: Some(800),
-                },
-                FileInfo {
-                    path: "fixtures/sample.wav".to_string(),
-                    is_dir: false,
-                    size: Some(46),
-                },
-                FileInfo {
-                    path: "fixtures/sample.mp3".to_string(),
-                    is_dir: false,
-                    size: Some(64),
-                },
-                FileInfo {
-                    path: "fixtures/sample.mp4".to_string(),
-                    is_dir: false,
-                    size: Some(256),
-                },
-                FileInfo {
-                    path: "fixtures/sample.bin".to_string(),
-                    is_dir: false,
-                    size: Some(128),
-                },
-            ],
-        );
-        wf.insert(
-            "omni".to_string(),
-            vec![
-                FileInfo {
-                    path: "src".to_string(),
-                    is_dir: true,
-                    size: None,
-                },
-                FileInfo {
-                    path: "src/main.rs".to_string(),
-                    is_dir: false,
-                    size: Some(9_612),
-                },
-                FileInfo {
-                    path: "src/components".to_string(),
-                    is_dir: true,
-                    size: None,
-                },
-                FileInfo {
-                    path: "src/components/chat/mod.rs".to_string(),
-                    is_dir: false,
-                    size: Some(14_020),
-                },
-                FileInfo {
-                    path: "src/components/sidebar/mod.rs".to_string(),
-                    is_dir: false,
-                    size: Some(3_400),
-                },
-                FileInfo {
-                    path: "src/lib".to_string(),
-                    is_dir: true,
-                    size: None,
-                },
-                FileInfo {
-                    path: "src/lib/mod.rs".to_string(),
-                    is_dir: false,
-                    size: Some(7_903),
-                },
-                FileInfo {
-                    path: "Cargo.toml".to_string(),
-                    is_dir: false,
-                    size: Some(1_200),
-                },
-                FileInfo {
-                    path: "README.md".to_string(),
-                    is_dir: false,
-                    size: Some(4_089),
-                },
-            ],
-        );
-        wf.insert(
-            "omni-rt".to_string(),
-            vec![
-                FileInfo {
-                    path: "crates".to_string(),
-                    is_dir: true,
-                    size: None,
-                },
-                FileInfo {
-                    path: "crates/omni-protocol".to_string(),
-                    is_dir: true,
-                    size: None,
-                },
-                FileInfo {
-                    path: "crates/omni-protocol/src/lib.rs".to_string(),
-                    is_dir: false,
-                    size: Some(5_120),
-                },
-                FileInfo {
-                    path: "crates/omni-rt".to_string(),
-                    is_dir: true,
-                    size: None,
-                },
-                FileInfo {
-                    path: "crates/omni-rt/src/main.rs".to_string(),
-                    is_dir: false,
-                    size: Some(3_800),
-                },
-                FileInfo {
-                    path: "crates/omni-dock".to_string(),
-                    is_dir: true,
-                    size: None,
-                },
-                FileInfo {
-                    path: "crates/omni-dock/src/omni-dock.ts".to_string(),
-                    is_dir: false,
-                    size: Some(8_200),
-                },
-                FileInfo {
-                    path: "Cargo.toml".to_string(),
-                    is_dir: false,
-                    size: Some(980),
-                },
-            ],
-        );
-        wf
-    };
-
     (
         ThreadState {
-            threads,
-            active_thread_id,
+            threads: vec![],
+            active_thread_id: None,
             show_kanban: false,
         },
         ChatState {
-            messages,
+            messages: HashMap::new(),
             input_draft: String::new(),
             is_streaming: false,
             stream_buffer: String::new(),
             error: None,
         },
         TasksState {
-            todos,
-            files,
-            tool_calls,
-            tool_results,
+            todos: HashMap::new(),
+            files: HashMap::new(),
+            tool_calls: HashMap::new(),
+            tool_results: HashMap::new(),
         },
         WorkspaceState {
-            workspace_path,
-            workspace_files,
-            open_tabs,
-            active_tab,
+            workspace_path: HashMap::new(),
+            workspace_files: HashMap::new(),
+            open_tabs: HashMap::new(),
+            active_tab: HashMap::new(),
             tab_generation: HashMap::new(),
         },
         ModelState {
-            providers: provider.list_providers(),
-            models,
-            selected_model,
+            providers: static_providers(),
+            models: static_models(),
+            selected_model: HashMap::new(),
         },
         UiState {
             theme: initial_theme,
@@ -1130,8 +399,159 @@ pub fn bootstrap(
             api_key_draft: String::new(),
         },
         SubagentState {
-            subagents,
+            subagents: HashMap::new(),
             pending_hitl: None,
         },
     )
+}
+
+#[cfg(target_arch = "wasm32")]
+pub async fn async_init(
+    mut thread_state: dioxus::prelude::Signal<ThreadState>,
+    mut chat_state: dioxus::prelude::Signal<ChatState>,
+    mut tasks_state: dioxus::prelude::Signal<TasksState>,
+    mut model_state: dioxus::prelude::Signal<ModelState>,
+    mut subagent_state: dioxus::prelude::Signal<SubagentState>,
+) {
+    use dioxus::signals::{ReadableExt, WritableExt};
+    use omni_rt::deepagents::{
+        config_store, message_store, seed, subagent_store, thread_store, todo_store,
+    };
+    use omni_rt::zenfs;
+
+    if zenfs::init().await.is_err() {
+        return;
+    }
+
+    let _ = seed::seed_if_empty().await;
+
+    let stored = match thread_store::list_threads().await {
+        Ok(t) => {
+            if t.is_empty() {
+                return;
+            }
+            t
+        }
+        Err(_) => return,
+    };
+
+    let first_model = model_state.read().models.first().map(|m| m.id.clone());
+    let mut selected_model = HashMap::new();
+    let mut messages: HashMap<String, Vec<UiMessage>> = HashMap::new();
+    let mut todos: HashMap<String, Vec<Todo>> = HashMap::new();
+    let mut subagents: HashMap<String, Vec<Subagent>> = HashMap::new();
+
+    let threads: Vec<UiThread> = stored
+        .into_iter()
+        .map(|t| {
+            let id = t.thread_id.clone();
+            selected_model.insert(
+                id.clone(),
+                first_model
+                    .clone()
+                    .unwrap_or_else(|| "claude-3-7-sonnet".to_string()),
+            );
+            UiThread {
+                id,
+                title: t.title,
+                status: match t.status {
+                    omni_rt::protocol::ThreadStatus::Busy => ThreadStatus::Busy,
+                    omni_rt::protocol::ThreadStatus::Interrupted => ThreadStatus::Interrupted,
+                    omni_rt::protocol::ThreadStatus::Error => ThreadStatus::Error,
+                    omni_rt::protocol::ThreadStatus::Idle => ThreadStatus::Idle,
+                },
+                updated_at: t.updated_at,
+            }
+        })
+        .collect();
+
+    for t in &threads {
+        if let Ok(msgs) = message_store::list_messages(&t.id).await {
+            messages.insert(
+                t.id.clone(),
+                msgs.into_iter()
+                    .map(|m| UiMessage {
+                        id: m.id,
+                        role: match m.role {
+                            message_store::Role::User => Role::User,
+                            message_store::Role::Assistant => Role::Assistant,
+                            message_store::Role::Tool => Role::Tool,
+                        },
+                        content: m.content,
+                    })
+                    .collect(),
+            );
+        }
+        if let Ok(tdos) = todo_store::list_todos(&t.id).await {
+            todos.insert(
+                t.id.clone(),
+                tdos.into_iter()
+                    .map(|td| Todo {
+                        id: td.id,
+                        content: td.content,
+                        status: match td.status {
+                            todo_store::TodoStatus::Pending => TodoStatus::Pending,
+                            todo_store::TodoStatus::InProgress => TodoStatus::InProgress,
+                            todo_store::TodoStatus::Completed => TodoStatus::Completed,
+                            todo_store::TodoStatus::Cancelled => TodoStatus::Cancelled,
+                        },
+                    })
+                    .collect(),
+            );
+        }
+        if let Ok(sas) = subagent_store::list_subagents(&t.id).await {
+            subagents.insert(
+                t.id.clone(),
+                sas.into_iter()
+                    .map(|sa| Subagent {
+                        id: sa.id,
+                        name: sa.name,
+                        description: sa.description,
+                        status: match sa.status {
+                            subagent_store::SubagentStatus::Pending => SubagentStatus::Pending,
+                            subagent_store::SubagentStatus::Running => SubagentStatus::Running,
+                            subagent_store::SubagentStatus::Completed => SubagentStatus::Completed,
+                            subagent_store::SubagentStatus::Failed => SubagentStatus::Failed,
+                        },
+                    })
+                    .collect(),
+            );
+        }
+    }
+
+    let active_id = threads.first().map(|t| t.id.clone());
+    {
+        let mut ts = thread_state.write();
+        ts.threads = threads;
+        ts.active_thread_id = active_id;
+    }
+    {
+        let mut cs = chat_state.write();
+        cs.messages = messages;
+    }
+    {
+        let mut tsk = tasks_state.write();
+        tsk.todos = todos;
+    }
+    {
+        let mut ss = subagent_state.write();
+        ss.subagents = subagents;
+    }
+    model_state.write().selected_model = selected_model;
+
+    let provider_map = [
+        (ProviderId::Anthropic, "anthropic"),
+        (ProviderId::OpenAI, "openai"),
+        (ProviderId::Google, "google"),
+        (ProviderId::Ollama, "ollama"),
+    ];
+    let mut providers = model_state.read().providers.clone();
+    for p in &mut providers {
+        for (pid, prefix) in &provider_map {
+            if p.id == *pid {
+                p.has_api_key = config_store::has_api_key(prefix).await.unwrap_or(false);
+            }
+        }
+    }
+    model_state.write().providers = providers;
 }

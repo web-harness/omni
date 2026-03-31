@@ -29,6 +29,8 @@ target
 /omni-ui/fixtures
 /omni-ui/assets/tailwind.css
 /omni-ui/public/omni-*.js
+/omni-rt/crates/*/omni-*.js
+/omni-ui/public/sql-wasm.wasm
 
 node_modules
 /dist

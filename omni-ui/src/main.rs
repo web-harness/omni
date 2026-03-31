@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use dioxus::prelude::*;
 use serde_json::json;
 
@@ -12,7 +10,7 @@ use components::{
     TasksSection, ThreadSidebar,
 };
 use lib::{
-    bootstrap, DataProvider, MockDataProvider, ModelState, Theme, ThreadState, UiState,
+    default_states, ChatState, ModelState, SubagentState, TasksState, Theme, ThreadState, UiState,
     WorkspaceState,
 };
 use routes::Route;
@@ -31,7 +29,7 @@ const OMNI_MDX_JS: Asset = asset!("/public/omni-mdx.js");
 const OMNI_PDFJS_JS: Asset = asset!("/public/omni-pdfjs.js");
 const OMNI_PDFJS_WORKER_JS: Asset = asset!("/public/omni-pdfjs.worker.js");
 const OMNI_PLYR_JS: Asset = asset!("/public/omni-plyr.js");
-const OMNI_ZENFS_JS: Asset = asset!("/public/omni-zenfs.js");
+const OMNI_SW_REGISTER_JS: Asset = asset!("/public/omni-sw-register.js");
 
 fn main() {
     dioxus::launch(App);
@@ -39,17 +37,26 @@ fn main() {
 
 #[component]
 fn App() -> Element {
-    let provider: Rc<dyn DataProvider> = Rc::new(MockDataProvider::new());
-    let (threads, chat, tasks, workspace, model, ui, subagents) = bootstrap(provider.clone());
+    let (threads, chat, tasks, workspace, model, ui, subagents) = default_states();
 
-    use_context_provider(|| provider);
-    use_context_provider(|| Signal::new(threads));
-    use_context_provider(|| Signal::new(chat));
-    use_context_provider(|| Signal::new(tasks));
+    let thread_signal = use_context_provider(|| Signal::new(threads));
+    let chat_signal = use_context_provider(|| Signal::new(chat));
+    let tasks_signal = use_context_provider(|| Signal::new(tasks));
     use_context_provider(|| Signal::new(workspace));
-    use_context_provider(|| Signal::new(model));
+    let model_signal = use_context_provider(|| Signal::new(model));
     use_context_provider(|| Signal::new(ui));
-    use_context_provider(|| Signal::new(subagents));
+    let subagent_signal = use_context_provider(|| Signal::new(subagents));
+
+    #[cfg(target_arch = "wasm32")]
+    use_future(move || {
+        lib::async_init(
+            thread_signal,
+            chat_signal,
+            tasks_signal,
+            model_signal,
+            subagent_signal,
+        )
+    });
 
     rsx! {
         document::Link { rel: "icon", href: FAVICON }
@@ -68,7 +75,8 @@ fn App() -> Element {
         document::Meta { name: "omni-pdfjs-worker", content: "{OMNI_PDFJS_WORKER_JS}" }
         document::Script { src: OMNI_PDFJS_JS, r#type: "module", defer: true }
         document::Script { src: OMNI_PLYR_JS, r#type: "module", defer: true }
-        document::Script { src: OMNI_ZENFS_JS }
+        document::Meta { name: "omni-sw-url", content: "/omni-sw.js" }
+        document::Script { src: OMNI_SW_REGISTER_JS, r#type: "module", defer: true }
 
         Router::<Route> {}
     }

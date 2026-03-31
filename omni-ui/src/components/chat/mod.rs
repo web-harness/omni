@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use dioxus::prelude::*;
 use dioxus_free_icons::icons::ld_icons::{
     LdBot, LdChevronDown, LdChevronRight, LdFolder, LdListTodo, LdSend, LdUser,
@@ -10,8 +8,8 @@ use futures_util::StreamExt;
 use crate::components::ui::{Badge, BadgeVariant, Popover};
 use crate::lib::thread_context::apply_stream_event;
 use crate::lib::{
-    ChatState, DataProvider, ModelState, Role, TasksState, ThreadState, ToolCall, ToolResult,
-    UiState, WorkspaceState,
+    ChatState, ModelState, Role, TasksState, ThreadState, ToolCall, ToolResult, UiState,
+    WorkspaceState,
 };
 
 #[derive(Clone)]
@@ -26,24 +24,69 @@ pub fn ChatContainer(thread_id: String) -> Element {
     let thread_state = use_context::<Signal<ThreadState>>();
     let mut chat_state = use_context::<Signal<ChatState>>();
     let mut tasks_state = use_context::<Signal<TasksState>>();
-    let provider = use_context::<Rc<dyn DataProvider>>();
 
-    let stream = use_coroutine(move |mut rx: UnboundedReceiver<StreamRequest>| {
-        let provider = provider.clone();
-        async move {
-            while let Some(req) = rx.next().await {
-                chat_state.write().is_streaming = true;
-                let mut events =
-                    provider.stream_response(&req.thread_id, &req.input, &req.model_id);
-                while let Some(event) = events.next().await {
-                    let active_tid = thread_state.read().active_thread_id.clone();
-                    apply_stream_event(
-                        active_tid.as_deref(),
-                        &mut chat_state.write(),
-                        &mut tasks_state.write(),
-                        event,
-                    );
+    let stream = use_coroutine(move |mut rx: UnboundedReceiver<StreamRequest>| async move {
+        while let Some(req) = rx.next().await {
+            chat_state.write().is_streaming = true;
+            chat_state.write().error = None;
+
+            #[cfg(target_arch = "wasm32")]
+            {
+                use omni_rt::deepagents::sse::{SseEvent, SseStream};
+                let body = serde_json::json!({
+                    "thread_id": req.thread_id,
+                    "input": req.input,
+                    "model_id": req.model_id,
+                })
+                .to_string();
+
+                match SseStream::connect("/api/runs/stream", &body).await {
+                    Ok(mut stream) => loop {
+                        match stream.next_event().await {
+                            Ok(Some(SseEvent::Token(tok))) => {
+                                let active_tid = thread_state.read().active_thread_id.clone();
+                                apply_stream_event(
+                                    active_tid.as_deref(),
+                                    &mut chat_state.write(),
+                                    &mut tasks_state.write(),
+                                    crate::lib::StreamEvent::Token(tok),
+                                );
+                            }
+                            Ok(Some(SseEvent::Done)) => {
+                                apply_stream_event(
+                                    Some(&req.thread_id),
+                                    &mut chat_state.write(),
+                                    &mut tasks_state.write(),
+                                    crate::lib::StreamEvent::Done,
+                                );
+                                break;
+                            }
+                            Ok(Some(SseEvent::Error(e))) => {
+                                chat_state.write().error = Some(e);
+                                chat_state.write().is_streaming = false;
+                                break;
+                            }
+                            Err(e) => {
+                                chat_state.write().error = Some(e.to_string());
+                                chat_state.write().is_streaming = false;
+                                break;
+                            }
+                            Ok(None) => {
+                                chat_state.write().is_streaming = false;
+                                break;
+                            }
+                        }
+                    },
+                    Err(e) => {
+                        chat_state.write().error = Some(e.to_string());
+                        chat_state.write().is_streaming = false;
+                    }
                 }
+            }
+
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                chat_state.write().is_streaming = false;
             }
         }
     });

@@ -24,7 +24,18 @@ export async function init(): Promise<void> {
     mounts: { "/": IndexedDB },
     defaultDirectories: true,
   });
-  for (const dir of ["/tmp", "/home", "/home/user", "/dev"]) {
+  for (const dir of [
+    "/tmp",
+    "/home",
+    "/home/user",
+    "/home/db",
+    "/home/db/threads",
+    "/home/db/messages",
+    "/home/db/todos",
+    "/home/db/subagents",
+    "/home/config",
+    "/dev",
+  ]) {
     await fs.promises.mkdir(dir, { recursive: true }).catch(() => {});
   }
 }

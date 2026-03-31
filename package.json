@@ -12,6 +12,7 @@
     "install:pdfjs": "npm ci --prefix omni-rt/crates/omni-pdfjs",
     "install:plyr": "npm ci --prefix omni-rt/crates/omni-plyr",
     "install:zenfs": "npm ci --prefix omni-rt/crates/omni-zenfs",
+    "install:sw": "npm ci --prefix omni-rt/crates/omni-sw",
     "postinstall": "npm-run-all --parallel install:*",
     "start": "cd omni-ui && dx serve",
     "format:biome": "biome format --write",
