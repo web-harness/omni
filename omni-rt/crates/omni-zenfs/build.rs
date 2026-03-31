@@ -25,7 +25,7 @@ fn main() {
     );
 
     let wrapper = format!(
-        "export {{ {} }} from '/omni-zenfs.js';\n",
+        "export {{ {} }} from '../../omni-zenfs.js';\n",
         exports.join(", ")
     );
     let wrapper_path = manifest_dir.join(WRAPPER_FILE);

@@ -4,10 +4,50 @@ pub use zenfs_backend::ZenFsBackend;
 
 use bashkit::PosixFs;
 use std::sync::Arc;
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
 
 pub fn build_bash() -> Bash {
     let fs = Arc::new(PosixFs::new(ZenFsBackend));
     Bash::builder().fs(fs).build()
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub async fn execute(command: String, cwd: Option<String>) -> Result<JsValue, JsValue> {
+    let mut bash = build_bash();
+    let cwd = cwd
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| "/home/workspace".to_string());
+    let script = format!("cd \"{}\" && {}", cwd.replace('"', "\\\""), command);
+
+    let obj = js_sys::Object::new();
+    match bash.exec(&script).await {
+        Ok(result) => {
+            let mut output = result.stdout;
+            if !result.stderr.is_empty() {
+                output.push_str(&result.stderr);
+            }
+            js_sys::Reflect::set(&obj, &"output".into(), &output.into())?;
+            js_sys::Reflect::set(
+                &obj,
+                &"exitCode".into(),
+                &JsValue::from_f64(result.exit_code as f64),
+            )?;
+            js_sys::Reflect::set(
+                &obj,
+                &"truncated".into(),
+                &JsValue::from_bool(result.stdout_truncated || result.stderr_truncated),
+            )?;
+        }
+        Err(err) => {
+            js_sys::Reflect::set(&obj, &"output".into(), &format!("Error: {err}").into())?;
+            js_sys::Reflect::set(&obj, &"exitCode".into(), &JsValue::from_f64(1.0))?;
+            js_sys::Reflect::set(&obj, &"truncated".into(), &JsValue::from_bool(false))?;
+        }
+    }
+
+    Ok(obj.into())
 }
 
 #[cfg(test)]

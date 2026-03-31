@@ -1,9 +1,22 @@
 import { Serwist } from "serwist";
-import { handleRunStream, handleRunWait } from "./agent/runtime.js";
 
 declare const self: ServiceWorkerGlobalScope;
 
 export type RunRoute = "runs-stream" | "runs-wait" | null;
+
+type RuntimeModule = {
+  handleRunStream(request: Request): Promise<Response>;
+  handleRunWait(request: Request): Promise<Response>;
+};
+
+let runtimeModulePromise: Promise<RuntimeModule> | null = null;
+
+function loadRuntimeModule(): Promise<RuntimeModule> {
+  if (!runtimeModulePromise) {
+    runtimeModulePromise = import("./agent/runtime.js") as Promise<RuntimeModule>;
+  }
+  return runtimeModulePromise;
+}
 
 export function matchRunRoute(request: Request): RunRoute {
   const url = new URL(request.url);
@@ -30,12 +43,12 @@ export function setupServiceWorker(scope: ServiceWorkerGlobalScope): void {
     const route = matchRunRoute(event.request);
 
     if (route === "runs-stream") {
-      event.respondWith(handleRunStream(event.request));
+      event.respondWith(loadRuntimeModule().then((runtime) => runtime.handleRunStream(event.request)));
       return;
     }
 
     if (route === "runs-wait") {
-      event.respondWith(handleRunWait(event.request));
+      event.respondWith(loadRuntimeModule().then((runtime) => runtime.handleRunWait(event.request)));
       return;
     }
   });

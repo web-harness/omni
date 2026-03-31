@@ -1,13 +1,27 @@
 import * as esbuild from "esbuild";
 import { readFileSync, copyFileSync, mkdirSync, writeFileSync } from "fs";
+import { execSync } from "child_process";
 import { createRequire } from "module";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
+const repoRoot = resolve(__dirname, "../../..");
+const zenfsCrateDir = resolve(__dirname, "../omni-zenfs");
+const bindgen = resolve(process.env.HOME || "~", ".local/share/.dx/tools/wasm-bindgen-0.2.114/wasm-bindgen");
+const bashkitWasm = resolve(repoRoot, "target/wasm32-unknown-unknown/release/omni_bashkit.wasm");
 
 mkdirSync("dist", { recursive: true });
+
+execSync("cargo build -p omni-bashkit --target wasm32-unknown-unknown --release", { cwd: repoRoot, stdio: "inherit" });
+
+execSync("npm run build", { cwd: zenfsCrateDir, stdio: "inherit" });
+
+execSync(`${bindgen} --target web --out-dir dist --out-name omni-bashkit \"${bashkitWasm}\"`, {
+  cwd: __dirname,
+  stdio: "inherit",
+});
 
 // Stub for Node built-ins that LangGraph imports but doesn't use in browser
 const nodeStubPlugin = {
@@ -111,9 +125,14 @@ const sharedOptions = {
   bundle: true,
   platform: "browser",
   target: "es2021",
+  external: ["./omni-bashkit.js", "/omni-bashkit.js", "/omni-zenfs.js"],
   define: {
+    process: "globalThis.__omni_process_polyfill",
     "process.env.NODE_ENV": '"production"',
     global: "globalThis",
+  },
+  banner: {
+    js: "globalThis.__omni_process_polyfill ??= { env: {}, platform: 'browser', version: 'v0.0.0', cwd: () => '/', nextTick: (fn, ...args) => queueMicrotask(() => fn(...args)) };",
   },
   plugins: [nodeStubPlugin],
 };

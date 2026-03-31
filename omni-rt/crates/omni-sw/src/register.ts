@@ -54,7 +54,9 @@ export async function registerServiceWorker(env: RegisterEnv): Promise<void> {
       });
     });
   } catch (err) {
-    console.error("[omni-sw] registration failed:", err);
+    const details =
+      err instanceof Error ? `${err.name}: ${err.message}${err.stack ? `\n${err.stack}` : ""}` : String(err);
+    console.error(`[omni-sw] registration failed: ${details}`);
   }
 }
 

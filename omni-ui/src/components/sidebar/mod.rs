@@ -38,11 +38,11 @@ pub fn ThreadSidebar() -> Element {
                             let nav = navigator.clone();
                             spawn(async move {
                                 if let Ok(thread) = omni_rt::deepagents::thread_store::create_thread(None).await {
-                                    let real_id = thread.thread_id.clone();
+                                    let real_id = thread.thread_id.simple().to_string();
                                     // Replace the temporary thread with the persisted one
                                     if let Some(entry) = t_state.write().threads.iter_mut().find(|t| t.id == tid) {
                                         entry.id = real_id.clone();
-                                        entry.updated_at = thread.updated_at;
+                                        entry.updated_at = thread.updated_at.to_rfc3339();
                                     }
                                     if t_state.read().active_thread_id.as_deref() == Some(&tid) {
                                         t_state.write().active_thread_id = Some(real_id.clone());

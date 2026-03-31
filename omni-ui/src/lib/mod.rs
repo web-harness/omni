@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::*;
 
 pub mod file_types;
 pub mod fixtures;
@@ -379,72 +377,6 @@ pub fn static_providers() -> Vec<Provider> {
     ]
 }
 
-#[cfg(target_arch = "wasm32")]
-fn shell_quote_single(s: &str) -> String {
-    let escaped = s.replace('"', "\\\"");
-    format!("\"{}\"", escaped)
-}
-
-#[cfg(target_arch = "wasm32")]
-fn install_bashkit_bridge() {
-    use js_sys::{Function, Object, Promise, Reflect};
-    use wasm_bindgen::closure::Closure;
-    use wasm_bindgen::JsCast;
-    use wasm_bindgen_futures::future_to_promise;
-
-    let global = js_sys::global();
-    if let Ok(existing) = Reflect::get(&global, &"__omni_bashkit_execute_client".into()) {
-        if existing.is_function() {
-            return;
-        }
-    }
-
-    let callback = Closure::<dyn FnMut(JsValue, JsValue) -> Promise>::new(
-        move |command: JsValue, cwd: JsValue| {
-            let command = command.as_string().unwrap_or_default();
-            let cwd = cwd
-                .as_string()
-                .filter(|s| !s.trim().is_empty())
-                .unwrap_or_else(|| "/home/workspace".to_string());
-
-            future_to_promise(async move {
-                let mut bash = omni_rt::bashkit::build_bash();
-                let script = format!("cd {} && {}", shell_quote_single(&cwd), command);
-
-                let response = match bash.exec(&script).await {
-                    Ok(result) => {
-                        let mut output = result.stdout;
-                        if !result.stderr.is_empty() {
-                            output.push_str(&result.stderr);
-                        }
-                        (
-                            output,
-                            result.exit_code,
-                            result.stdout_truncated || result.stderr_truncated,
-                        )
-                    }
-                    Err(err) => (format!("Error: {err}"), 1, false),
-                };
-
-                let obj = Object::new();
-                Reflect::set(&obj, &"output".into(), &response.0.into()).ok();
-                Reflect::set(
-                    &obj,
-                    &"exitCode".into(),
-                    &JsValue::from_f64(response.1 as f64),
-                )
-                .ok();
-                Reflect::set(&obj, &"truncated".into(), &JsValue::from_bool(response.2)).ok();
-                Ok(obj.into())
-            })
-        },
-    );
-
-    let func: &Function = callback.as_ref().unchecked_ref();
-    Reflect::set(&global, &"__omni_bashkit_execute_client".into(), func).ok();
-    callback.forget();
-}
-
 pub fn default_states() -> (
     ThreadState,
     ChatState,
@@ -540,8 +472,6 @@ pub async fn async_init(
         return;
     }
 
-    install_bashkit_bridge();
-
     {
         let models = model_registry::list_models()
             .into_iter()
@@ -584,6 +514,9 @@ pub async fn async_init(
         Err(_) => return,
     };
 
+    let default_model = config_store::get_default_model()
+        .await
+        .unwrap_or_else(|_| "claude-3-7-sonnet".to_string());
     let first_model = model_state.read().models.first().map(|m| m.id.clone());
     let mut selected_model = HashMap::new();
     let mut messages: HashMap<String, Vec<UiMessage>> = HashMap::new();
@@ -593,23 +526,38 @@ pub async fn async_init(
     let threads: Vec<UiThread> = stored
         .into_iter()
         .map(|t| {
-            let id = t.thread_id.clone();
+            let id = t.thread_id.simple().to_string();
             selected_model.insert(
                 id.clone(),
-                first_model
-                    .clone()
-                    .unwrap_or_else(|| "claude-3-7-sonnet".to_string()),
+                if model_state
+                    .read()
+                    .models
+                    .iter()
+                    .any(|m| m.id == default_model)
+                {
+                    default_model.clone()
+                } else {
+                    first_model
+                        .clone()
+                        .unwrap_or_else(|| "claude-3-7-sonnet".to_string())
+                },
             );
+            let title = t
+                .metadata
+                .get("title")
+                .and_then(|v| v.as_str())
+                .unwrap_or("New Thread")
+                .to_string();
             UiThread {
                 id,
-                title: t.title,
+                title,
                 status: match t.status {
                     omni_rt::protocol::ThreadStatus::Busy => ThreadStatus::Busy,
                     omni_rt::protocol::ThreadStatus::Interrupted => ThreadStatus::Interrupted,
                     omni_rt::protocol::ThreadStatus::Error => ThreadStatus::Error,
                     omni_rt::protocol::ThreadStatus::Idle => ThreadStatus::Idle,
                 },
-                updated_at: t.updated_at,
+                updated_at: t.updated_at.to_rfc3339(),
             }
         })
         .collect();
@@ -687,6 +635,4 @@ pub async fn async_init(
         ss.subagents = subagents;
     }
     model_state.write().selected_model = selected_model;
-
-    let _ = config_store::get_default_model().await;
 }

@@ -4,6 +4,7 @@ import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { HumanMessage } from "@langchain/core/messages";
 import { createDeepAgent } from "deepagents";
+import initBashkit, { execute as bashkitExecute } from "./omni-bashkit.js";
 import { fs, configure } from "@zenfs/core";
 import { IndexedDB } from "@zenfs/dom";
 import { SqlJsSaver } from "../checkpointer.js";
@@ -94,12 +95,36 @@ function sseChunk(data: string): Uint8Array {
   return new TextEncoder().encode(`data: ${data}\n\n`);
 }
 
-async function executeWithBashkit(_command: string, _cwd: string) {
-  return {
-    output: "Error: SW bashkit executor is not wired yet.",
-    exitCode: 1,
-    truncated: false,
-  };
+type BashkitExecute = (
+  command: string,
+  cwd?: string,
+) => Promise<{
+  output: string;
+  exitCode: number;
+  truncated: boolean;
+}>;
+
+let bashkitReadyPromise: Promise<void> | null = null;
+
+async function loadBashkitExecutor(): Promise<BashkitExecute> {
+  if (!bashkitReadyPromise) {
+    bashkitReadyPromise = initBashkit();
+  }
+  await bashkitReadyPromise;
+  return bashkitExecute as BashkitExecute;
+}
+
+async function executeWithBashkit(command: string, cwd: string) {
+  try {
+    const execute = await loadBashkitExecutor();
+    return await execute(command, cwd);
+  } catch (err) {
+    return {
+      output: `Error: ${String(err)}`,
+      exitCode: 1,
+      truncated: false,
+    };
+  }
 }
 
 export async function handleRunStream(request: Request): Promise<Response> {

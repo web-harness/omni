@@ -31,6 +31,16 @@ const OMNI_PDFJS_WORKER_JS: Asset = asset!("/public/omni-pdfjs.worker.js");
 const OMNI_PLYR_JS: Asset = asset!("/public/omni-plyr.js");
 const OMNI_SW_REGISTER_JS: Asset = asset!("/public/omni-sw-register.js");
 
+#[cfg(target_arch = "wasm32")]
+fn provider_prefix(provider: &lib::ProviderId) -> &'static str {
+    match provider {
+        lib::ProviderId::Anthropic => "anthropic",
+        lib::ProviderId::OpenAI => "openai",
+        lib::ProviderId::Google => "google",
+        lib::ProviderId::Ollama => "ollama",
+    }
+}
+
 fn main() {
     dioxus::launch(App);
 }
@@ -193,7 +203,7 @@ pub fn AppLayout() -> Element {
                 open: ui_state.read().api_key_dialog_open,
                 on_close: move |_| ui_state.write().api_key_dialog_open = false,
                 h3 { class: "text-sm font-semibold", "Provider API Key" }
-                p { class: "mt-2 text-xs text-muted-foreground", "Mocked dialog for API key setup." }
+                p { class: "mt-2 text-xs text-muted-foreground", "API keys are stored in /home/config/.env." }
                 p { class: "mt-2 text-[11px]", "Provider: {ui_state.read().api_key_provider:?}" }
                 Input {
                     value: ui_state.read().api_key_draft.clone(),
@@ -211,6 +221,47 @@ pub fn AppLayout() -> Element {
                     }
                     Button {
                         onclick: move |_| {
+                            #[cfg(target_arch = "wasm32")]
+                            {
+                                let provider = ui_state.read().api_key_provider.clone();
+                                let value = ui_state.read().api_key_draft.trim().to_string();
+                                let mut model_state_for_save = model_state;
+                                spawn(async move {
+                                    let prefix = provider_prefix(&provider);
+                                    if value.is_empty() {
+                                        let _ = omni_rt::deepagents::config_store::delete_api_key(prefix).await;
+                                    } else {
+                                        let _ = omni_rt::deepagents::config_store::set_api_key(prefix, &value).await;
+                                    }
+
+                                    if let Ok(providers) = omni_rt::deepagents::model_registry::list_providers_with_keys().await {
+                                        let mapped = providers
+                                            .into_iter()
+                                            .map(|(p, has_api_key)| lib::Provider {
+                                                id: match p.id {
+                                                    omni_rt::deepagents::model_registry::ProviderId::Anthropic => {
+                                                        lib::ProviderId::Anthropic
+                                                    }
+                                                    omni_rt::deepagents::model_registry::ProviderId::OpenAI => {
+                                                        lib::ProviderId::OpenAI
+                                                    }
+                                                    omni_rt::deepagents::model_registry::ProviderId::Google => {
+                                                        lib::ProviderId::Google
+                                                    }
+                                                    omni_rt::deepagents::model_registry::ProviderId::Ollama => {
+                                                        lib::ProviderId::Ollama
+                                                    }
+                                                },
+                                                name: p.name,
+                                                has_api_key,
+                                            })
+                                            .collect::<Vec<_>>();
+                                        model_state_for_save.write().providers = mapped;
+                                    }
+                                });
+                            }
+
+                            ui_state.write().api_key_draft.clear();
                             ui_state.write().api_key_dialog_open = false;
                         },
                         "Save"

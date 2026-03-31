@@ -445,6 +445,16 @@ pub fn ModelSwitcher() -> Element {
         .cloned()
         .collect();
 
+    #[cfg(target_arch = "wasm32")]
+    fn provider_prefix(provider: &crate::lib::ProviderId) -> &'static str {
+        match provider {
+            crate::lib::ProviderId::Anthropic => "anthropic",
+            crate::lib::ProviderId::OpenAI => "openai",
+            crate::lib::ProviderId::Google => "google",
+            crate::lib::ProviderId::Ollama => "ollama",
+        }
+    }
+
     rsx! {
         Popover {
             open: open(),
@@ -482,7 +492,23 @@ pub fn ModelSwitcher() -> Element {
                     button {
                         class: "mt-1 w-full rounded-sm border border-border px-2 py-1 text-left text-[10px] text-muted-foreground hover:bg-background-interactive",
                         onclick: move |_| {
-                            ui_state.write().api_key_provider = selected_provider();
+                            let provider = selected_provider();
+                            ui_state.write().api_key_provider = provider.clone();
+
+                            #[cfg(target_arch = "wasm32")]
+                            {
+                                let mut ui_for_load = ui_state;
+                                let prefix = provider_prefix(&provider).to_string();
+                                spawn(async move {
+                                    let key = omni_rt::deepagents::config_store::get_api_key(&prefix)
+                                        .await
+                                        .ok()
+                                        .flatten()
+                                        .unwrap_or_default();
+                                    ui_for_load.write().api_key_draft = key;
+                                });
+                            }
+
                             ui_state.write().api_key_dialog_open = true;
                             open.set(false);
                         },
@@ -505,6 +531,13 @@ pub fn ModelSwitcher() -> Element {
                                     class: "{btn_class}",
                                     onclick: move |_| {
                                         model_state.write().selected_model.insert(tid_for_click.clone(), mid.clone());
+                                        #[cfg(target_arch = "wasm32")]
+                                        {
+                                            let model_id = mid.clone();
+                                            spawn(async move {
+                                                let _ = omni_rt::deepagents::config_store::set_default_model(&model_id).await;
+                                            });
+                                        }
                                         open.set(false);
                                     },
                                     "{model.name}"

@@ -3599,8 +3599,10 @@ dependencies = [
  "async-trait",
  "bashkit",
  "futures-channel",
+ "js-sys",
  "omni-zenfs",
  "tokio",
+ "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
 ]

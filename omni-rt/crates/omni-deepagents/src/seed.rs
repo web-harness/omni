@@ -28,7 +28,7 @@ pub async fn seed_if_empty() -> Result<(), std::io::Error> {
         now.to_rfc3339(),
     )
     .await?;
-    let t1id = &t1.thread_id;
+    let t1id = t1.thread_id.simple().to_string();
 
     for msg in [
         StoredMessage { id: "m1".into(), thread_id: t1id.clone(), role: Role::User, content: "I need a full todo management system with CRUD operations, filtering by status, and persistence via ZenFS.".into(), created_at: "2025-03-30T10:00:00Z".into() },
@@ -105,7 +105,7 @@ pub async fn seed_if_empty() -> Result<(), std::io::Error> {
         (now - chrono::Duration::hours(16)).to_rfc3339(),
     )
     .await?;
-    let t2id = &t2.thread_id;
+    let t2id = t2.thread_id.simple().to_string();
 
     for msg in [
         StoredMessage { id: "m5".into(), thread_id: t2id.clone(), role: Role::User, content: "Set up JWT-based auth with refresh tokens, protected routes, and session persistence.".into(), created_at: "2025-03-29T18:00:00Z".into() },
@@ -168,7 +168,7 @@ pub async fn seed_if_empty() -> Result<(), std::io::Error> {
         (now - chrono::Duration::hours(46)).to_rfc3339(),
     )
     .await?;
-    let t3id = &t3.thread_id;
+    let t3id = t3.thread_id.simple().to_string();
 
     for msg in [
         StoredMessage { id: "m8".into(), thread_id: t3id.clone(), role: Role::User, content: "We need to migrate from SQLite to PostgreSQL without downtime. There are 2M records.".into(), created_at: "2025-03-28T12:00:00Z".into() },
@@ -223,7 +223,7 @@ pub async fn seed_if_empty() -> Result<(), std::io::Error> {
         (now - chrono::Duration::hours(73)).to_rfc3339(),
     )
     .await?;
-    let t4id = &t4.thread_id;
+    let t4id = t4.thread_id.simple().to_string();
 
     for msg in [
         StoredMessage { id: "m10".into(), thread_id: t4id.clone(), role: Role::User, content: "Set up GitHub Actions with test, lint, build, deploy stages and environment-specific secrets.".into(), created_at: "2025-03-27T09:00:00Z".into() },
@@ -266,7 +266,7 @@ pub async fn seed_if_empty() -> Result<(), std::io::Error> {
         (now - chrono::Duration::hours(111)).to_rfc3339(),
     )
     .await?;
-    let t5id = &t5.thread_id;
+    let t5id = t5.thread_id.simple().to_string();
 
     for msg in [
         StoredMessage { id: "m12".into(), thread_id: t5id.clone(), role: Role::User, content: "What would be a good approach to implement real-time collaboration features?".into(), created_at: "2025-03-26T15:00:00Z".into() },
