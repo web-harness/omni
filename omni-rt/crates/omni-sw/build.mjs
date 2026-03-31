@@ -125,7 +125,7 @@ const sharedOptions = {
   bundle: true,
   platform: "browser",
   target: "es2021",
-  external: ["./omni-bashkit.js", "/omni-bashkit.js", "/omni-zenfs.js"],
+  external: ["./omni-bashkit.js", "/omni-bashkit.js", "./omni-zenfs.js", "/omni-zenfs.js"],
   define: {
     process: "globalThis.__omni_process_polyfill",
     "process.env.NODE_ENV": '"production"',

@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 
 pub mod file_types;
 pub mod fixtures;
+#[cfg(target_arch = "wasm32")]
+pub mod sw_api;
 pub mod thread_context;
 pub mod utils;
 
@@ -270,21 +272,7 @@ impl SubagentState {
 pub fn static_models() -> Vec<ModelConfig> {
     #[cfg(target_arch = "wasm32")]
     {
-        return omni_rt::deepagents::model_registry::list_models()
-            .into_iter()
-            .map(|m| ModelConfig {
-                id: m.id,
-                name: m.name,
-                provider: match m.provider {
-                    omni_rt::deepagents::model_registry::ProviderId::Anthropic => {
-                        ProviderId::Anthropic
-                    }
-                    omni_rt::deepagents::model_registry::ProviderId::OpenAI => ProviderId::OpenAI,
-                    omni_rt::deepagents::model_registry::ProviderId::Google => ProviderId::Google,
-                    omni_rt::deepagents::model_registry::ProviderId::Ollama => ProviderId::Ollama,
-                },
-            })
-            .collect();
+        return vec![];
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -335,21 +323,7 @@ pub fn static_models() -> Vec<ModelConfig> {
 pub fn static_providers() -> Vec<Provider> {
     #[cfg(target_arch = "wasm32")]
     {
-        return omni_rt::deepagents::model_registry::list_providers()
-            .into_iter()
-            .map(|p| Provider {
-                id: match p.id {
-                    omni_rt::deepagents::model_registry::ProviderId::Anthropic => {
-                        ProviderId::Anthropic
-                    }
-                    omni_rt::deepagents::model_registry::ProviderId::OpenAI => ProviderId::OpenAI,
-                    omni_rt::deepagents::model_registry::ProviderId::Google => ProviderId::Google,
-                    omni_rt::deepagents::model_registry::ProviderId::Ollama => ProviderId::Ollama,
-                },
-                name: p.name,
-                has_api_key: false,
-            })
-            .collect();
+        return vec![];
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -450,171 +424,52 @@ pub async fn async_init(
     mut thread_state: dioxus::prelude::Signal<ThreadState>,
     mut chat_state: dioxus::prelude::Signal<ChatState>,
     mut tasks_state: dioxus::prelude::Signal<TasksState>,
+    mut workspace_state: dioxus::prelude::Signal<WorkspaceState>,
     mut model_state: dioxus::prelude::Signal<ModelState>,
     mut subagent_state: dioxus::prelude::Signal<SubagentState>,
 ) {
     use dioxus::signals::{ReadableExt, WritableExt};
-    use omni_rt::deepagents::{
-        config_store, message_store, model_registry, seed, subagent_store, thread_store, todo_store,
-    };
-    use omni_rt::zenfs;
-
-    fn map_provider_id(id: model_registry::ProviderId) -> ProviderId {
-        match id {
-            model_registry::ProviderId::Anthropic => ProviderId::Anthropic,
-            model_registry::ProviderId::OpenAI => ProviderId::OpenAI,
-            model_registry::ProviderId::Google => ProviderId::Google,
-            model_registry::ProviderId::Ollama => ProviderId::Ollama,
-        }
-    }
-
-    if zenfs::init().await.is_err() {
-        return;
-    }
-
-    {
-        let models = model_registry::list_models()
-            .into_iter()
-            .map(|m| ModelConfig {
-                id: m.id,
-                name: m.name,
-                provider: map_provider_id(m.provider),
-            })
-            .collect::<Vec<_>>();
-
-        let providers = model_registry::list_providers_with_keys()
-            .await
-            .unwrap_or_default()
-            .into_iter()
-            .map(|(p, has_api_key)| Provider {
-                id: map_provider_id(p.id),
-                name: p.name,
-                has_api_key,
-            })
-            .collect::<Vec<_>>();
-
-        let mut ms = model_state.write();
-        if !models.is_empty() {
-            ms.models = models;
-        }
-        if !providers.is_empty() {
-            ms.providers = providers;
-        }
-    }
-
-    let _ = seed::seed_if_empty().await;
-
-    let stored = match thread_store::list_threads().await {
-        Ok(t) => {
-            if t.is_empty() {
-                return;
-            }
-            t
-        }
+    let payload = match sw_api::fetch_bootstrap().await {
+        Ok(p) => p,
         Err(_) => return,
     };
 
-    let default_model = config_store::get_default_model()
-        .await
-        .unwrap_or_else(|_| "claude-3-7-sonnet".to_string());
+    {
+        let mut ms = model_state.write();
+        if !payload.models.is_empty() {
+            ms.models = payload.models.clone();
+        }
+        if !payload.providers.is_empty() {
+            ms.providers = payload.providers.clone();
+        }
+    }
+
     let first_model = model_state.read().models.first().map(|m| m.id.clone());
     let mut selected_model = HashMap::new();
-    let mut messages: HashMap<String, Vec<UiMessage>> = HashMap::new();
-    let mut todos: HashMap<String, Vec<Todo>> = HashMap::new();
-    let mut subagents: HashMap<String, Vec<Subagent>> = HashMap::new();
-
-    let threads: Vec<UiThread> = stored
+    let threads: Vec<UiThread> = payload
+        .threads
+        .clone()
         .into_iter()
         .map(|t| {
-            let id = t.thread_id.simple().to_string();
+            let id = t.id.clone();
             selected_model.insert(
                 id.clone(),
                 if model_state
                     .read()
                     .models
                     .iter()
-                    .any(|m| m.id == default_model)
+                    .any(|m| m.id == payload.default_model)
                 {
-                    default_model.clone()
+                    payload.default_model.clone()
                 } else {
                     first_model
                         .clone()
                         .unwrap_or_else(|| "claude-3-7-sonnet".to_string())
                 },
             );
-            let title = t
-                .metadata
-                .get("title")
-                .and_then(|v| v.as_str())
-                .unwrap_or("New Thread")
-                .to_string();
-            UiThread {
-                id,
-                title,
-                status: match t.status {
-                    omni_rt::protocol::ThreadStatus::Busy => ThreadStatus::Busy,
-                    omni_rt::protocol::ThreadStatus::Interrupted => ThreadStatus::Interrupted,
-                    omni_rt::protocol::ThreadStatus::Error => ThreadStatus::Error,
-                    omni_rt::protocol::ThreadStatus::Idle => ThreadStatus::Idle,
-                },
-                updated_at: t.updated_at.to_rfc3339(),
-            }
+            t
         })
         .collect();
-
-    for t in &threads {
-        if let Ok(msgs) = message_store::list_messages(&t.id).await {
-            messages.insert(
-                t.id.clone(),
-                msgs.into_iter()
-                    .map(|m| UiMessage {
-                        id: m.id,
-                        role: match m.role {
-                            message_store::Role::User => Role::User,
-                            message_store::Role::Assistant => Role::Assistant,
-                            message_store::Role::Tool => Role::Tool,
-                        },
-                        content: m.content,
-                    })
-                    .collect(),
-            );
-        }
-        if let Ok(tdos) = todo_store::list_todos(&t.id).await {
-            todos.insert(
-                t.id.clone(),
-                tdos.into_iter()
-                    .map(|td| Todo {
-                        id: td.id,
-                        content: td.content,
-                        status: match td.status {
-                            todo_store::TodoStatus::Pending => TodoStatus::Pending,
-                            todo_store::TodoStatus::InProgress => TodoStatus::InProgress,
-                            todo_store::TodoStatus::Completed => TodoStatus::Completed,
-                            todo_store::TodoStatus::Cancelled => TodoStatus::Cancelled,
-                        },
-                    })
-                    .collect(),
-            );
-        }
-        if let Ok(sas) = subagent_store::list_subagents(&t.id).await {
-            subagents.insert(
-                t.id.clone(),
-                sas.into_iter()
-                    .map(|sa| Subagent {
-                        id: sa.id,
-                        name: sa.name,
-                        description: sa.description,
-                        status: match sa.status {
-                            subagent_store::SubagentStatus::Pending => SubagentStatus::Pending,
-                            subagent_store::SubagentStatus::Running => SubagentStatus::Running,
-                            subagent_store::SubagentStatus::Completed => SubagentStatus::Completed,
-                            subagent_store::SubagentStatus::Failed => SubagentStatus::Failed,
-                        },
-                    })
-                    .collect(),
-            );
-        }
-    }
 
     let active_id = threads.first().map(|t| t.id.clone());
     {
@@ -624,15 +479,29 @@ pub async fn async_init(
     }
     {
         let mut cs = chat_state.write();
-        cs.messages = messages;
+        cs.messages = payload.messages;
     }
     {
         let mut tsk = tasks_state.write();
-        tsk.todos = todos;
+        tsk.todos = payload.todos;
     }
     {
         let mut ss = subagent_state.write();
-        ss.subagents = subagents;
+        ss.subagents = payload.subagents;
     }
     model_state.write().selected_model = selected_model;
+
+    if let Some(active) = thread_state.read().active_thread_id.clone() {
+        let workspace = "/home/workspace".to_string();
+        if let Ok(files) = sw_api::list_workspace_files(&workspace).await {
+            workspace_state
+                .write()
+                .workspace_path
+                .insert(active.clone(), workspace.clone());
+            workspace_state
+                .write()
+                .workspace_files
+                .insert(workspace, files);
+        }
+    }
 }

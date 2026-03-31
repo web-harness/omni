@@ -37,12 +37,12 @@ pub fn ThreadSidebar() -> Element {
                             let tid = temp_id.clone();
                             let nav = navigator.clone();
                             spawn(async move {
-                                if let Ok(thread) = omni_rt::deepagents::thread_store::create_thread(None).await {
-                                    let real_id = thread.thread_id.simple().to_string();
+                                if let Ok(thread) = crate::lib::sw_api::create_thread().await {
+                                    let real_id = thread.id;
                                     // Replace the temporary thread with the persisted one
                                     if let Some(entry) = t_state.write().threads.iter_mut().find(|t| t.id == tid) {
                                         entry.id = real_id.clone();
-                                        entry.updated_at = thread.updated_at.to_rfc3339();
+                                        entry.updated_at = thread.updated_at;
                                     }
                                     if t_state.read().active_thread_id.as_deref() == Some(&tid) {
                                         t_state.write().active_thread_id = Some(real_id.clone());
@@ -140,7 +140,7 @@ fn ThreadRow(thread: crate::lib::UiThread) -> Element {
                         {
                             let id2 = id.clone();
                             spawn(async move {
-                                let _ = omni_rt::deepagents::thread_store::delete_thread(&id2).await;
+                                let _ = crate::lib::sw_api::delete_thread(&id2).await;
                             });
                         }
                     },

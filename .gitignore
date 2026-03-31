@@ -32,7 +32,9 @@ target
 /omni-ui/public/omni-*.wasm
 /omni-ui/public/omni-*.wasm.d.ts
 /omni-rt/crates/*/omni-*.js
-/omni-ui/public/sql-wasm.wasm
+/omni-ui/public/*.wasm
+/omni-ui/public/wasm/omni-*.js
+/omni-ui/public/snippets/omni-*/*.js
 
 node_modules
 /dist

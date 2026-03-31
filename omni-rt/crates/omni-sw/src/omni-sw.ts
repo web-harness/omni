@@ -1,8 +1,20 @@
 import { Serwist } from "serwist";
+import { handleStoreRoute, matchStoreRoute } from "./store-api.js";
 
 declare const self: ServiceWorkerGlobalScope;
 
 export type RunRoute = "runs-stream" | "runs-wait" | null;
+export type StoreRoute =
+  | "store-bootstrap"
+  | "store-create-thread"
+  | "store-delete-thread"
+  | "store-providers"
+  | "store-get-api-key"
+  | "store-set-api-key"
+  | "store-delete-api-key"
+  | "store-get-default-model"
+  | "store-set-default-model"
+  | null;
 
 type RuntimeModule = {
   handleRunStream(request: Request): Promise<Response>;
@@ -40,6 +52,12 @@ export function setupServiceWorker(scope: ServiceWorkerGlobalScope): void {
   serwist.addEventListeners();
 
   scope.addEventListener("fetch", (event: FetchEvent) => {
+    const storeRoute = matchStoreRoute(event.request);
+    if (storeRoute) {
+      event.respondWith(handleStoreRoute(event.request, storeRoute));
+      return;
+    }
+
     const route = matchRunRoute(event.request);
 
     if (route === "runs-stream") {

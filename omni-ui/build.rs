@@ -56,6 +56,17 @@ fn main() {
         )
         .unwrap_or_else(|e| panic!("failed to copy {js_name}: {e}"));
 
+        if *js_name == "omni-zenfs.js" {
+            let wasm_dir = public_dir.join("wasm");
+            fs::create_dir_all(&wasm_dir)
+                .unwrap_or_else(|e| panic!("failed to create wasm dir: {e}"));
+            fs::write(
+                wasm_dir.join("omni-zenfs.js"),
+                "export * from \"../omni-zenfs.js\";\n",
+            )
+            .unwrap_or_else(|e| panic!("failed to write wasm/omni-zenfs.js: {e}"));
+        }
+
         if let Some(extra) = extra_file {
             fs::copy(crate_dir.join("dist").join(extra), public_dir.join(extra))
                 .unwrap_or_else(|e| panic!("failed to copy {extra}: {e}"));
@@ -91,8 +102,52 @@ fn main() {
             }
             copy_dir_recursive(&snippets_src, &snippets_dst)
                 .unwrap_or_else(|e| panic!("failed to copy snippets dir: {e}"));
+
+            normalize_zenfs_snippet_import(&public_dir)
+                .unwrap_or_else(|e| panic!("failed to normalize zenfs snippet import: {e}"));
         }
     }
+}
+
+fn normalize_zenfs_snippet_import(public_dir: &PathBuf) -> std::io::Result<()> {
+    let bashkit_js = public_dir.join("omni-bashkit.js");
+    if !bashkit_js.exists() {
+        return Ok(());
+    }
+
+    let mut js = fs::read_to_string(&bashkit_js)?;
+    let needle = "./snippets/omni-zenfs-";
+    let Some(start) = js.find(needle) else {
+        return Ok(());
+    };
+
+    let tail = &js[start + needle.len()..];
+    let Some(end_rel) = tail.find("/omni-zenfs.js") else {
+        return Ok(());
+    };
+    let hash = &tail[..end_rel];
+    if hash.is_empty() {
+        return Ok(());
+    }
+
+    let hashed_file = public_dir
+        .join("snippets")
+        .join(format!("omni-zenfs-{hash}"))
+        .join("omni-zenfs.js");
+    if !hashed_file.exists() {
+        return Ok(());
+    }
+
+    let stable_dir = public_dir.join("snippets").join("omni-zenfs");
+    fs::create_dir_all(&stable_dir)?;
+    fs::copy(&hashed_file, stable_dir.join("omni-zenfs.js"))?;
+
+    let old = format!("./snippets/omni-zenfs-{hash}/omni-zenfs.js");
+    let new = "./snippets/omni-zenfs/omni-zenfs.js";
+    js = js.replace(&old, new);
+    fs::write(&bashkit_js, js)?;
+
+    Ok(())
 }
 
 fn copy_dir_recursive(src: &PathBuf, dst: &PathBuf) -> std::io::Result<()> {

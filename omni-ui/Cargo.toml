@@ -24,6 +24,7 @@ web-sys = { version = "0.3", features = ["Window", "Location"] }
 js-sys = "0.3"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
+gloo-net = { version = "0.6", features = ["http"] }
 
 [build-dependencies]
 video-rs = { version = "0.11", features = ["ndarray"] }

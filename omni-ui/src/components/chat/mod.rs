@@ -500,10 +500,8 @@ pub fn ModelSwitcher() -> Element {
                                 let mut ui_for_load = ui_state;
                                 let prefix = provider_prefix(&provider).to_string();
                                 spawn(async move {
-                                    let key = omni_rt::deepagents::config_store::get_api_key(&prefix)
+                                    let key = crate::lib::sw_api::get_api_key(&prefix)
                                         .await
-                                        .ok()
-                                        .flatten()
                                         .unwrap_or_default();
                                     ui_for_load.write().api_key_draft = key;
                                 });
@@ -535,7 +533,7 @@ pub fn ModelSwitcher() -> Element {
                                         {
                                             let model_id = mid.clone();
                                             spawn(async move {
-                                                let _ = omni_rt::deepagents::config_store::set_default_model(&model_id).await;
+                                                let _ = crate::lib::sw_api::set_default_model(&model_id).await;
                                             });
                                         }
                                         open.set(false);
@@ -584,19 +582,29 @@ pub fn WorkspacePicker() -> Element {
                 div { class: "px-2 pb-1 text-[9px] font-semibold uppercase tracking-widest text-muted-foreground", "Select Workspace" }
                 for (name, path) in presets {
                     {
-                        let active = workspace_state.read().workspace_for(&tid) == name;
+                        let active = workspace_state.read().workspace_for(&tid) == path;
                         let btn_class = if active {
                             "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left bg-primary/10 text-primary"
                         } else {
                             "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left hover:bg-background-interactive text-muted-foreground"
                         };
                         let tid_for_click = tid.clone();
+                        let mut ws_state = workspace_state;
                         rsx! {
                             button {
                                 key: "{name}",
                                 class: "{btn_class}",
                                 onclick: move |_| {
-                                    workspace_state.write().workspace_path.insert(tid_for_click.clone(), name.to_string());
+                                    let workspace_path = path.to_string();
+                                    ws_state
+                                        .write()
+                                        .workspace_path
+                                        .insert(tid_for_click.clone(), workspace_path.clone());
+                                    spawn(async move {
+                                        if let Ok(files) = crate::lib::sw_api::list_workspace_files(&workspace_path).await {
+                                            ws_state.write().workspace_files.insert(workspace_path, files);
+                                        }
+                                    });
                                     open.set(false);
                                 },
                                 Icon { width: 12, height: 12, icon: LdFolder, class: "shrink-0" }

@@ -52,7 +52,7 @@ fn App() -> Element {
     let thread_signal = use_context_provider(|| Signal::new(threads));
     let chat_signal = use_context_provider(|| Signal::new(chat));
     let tasks_signal = use_context_provider(|| Signal::new(tasks));
-    use_context_provider(|| Signal::new(workspace));
+    let workspace_signal = use_context_provider(|| Signal::new(workspace));
     let model_signal = use_context_provider(|| Signal::new(model));
     use_context_provider(|| Signal::new(ui));
     let subagent_signal = use_context_provider(|| Signal::new(subagents));
@@ -63,6 +63,7 @@ fn App() -> Element {
             thread_signal,
             chat_signal,
             tasks_signal,
+            workspace_signal,
             model_signal,
             subagent_signal,
         )
@@ -104,7 +105,7 @@ pub fn AppLayout() -> Element {
         .active_thread_id
         .clone()
         .unwrap_or_default();
-    let active_panel = "chat";
+    let active_panel = workspace_state.read().active_tab_for(&thread_id);
 
     let open_tabs = workspace_state.read().open_tabs_for(&thread_id);
     let mut panels = vec![
@@ -140,7 +141,7 @@ pub fn AppLayout() -> Element {
             omni-dock {
                 class: "h-screen w-screen",
                 "data-panels": panel_config,
-                "data-active-panel": active_panel,
+                "data-active-panel": active_panel.clone(),
                 "data-proportions": "20,60,20",
                 input {
                     r#type: "hidden",
@@ -229,34 +230,13 @@ pub fn AppLayout() -> Element {
                                 spawn(async move {
                                     let prefix = provider_prefix(&provider);
                                     if value.is_empty() {
-                                        let _ = omni_rt::deepagents::config_store::delete_api_key(prefix).await;
+                                        let _ = lib::sw_api::delete_api_key(prefix).await;
                                     } else {
-                                        let _ = omni_rt::deepagents::config_store::set_api_key(prefix, &value).await;
+                                        let _ = lib::sw_api::set_api_key(prefix, &value).await;
                                     }
 
-                                    if let Ok(providers) = omni_rt::deepagents::model_registry::list_providers_with_keys().await {
-                                        let mapped = providers
-                                            .into_iter()
-                                            .map(|(p, has_api_key)| lib::Provider {
-                                                id: match p.id {
-                                                    omni_rt::deepagents::model_registry::ProviderId::Anthropic => {
-                                                        lib::ProviderId::Anthropic
-                                                    }
-                                                    omni_rt::deepagents::model_registry::ProviderId::OpenAI => {
-                                                        lib::ProviderId::OpenAI
-                                                    }
-                                                    omni_rt::deepagents::model_registry::ProviderId::Google => {
-                                                        lib::ProviderId::Google
-                                                    }
-                                                    omni_rt::deepagents::model_registry::ProviderId::Ollama => {
-                                                        lib::ProviderId::Ollama
-                                                    }
-                                                },
-                                                name: p.name,
-                                                has_api_key,
-                                            })
-                                            .collect::<Vec<_>>();
-                                        model_state_for_save.write().providers = mapped;
+                                    if let Ok(providers) = lib::sw_api::list_providers_with_keys().await {
+                                        model_state_for_save.write().providers = providers;
                                     }
                                 });
                             }

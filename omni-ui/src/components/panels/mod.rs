@@ -152,6 +152,28 @@ pub fn FilesSection() -> Element {
         .unwrap_or_default();
     let files = workspace_state.read().files_for_thread(&tid);
     let workspace = workspace_state.read().workspace_for(&tid);
+    let mut workspace_state_for_sync = workspace_state;
+
+    {
+        let workspace_path = workspace.clone();
+        let mut ws_state = workspace_state;
+        let should_fetch = files.is_empty();
+        use_effect(move || {
+            if should_fetch {
+                let workspace_path_for_task = workspace_path.clone();
+                spawn(async move {
+                    if let Ok(fetched) =
+                        crate::lib::sw_api::list_workspace_files(&workspace_path_for_task).await
+                    {
+                        ws_state
+                            .write()
+                            .workspace_files
+                            .insert(workspace_path_for_task, fetched);
+                    }
+                });
+            }
+        });
+    }
 
     rsx! {
         div { class: "overflow-auto",
@@ -159,6 +181,17 @@ pub fn FilesSection() -> Element {
                 span { class: "text-[10px] font-semibold text-muted-foreground tracking-wide", "{workspace}" }
                 button {
                     class: "flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground",
+                    onclick: move |_| {
+                        let workspace_path = workspace.clone();
+                        spawn(async move {
+                            if let Ok(files) = crate::lib::sw_api::list_workspace_files(&workspace_path).await {
+                                workspace_state_for_sync
+                                    .write()
+                                    .workspace_files
+                                    .insert(workspace_path, files);
+                            }
+                        });
+                    },
                     Icon { width: 10, height: 10, icon: LdRefreshCw }
                     span { "Sync" }
                 }
@@ -175,7 +208,7 @@ pub fn FilesSection() -> Element {
                                 ws.open_tabs.entry(tid.clone()).or_default().push(path.clone());
                             }
                             ws.active_tab.insert(tid.clone(), path);
-                        }}}
+                        }, workspace_root: workspace.clone() }}
                     }
                 }
             }
@@ -184,8 +217,14 @@ pub fn FilesSection() -> Element {
 }
 
 #[component]
-fn FileRow(file: FileInfo, on_open: EventHandler<String>) -> Element {
-    let depth = file.path.matches('/').count();
+fn FileRow(file: FileInfo, on_open: EventHandler<String>, workspace_root: String) -> Element {
+    let root = workspace_root.trim_end_matches('/');
+    let relative = file
+        .path
+        .strip_prefix(&format!("{root}/"))
+        .unwrap_or(&file.path)
+        .to_string();
+    let depth = relative.matches('/').count();
     let name = file
         .path
         .split('/')
