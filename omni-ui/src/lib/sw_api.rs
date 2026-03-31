@@ -3,14 +3,21 @@ use std::collections::HashMap;
 use gloo_net::http::Request;
 use serde::Deserialize;
 
-use super::{ModelConfig, Provider, Subagent, Todo, UiMessage, UiThread};
+use super::{
+    FileInfo, ModelConfig, Provider, Subagent, Todo, ToolCall, ToolResult, UiMessage, UiThread,
+};
 
 #[derive(Deserialize)]
 pub struct BootstrapPayload {
     pub threads: Vec<UiThread>,
     pub messages: HashMap<String, Vec<UiMessage>>,
     pub todos: HashMap<String, Vec<Todo>>,
+    pub files: HashMap<String, Vec<FileInfo>>,
+    pub tool_calls: HashMap<String, Vec<ToolCall>>,
+    pub tool_results: HashMap<String, Vec<ToolResult>>,
     pub subagents: HashMap<String, Vec<Subagent>>,
+    pub workspace_path: HashMap<String, String>,
+    pub workspace_files: HashMap<String, Vec<FileInfo>>,
     pub providers: Vec<Provider>,
     pub models: Vec<ModelConfig>,
     pub default_model: String,

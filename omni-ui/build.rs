@@ -18,6 +18,7 @@ fn main() {
             Some("omni-pdfjs.worker.js"),
         ),
         ("omni-rt/crates/omni-plyr", "omni-plyr.js", None),
+        ("omni-rt/crates/omni-pretext", "omni-pretext.js", None),
         ("omni-rt/crates/omni-zenfs", "omni-zenfs.js", None),
         (
             "omni-rt/crates/omni-sw",

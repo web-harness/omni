@@ -248,7 +248,12 @@ fn UpdateTodosRenderer(call: ToolCall, result: Option<ToolResult>) -> Element {
                             } else {
                                 div { class: "mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border border-border" }
                             }
-                            omni-text { "data-text": "{content}", "data-strategy": "truncate", "data-max-lines": "2", class: "text-[11px] text-foreground leading-5" }
+                            omni-text {
+                                "data-text": "{content}",
+                                "data-strategy": "truncate",
+                                "data-max-lines": "2",
+                                class: "text-[11px] text-foreground leading-5",
+                            }
                         }
                     }
                 }
@@ -282,7 +287,12 @@ fn SubagentTaskRenderer(call: ToolCall) -> Element {
             }
             div { class: "px-3 pb-3 pt-1 text-muted-foreground",
                 if open() {
-                    "{task}"
+                    omni-text {
+                        "data-text": "{task}",
+                        "data-strategy": "none",
+                        "data-max-lines": "20",
+                        class: "text-[11px]",
+                    }
                 } else {
                     omni-text {
                         "data-text": "{task}",

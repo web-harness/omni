@@ -429,9 +429,17 @@ pub async fn async_init(
     mut subagent_state: dioxus::prelude::Signal<SubagentState>,
 ) {
     use dioxus::signals::{ReadableExt, WritableExt};
-    let payload = match sw_api::fetch_bootstrap().await {
-        Ok(p) => p,
-        Err(_) => return,
+    use gloo_timers::future::TimeoutFuture;
+    let mut payload_opt = None;
+    for _ in 0..20 {
+        if let Ok(p) = sw_api::fetch_bootstrap().await {
+            payload_opt = Some(p);
+            break;
+        }
+        TimeoutFuture::new(200).await;
+    }
+    let Some(payload) = payload_opt else {
+        return;
     };
 
     {
@@ -484,6 +492,9 @@ pub async fn async_init(
     {
         let mut tsk = tasks_state.write();
         tsk.todos = payload.todos;
+        tsk.files = payload.files;
+        tsk.tool_calls = payload.tool_calls;
+        tsk.tool_results = payload.tool_results;
     }
     {
         let mut ss = subagent_state.write();
@@ -491,17 +502,25 @@ pub async fn async_init(
     }
     model_state.write().selected_model = selected_model;
 
-    if let Some(active) = thread_state.read().active_thread_id.clone() {
-        let workspace = "/home/workspace".to_string();
-        if let Ok(files) = sw_api::list_workspace_files(&workspace).await {
-            workspace_state
-                .write()
-                .workspace_path
-                .insert(active.clone(), workspace.clone());
-            workspace_state
-                .write()
-                .workspace_files
-                .insert(workspace, files);
+    {
+        let mut ws = workspace_state.write();
+        ws.workspace_path = payload.workspace_path;
+        ws.workspace_files = payload.workspace_files;
+    }
+
+    let active_id = thread_state.read().active_thread_id.clone();
+    if let Some(active) = active_id {
+        let workspace = workspace_state.read().workspace_for(&active);
+        if workspace_state
+            .read()
+            .workspace_files
+            .get(&workspace)
+            .is_none()
+        {
+            if let Ok(files) = sw_api::list_workspace_files(&workspace).await {
+                let mut ws = workspace_state.write();
+                ws.workspace_files.insert(workspace, files);
+            }
         }
     }
 }

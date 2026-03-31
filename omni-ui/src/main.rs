@@ -272,13 +272,32 @@ pub fn Home() -> Element {
 #[component]
 pub fn ThreadView(id: String) -> Element {
     let mut thread_state = use_context::<Signal<ThreadState>>();
+    let navigator = use_navigator();
     let id_clone = id.clone();
     use_effect(move || {
-        let current = thread_state.read().active_thread_id.clone();
-        if current.as_deref() != Some(&id_clone) || thread_state.read().show_kanban {
-            let mut s = thread_state.write();
-            s.active_thread_id = Some(id_clone.clone());
-            s.show_kanban = false;
+        let snapshot = thread_state.read();
+        let exists = snapshot.threads.iter().any(|t| t.id == id_clone);
+        let current = snapshot.active_thread_id.clone();
+        let was_kanban = snapshot.show_kanban;
+        let first = snapshot.threads.first().map(|t| t.id.clone());
+        drop(snapshot);
+
+        if exists {
+            if current.as_deref() != Some(&id_clone) || was_kanban {
+                let mut s = thread_state.write();
+                s.active_thread_id = Some(id_clone.clone());
+                s.show_kanban = false;
+            }
+            return;
+        }
+
+        if let Some(valid_id) = first {
+            {
+                let mut s = thread_state.write();
+                s.active_thread_id = Some(valid_id.clone());
+                s.show_kanban = false;
+            }
+            navigator.replace(Route::ThreadView { id: valid_id });
         }
     });
     rsx! { div {} }

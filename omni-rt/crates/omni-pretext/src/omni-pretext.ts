@@ -82,9 +82,12 @@ class OmniText extends HTMLElement {
     const strategy = this.getAttribute("data-strategy") ?? "truncate";
     const maxLines = parseInt(this.getAttribute("data-max-lines") ?? "1", 10);
     const minSize = parseFloat(this.getAttribute("data-min-size") ?? "9");
-    const width = this.getBoundingClientRect().width;
+    const ownWidth = this.getBoundingClientRect().width;
+    const parentWidth = this.parentElement?.getBoundingClientRect().width ?? 0;
+    const width = ownWidth > 0 ? ownWidth : parentWidth;
 
     if (width <= 0) {
+      if (this.textContent !== text) this.textContent = text;
       // Retry next frame until we have a layout
       this._rafId = requestAnimationFrame(() => {
         this._rafId = null;
