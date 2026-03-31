@@ -67,7 +67,7 @@ fn TabChip(tab: String, active: bool) -> Element {
                 span { "Agent" }
             } else {
                 FileIcon { path: tab.clone() }
-                span { class: "max-w-[180px] truncate", "{tab}" }
+                omni-text { "data-text": "{tab}", "data-strategy": "truncate", "data-max-lines": "1", class: "max-w-[180px] text-[11px]" }
                 button {
                     class: "rounded p-0.5 hover:bg-background",
                     onclick: {
@@ -170,7 +170,7 @@ pub fn FileViewer(path: String, thread_id: String) -> Element {
     rsx! {
         div { class: "h-full w-full flex flex-col",
             div { class: "flex items-center justify-between px-3 py-1 bg-sidebar border-b border-border text-[11px] shrink-0",
-                span { class: "text-muted-foreground truncate", "{path}" }
+                omni-text { "data-text": "{path}", "data-strategy": "truncate", "data-max-lines": "1", class: "text-muted-foreground" }
                 button {
                     class: "ml-2 text-muted-foreground hover:text-foreground leading-none",
                     onclick: move |_| {

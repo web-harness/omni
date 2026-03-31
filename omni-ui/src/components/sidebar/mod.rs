@@ -4,6 +4,7 @@ use dioxus_free_icons::icons::ld_icons::{
 };
 use dioxus_free_icons::Icon;
 
+use crate::lib::utils::relative_time;
 use crate::lib::{Theme, ThreadState, ThreadStatus, UiState};
 use crate::routes::Route;
 
@@ -124,8 +125,13 @@ fn ThreadRow(thread: crate::lib::UiThread) -> Element {
             div { class: "flex items-center gap-2",
                 StatusIcon { status: thread.status.clone() }
                 div { class: "min-w-0 flex-1",
-                    div { class: "truncate text-xs font-semibold", "{thread.title}" }
-                    div { class: "text-[10px] text-muted-foreground", "{thread.updated_at}" }
+                    omni-text {
+                        "data-text": "{thread.title}",
+                        "data-strategy": "truncate",
+                        "data-max-lines": "1",
+                        class: "text-xs font-semibold",
+                    }
+                    div { class: "text-[10px] text-muted-foreground", "{relative_time(&thread.updated_at)}" }
                 }
                 button {
                     class: "rounded px-1 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-status-critical transition-opacity",

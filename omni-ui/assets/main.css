@@ -26,6 +26,12 @@
   box-sizing: border-box;
 }
 
+omni-text {
+  display: block;
+  overflow: hidden;
+  min-width: 0;
+}
+
 button,
 [role="button"],
 a,

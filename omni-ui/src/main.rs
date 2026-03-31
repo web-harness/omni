@@ -29,6 +29,7 @@ const OMNI_MDX_JS: Asset = asset!("/public/omni-mdx.js");
 const OMNI_PDFJS_JS: Asset = asset!("/public/omni-pdfjs.js");
 const OMNI_PDFJS_WORKER_JS: Asset = asset!("/public/omni-pdfjs.worker.js");
 const OMNI_PLYR_JS: Asset = asset!("/public/omni-plyr.js");
+const OMNI_PRETEXT_JS: Asset = asset!("/public/omni-pretext.js");
 const OMNI_SW_REGISTER_JS: Asset = asset!("/public/omni-sw-register.js");
 
 #[cfg(target_arch = "wasm32")]
@@ -86,6 +87,7 @@ fn App() -> Element {
         document::Meta { name: "omni-pdfjs-worker", content: "{OMNI_PDFJS_WORKER_JS}" }
         document::Script { src: OMNI_PDFJS_JS, r#type: "module", defer: true }
         document::Script { src: OMNI_PLYR_JS, r#type: "module", defer: true }
+        document::Script { src: OMNI_PRETEXT_JS, r#type: "module", defer: true }
         document::Meta { name: "omni-sw-url", content: "/omni-sw.js" }
         document::Script { src: OMNI_SW_REGISTER_JS, r#type: "module", defer: true }
 

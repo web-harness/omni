@@ -1,0 +1,15 @@
+{
+  "name": "@omni/omni-pretext",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/omni-pretext.ts --bundle --format=esm --outfile=dist/omni-pretext.js"
+  },
+  "dependencies": {
+    "@chenglou/pretext": "^0.0.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.2"
+  }
+}

@@ -109,10 +109,11 @@ fn badge_variant_class(variant: BadgeVariant) -> &'static str {
 pub fn Badge(
     children: Element,
     #[props(default = BadgeVariant::Default)] variant: BadgeVariant,
+    #[props(default = String::new())] class: String,
 ) -> Element {
     rsx! {
         span {
-            class: "inline-flex items-center rounded-sm border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {badge_variant_class(variant)}",
+            class: "inline-flex items-center rounded-sm border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {badge_variant_class(variant)} {class}",
             {children}
         }
     }

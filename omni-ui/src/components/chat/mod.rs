@@ -248,7 +248,7 @@ fn UpdateTodosRenderer(call: ToolCall, result: Option<ToolResult>) -> Element {
                             } else {
                                 div { class: "mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border border-border" }
                             }
-                            span { class: "text-[11px] text-foreground leading-5", "{content}" }
+                            omni-text { "data-text": "{content}", "data-strategy": "truncate", "data-max-lines": "2", class: "text-[11px] text-foreground leading-5" }
                         }
                     }
                 }
@@ -266,11 +266,6 @@ fn SubagentTaskRenderer(call: ToolCall) -> Element {
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
-    let preview: String = if task.len() > 120 {
-        format!("{}...", &task[..120])
-    } else {
-        task.clone()
-    };
 
     rsx! {
         div { class: "rounded-sm border border-border bg-background-elevated text-[11px] overflow-hidden",
@@ -289,7 +284,12 @@ fn SubagentTaskRenderer(call: ToolCall) -> Element {
                 if open() {
                     "{task}"
                 } else {
-                    "{preview}"
+                    omni-text {
+                        "data-text": "{task}",
+                        "data-strategy": "truncate",
+                        "data-max-lines": "2",
+                        class: "text-[11px]",
+                    }
                 }
             }
         }
@@ -463,7 +463,7 @@ pub fn ModelSwitcher() -> Element {
                 button {
                     class: "flex items-center gap-1 rounded-sm border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-background-interactive",
                     onclick: move |_| open.set(!open()),
-                    span { class: "max-w-[180px] truncate", "{selected_model}" }
+                    omni-text { "data-text": "{selected_model}", "data-strategy": "truncate", "data-max-lines": "1", class: "max-w-[180px]" }
                     Icon { width: 10, height: 10, icon: LdChevronDown }
                 }
             },
@@ -574,7 +574,7 @@ pub fn WorkspacePicker() -> Element {
                     class: "flex items-center gap-1 rounded-sm border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-background-interactive",
                     onclick: move |_| open.set(!open()),
                     Icon { width: 10, height: 10, icon: LdFolder }
-                    span { class: "max-w-[160px] truncate", "{workspace_state.read().workspace_for(&tid)}" }
+                    omni-text { "data-text": "{workspace_state.read().workspace_for(&tid)}", "data-strategy": "truncate", "data-max-lines": "1", class: "max-w-[160px]" }
                     Icon { width: 10, height: 10, icon: LdChevronDown }
                 }
             },

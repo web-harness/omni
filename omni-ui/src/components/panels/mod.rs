@@ -129,10 +129,16 @@ pub fn TasksSection() -> Element {
                             }
                         }
                         div { class: "min-w-0 flex-1",
-                            p { class: "text-[11px] leading-4", "{todo.content}" }
+                            omni-text {
+                                "data-text": "{todo.content}",
+                                "data-strategy": "shrink-truncate",
+                                "data-max-lines": "2",
+                                "data-min-size": "9",
+                                class: "text-[11px] leading-4",
+                            }
                         }
                         if todo.status == TodoStatus::InProgress {
-                            Badge { variant: BadgeVariant::Info, "IN PROGRESS" }
+                            Badge { variant: BadgeVariant::Info, class: "shrink-0", "IN PROGRESS" }
                         }
                     }
                 }
@@ -178,7 +184,7 @@ pub fn FilesSection() -> Element {
     rsx! {
         div { class: "overflow-auto",
             div { class: "flex items-center justify-between px-3 py-1.5 border-b border-border",
-                span { class: "text-[10px] font-semibold text-muted-foreground tracking-wide", "{workspace}" }
+                omni-text { "data-text": "{workspace}", "data-strategy": "truncate", "data-max-lines": "1", class: "text-[10px] font-semibold text-muted-foreground tracking-wide" }
                 button {
                     class: "flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground",
                     onclick: move |_| {
@@ -268,7 +274,7 @@ fn FileRow(file: FileInfo, on_open: EventHandler<String>, workspace_root: String
             } else {
                 Icon { width: 12, height: 12, icon: LdFileCode2, class: "{icon_color} shrink-0" }
             }
-            span { class: "flex-1 truncate text-[11px]", "{name}" }
+            omni-text { "data-text": "{name}", "data-strategy": "truncate", "data-max-lines": "1", class: "flex-1 text-[11px]" }
             if !size_str.is_empty() {
                 span { class: "shrink-0 text-[10px] text-muted-foreground", "{size_str}" }
             }
@@ -293,7 +299,7 @@ pub fn AgentsSection() -> Element {
                 div { key: "{agent.id}", class: "px-3 py-2 border-b border-border/50",
                     div { class: "flex items-center gap-2 mb-1",
                         Icon { width: 12, height: 12, icon: LdBot, class: "text-status-info shrink-0" }
-                        span { class: "flex-1 text-[11px] font-semibold truncate", "{agent.name}" }
+                        omni-text { "data-text": "{agent.name}", "data-strategy": "truncate", "data-max-lines": "1", class: "flex-1 text-[11px] font-semibold" }
                         {
                             let (variant, label) = match agent.status {
                                 SubagentStatus::Running => (BadgeVariant::Info, "RUNNING"),
@@ -304,7 +310,7 @@ pub fn AgentsSection() -> Element {
                             rsx! { Badge { variant, "{label}" } }
                         }
                     }
-                    p { class: "text-[10px] text-muted-foreground leading-4 line-clamp-3", "{agent.description}" }
+                    omni-text { "data-text": "{agent.description}", "data-strategy": "truncate", "data-max-lines": "3", class: "text-[10px] text-muted-foreground leading-4" }
                 }
             }
         }

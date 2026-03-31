@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "install:wc": "npm ci --prefix omni-wc",
+    "install:pretext": "npm ci --prefix omni-rt/crates/omni-pretext",
     "install:dock": "npm ci --prefix omni-rt/crates/omni-dock",
     "install:popper": "npm ci --prefix omni-rt/crates/omni-popper",
     "install:monaco": "npm ci --prefix omni-rt/crates/omni-monaco",
