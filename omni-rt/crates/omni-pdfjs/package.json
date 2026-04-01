@@ -6,8 +6,8 @@
   "main": "dist/omni-pdfjs.js",
   "module": "dist/omni-pdfjs.js",
   "scripts": {
-    "build": "mkdir -p dist && cp node_modules/pdfjs-dist/build/pdf.worker.min.mjs dist/omni-pdfjs.worker.js && esbuild src/omni-pdfjs.ts --bundle --format=esm --outfile=dist/omni-pdfjs.js --loader:.css=text --loader:.ttf=file --loader:.woff=file --loader:.woff2=file",
-    "watch": "mkdir -p dist && cp node_modules/pdfjs-dist/build/pdf.worker.min.mjs dist/omni-pdfjs.worker.js && esbuild src/omni-pdfjs.ts --bundle --format=esm --outfile=dist/omni-pdfjs.js --loader:.css=text --loader:.ttf=file --loader:.woff=file --loader:.woff2=file --watch"
+    "build": "mkdir -p dist && cp node_modules/pdfjs-dist/build/pdf.worker.min.mjs dist/omni-pdfjs.worker.js && esbuild src/omni-pdfjs.ts --bundle --format=esm --outfile=dist/omni-pdfjs.js --loader:.css=text --loader:.ttf=file --loader:.woff=file --loader:.woff2=file --define:process=globalThis.__omni_process_polyfill --banner:js=\"globalThis.__omni_process_polyfill ??= { env: {}, getBuiltinModule: () => undefined };\"",
+    "watch": "mkdir -p dist && cp node_modules/pdfjs-dist/build/pdf.worker.min.mjs dist/omni-pdfjs.worker.js && esbuild src/omni-pdfjs.ts --bundle --format=esm --outfile=dist/omni-pdfjs.js --loader:.css=text --loader:.ttf=file --loader:.woff=file --loader:.woff2=file --define:process=globalThis.__omni_process_polyfill --banner:js=\"globalThis.__omni_process_polyfill ??= { env: {}, getBuiltinModule: () => undefined };\" --watch"
   },
   "dependencies": {
     "lit": "^3.2.0",

@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "esbuild src/omni-dock.ts --bundle --format=iife --outfile=dist/omni-dock.js --loader:.css=text --loader:.svg=text",
-    "watch": "esbuild src/omni-dock.ts --bundle --format=iife --outfile=dist/omni-dock.js --loader:.css=text --loader:.svg=text --watch"
+    "build": "esbuild src/omni-dock.ts --bundle --format=esm --outfile=dist/omni-dock.js --loader:.css=text --loader:.svg=text",
+    "watch": "esbuild src/omni-dock.ts --bundle --format=esm --outfile=dist/omni-dock.js --loader:.css=text --loader:.svg=text --watch"
   },
   "dependencies": {
     "dockview-core": "^5.1.0",

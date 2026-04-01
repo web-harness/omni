@@ -26,7 +26,6 @@ target
 **/*.rs.bk
 
 /omni-ui/target
-/omni-ui/fixtures
 /omni-ui/assets/tailwind.css
 /omni-ui/public/omni-*.js
 /omni-ui/public/omni-*.wasm

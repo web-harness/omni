@@ -1,4 +1,9 @@
-include!(concat!(env!("OUT_DIR"), "/fixtures.rs"));
+use base64::{engine::general_purpose::STANDARD, Engine as _};
+
+const FIXTURE_PNG_BYTES: &[u8] = include_bytes!("../../fixtures/sample.png");
+const FIXTURE_WAV_BYTES: &[u8] = include_bytes!("../../fixtures/sample.wav");
+const FIXTURE_PDF_BYTES: &[u8] = include_bytes!("../../fixtures/sample.pdf");
+const FIXTURE_MP4_BYTES: &[u8] = include_bytes!("../../fixtures/sample.mp4");
 
 pub enum FixtureContent {
     Text(&'static str),
@@ -20,12 +25,10 @@ pub fn get_fixture(path: &str) -> FixtureContent {
         "toml" => FixtureContent::Text(include_str!("../../fixtures/sample.toml")),
         "sh" | "bash" => FixtureContent::Text(include_str!("../../fixtures/sample.sh")),
         "svg" => FixtureContent::Text(include_str!("../../fixtures/sample.svg")),
-        "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "ico" => {
-            FixtureContent::Base64(FIXTURE_PNG_B64)
-        }
-        "wav" | "mp3" | "ogg" | "flac" | "aac" | "m4a" => FixtureContent::Base64(FIXTURE_WAV_B64),
-        "mp4" | "webm" | "ogv" | "mov" | "avi" => FixtureContent::Base64(FIXTURE_MP4_B64),
-        "pdf" => FixtureContent::Base64(FIXTURE_PDF_B64),
+        "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "ico" => FixtureContent::Base64(""),
+        "wav" | "mp3" | "ogg" | "flac" | "aac" | "m4a" => FixtureContent::Base64(""),
+        "mp4" | "webm" | "ogv" | "mov" | "avi" => FixtureContent::Base64(""),
+        "pdf" => FixtureContent::Base64(""),
         _ => FixtureContent::Text(""),
     }
 }
@@ -38,8 +41,14 @@ pub fn fixture_text(path: &str) -> String {
 }
 
 pub fn fixture_b64(path: &str) -> String {
-    match get_fixture(path) {
-        FixtureContent::Base64(s) => s.to_string(),
-        FixtureContent::Text(_) => String::new(),
+    let ext = path.rsplit('.').next().unwrap_or("");
+    match ext {
+        "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "ico" => {
+            STANDARD.encode(FIXTURE_PNG_BYTES)
+        }
+        "wav" | "mp3" | "ogg" | "flac" | "aac" | "m4a" => STANDARD.encode(FIXTURE_WAV_BYTES),
+        "mp4" | "webm" | "ogv" | "mov" | "avi" => STANDARD.encode(FIXTURE_MP4_BYTES),
+        "pdf" => STANDARD.encode(FIXTURE_PDF_BYTES),
+        _ => String::new(),
     }
 }

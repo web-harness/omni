@@ -7,7 +7,15 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!.cargo/*", "!omni-ui/public/*", "!target/*", "!dist/*", "!node_modules/*"]
+    "includes": [
+      "**",
+      "!.cargo/*",
+      "!omni-ui/fixtures/*",
+      "!omni-ui/public/*",
+      "!target/*",
+      "!dist/*",
+      "!node_modules/*"
+    ]
   },
   "formatter": {
     "enabled": true,

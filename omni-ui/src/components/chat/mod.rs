@@ -6,6 +6,7 @@ use dioxus_free_icons::Icon;
 use futures_util::StreamExt;
 
 use crate::components::ui::{Badge, BadgeVariant, Popover};
+#[cfg(target_arch = "wasm32")]
 use crate::lib::thread_context::apply_stream_event;
 use crate::lib::{
     ChatState, ModelState, Role, TasksState, ThreadState, ToolCall, ToolResult, UiState,
@@ -561,7 +562,7 @@ pub fn ModelSwitcher() -> Element {
 
 #[component]
 pub fn WorkspacePicker() -> Element {
-    let mut workspace_state = use_context::<Signal<WorkspaceState>>();
+    let workspace_state = use_context::<Signal<WorkspaceState>>();
     let thread_state = use_context::<Signal<ThreadState>>();
     let mut open = use_signal(|| false);
     let presets = vec![

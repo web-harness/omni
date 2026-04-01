@@ -12,6 +12,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 uuid = { version = "1.11", features = ["v4", "serde", "js"] }
 futures-util = "0.3"
+base64 = "0.22"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = "0.4"
@@ -26,10 +27,6 @@ wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 gloo-net = { version = "0.6", features = ["http"] }
 gloo-timers = { version = "0.3", features = ["futures"] }
-
-[build-dependencies]
-video-rs = { version = "0.11", features = ["ndarray"] }
-ndarray = "0.17"
 
 [features]
 default = ["web"]

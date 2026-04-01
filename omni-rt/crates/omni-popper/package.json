@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "esbuild src/omni-popper.ts --bundle --format=iife --outfile=dist/omni-popper.js"
+    "build": "esbuild src/omni-popper.ts --bundle --format=esm --outfile=dist/omni-popper.js"
   },
   "dependencies": {
     "@popperjs/core": "^2.11.8",

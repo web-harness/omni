@@ -1,3 +1,5 @@
+#![allow(special_module_name)]
+
 use dioxus::prelude::*;
 use serde_json::json;
 
@@ -9,10 +11,7 @@ use components::{
     AgentsSection, Button, ButtonVariant, ChatContainer, Dialog, FilesSection, Input, KanbanView,
     TasksSection, ThreadSidebar,
 };
-use lib::{
-    default_states, ChatState, ModelState, SubagentState, TasksState, Theme, ThreadState, UiState,
-    WorkspaceState,
-};
+use lib::{default_states, ModelState, Theme, ThreadState, UiState, WorkspaceState};
 use routes::Route;
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
