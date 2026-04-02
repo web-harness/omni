@@ -1,7 +1,6 @@
 use dioxus::prelude::*;
 use dioxus_free_icons::icons::ld_icons::{
-    LdBot, LdChevronDown, LdChevronRight, LdFile, LdFileCode2, LdFileText, LdFolder, LdGitBranch,
-    LdListTodo, LdRefreshCw,
+    LdBot, LdFile, LdFileCode2, LdFileText, LdFolder, LdRefreshCw,
 };
 use dioxus_free_icons::Icon;
 
@@ -10,84 +9,6 @@ use crate::lib::utils::fmt_size;
 use crate::lib::{
     FileInfo, SubagentState, SubagentStatus, TasksState, ThreadState, TodoStatus, WorkspaceState,
 };
-
-#[component]
-pub fn RightPanel() -> Element {
-    let mut tasks_open = use_signal(|| true);
-    let mut files_open = use_signal(|| true);
-    let mut agents_open = use_signal(|| true);
-
-    let thread_state = use_context::<Signal<ThreadState>>();
-    let tasks_state = use_context::<Signal<TasksState>>();
-    let subagent_state = use_context::<Signal<SubagentState>>();
-    let tid = thread_state
-        .read()
-        .active_thread_id
-        .clone()
-        .unwrap_or_default();
-
-    let todos = tasks_state.read().todos_for(&tid);
-    let files = tasks_state.read().files_for(&tid);
-    let agents = subagent_state.read().subagents_for(&tid);
-
-    let todo_count = todos.len();
-    let file_count = files.iter().filter(|f| !f.is_dir).count();
-    let agent_count = agents.len();
-
-    rsx! {
-        aside {
-            class: "h-full w-full border-l border-border bg-sidebar flex flex-col overflow-auto text-[11px]",
-
-            button {
-                class: "flex w-full items-center gap-2 px-3 py-2 text-section-header border-b border-border hover:bg-background-interactive",
-                onclick: move |_| tasks_open.set(!tasks_open()),
-                if tasks_open() {
-                    Icon { width: 10, height: 10, icon: LdChevronDown, class: "text-muted-foreground" }
-                } else {
-                    Icon { width: 10, height: 10, icon: LdChevronRight, class: "text-muted-foreground" }
-                }
-                Icon { width: 12, height: 12, icon: LdListTodo }
-                span { "TASKS" }
-                span { class: "ml-auto rounded bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground", "{todo_count}" }
-            }
-            if tasks_open() {
-                TasksSection {}
-            }
-
-            button {
-                class: "flex w-full items-center gap-2 px-3 py-2 text-section-header border-b border-t border-border hover:bg-background-interactive",
-                onclick: move |_| files_open.set(!files_open()),
-                if files_open() {
-                    Icon { width: 10, height: 10, icon: LdChevronDown, class: "text-muted-foreground" }
-                } else {
-                    Icon { width: 10, height: 10, icon: LdChevronRight, class: "text-muted-foreground" }
-                }
-                Icon { width: 12, height: 12, icon: LdFolder }
-                span { "FILES" }
-                span { class: "ml-auto rounded bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground", "{file_count}" }
-            }
-            if files_open() {
-                FilesSection {}
-            }
-
-            button {
-                class: "flex w-full items-center gap-2 px-3 py-2 text-section-header border-b border-t border-border hover:bg-background-interactive",
-                onclick: move |_| agents_open.set(!agents_open()),
-                if agents_open() {
-                    Icon { width: 10, height: 10, icon: LdChevronDown, class: "text-muted-foreground" }
-                } else {
-                    Icon { width: 10, height: 10, icon: LdChevronRight, class: "text-muted-foreground" }
-                }
-                Icon { width: 12, height: 12, icon: LdGitBranch }
-                span { "AGENTS" }
-                span { class: "ml-auto rounded bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground", "{agent_count}" }
-            }
-            if agents_open() {
-                AgentsSection {}
-            }
-        }
-    }
-}
 
 #[component]
 pub fn TasksSection() -> Element {

@@ -1,0 +1,18 @@
+export {
+  appendFile,
+  copyFile,
+  exists,
+  fs,
+  init,
+  lstat,
+  mkdir,
+  path,
+  readFile,
+  readdir,
+  readlink,
+  rename,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from "./omni-zenfs.js";

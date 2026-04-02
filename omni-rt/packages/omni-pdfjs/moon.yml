@@ -1,0 +1,85 @@
+language: typescript
+layer: library
+stack: frontend
+
+tasks:
+  clean-public:
+    command: shx
+    args:
+      - rm
+      - -f
+      - ../../../omni-ui/public/omni-pdfjs.js
+      - ../../../omni-ui/public/omni-pdfjs.worker.js
+      - ../../../omni-ui/public/omni-pdfjs-*.js
+      - ../../../omni-ui/public/omni-pdfjs-*.ttf
+      - ../../../omni-ui/public/omni-pdfjs-*.woff
+      - ../../../omni-ui/public/omni-pdfjs-*.woff2
+      - ../../../omni-ui/public/omni-pdfjs-*.svg
+    inputs:
+      - '@group(configs)'
+    options:
+      internal: true
+  copy-worker:
+    command: shx
+    args:
+      - cp
+      - node_modules/pdfjs-dist/build/pdf.worker.min.mjs
+      - omni-ui/public/omni-pdfjs.worker.js
+    deps:
+      - clean-public
+    inputs:
+      - package.json
+      - '@group(configs)'
+    options:
+      internal: true
+      runFromWorkspaceRoot: true
+  build:
+    command: esbuild
+    args:
+      - src/omni-pdfjs.ts
+      - --bundle
+      - --format=esm
+      - --splitting
+      - --outdir=../../../omni-ui/public
+      - --entry-names=omni-pdfjs
+      - --chunk-names=omni-pdfjs-[name]-[hash]
+      - --asset-names=omni-pdfjs-[name]-[hash]
+      - --loader:.css=text
+      - --loader:.ttf=file
+      - --loader:.woff=file
+      - --loader:.woff2=file
+      - --define:process=globalThis.__omni_process_polyfill
+      - '--banner:js=globalThis.__omni_process_polyfill ??= { env: {}, getBuiltinModule: () => undefined };'
+    deps:
+      - copy-worker
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+    options:
+      shell: false
+  watch:
+    command: esbuild
+    args:
+      - src/omni-pdfjs.ts
+      - --bundle
+      - --format=esm
+      - --splitting
+      - --outdir=../../../omni-ui/public
+      - --entry-names=omni-pdfjs
+      - --chunk-names=omni-pdfjs-[name]-[hash]
+      - --asset-names=omni-pdfjs-[name]-[hash]
+      - --loader:.css=text
+      - --loader:.ttf=file
+      - --loader:.woff=file
+      - --loader:.woff2=file
+      - --define:process=globalThis.__omni_process_polyfill
+      - '--banner:js=globalThis.__omni_process_polyfill ??= { env: {}, getBuiltinModule: () => undefined };'
+      - --watch
+    deps:
+      - copy-worker
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+    preset: server
+    options:
+      shell: false

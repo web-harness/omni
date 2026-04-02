@@ -1,0 +1,13 @@
+{
+  "name": "@omni/omni-popper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@popperjs/core": "^2.11.8",
+    "lit": "^3.2.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.2"
+  }
+}

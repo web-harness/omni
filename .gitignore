@@ -27,7 +27,7 @@ target
 
 /omni-ui/target
 /omni-ui/assets/tailwind.css
-/omni-ui/public/omni-*.js
+/omni-ui/public/*-*.js
 /omni-ui/public/omni-*.wasm
 /omni-ui/public/omni-*.wasm.d.ts
 /omni-rt/crates/*/omni-*.js
@@ -39,3 +39,4 @@ node_modules
 /dist
 dist/
 storybook-static/
+.moon/cache/

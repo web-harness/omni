@@ -1,0 +1,52 @@
+language: typescript
+layer: library
+stack: frontend
+
+tasks:
+  clean-public:
+    command: shx
+    args:
+      - rm
+      - -f
+      - ../../../omni-ui/public/omni-plyr.js
+      - ../../../omni-ui/public/omni-plyr-*.js
+    inputs:
+      - '@group(configs)'
+    options:
+      internal: true
+  build:
+    command: esbuild
+    args:
+      - src/omni-plyr.ts
+      - --bundle
+      - --format=esm
+      - --splitting
+      - --outdir=../../../omni-ui/public
+      - --entry-names=omni-plyr
+      - --chunk-names=omni-plyr-[name]-[hash]
+      - --alias:plyr/dist/plyr.svg=../../../node_modules/plyr/dist/plyr.svg
+      - --loader:.css=text
+      - --loader:.svg=text
+    deps:
+      - clean-public
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+  watch:
+    command: esbuild
+    args:
+      - src/omni-plyr.ts
+      - --bundle
+      - --format=esm
+      - --splitting
+      - --outdir=../../../omni-ui/public
+      - --entry-names=omni-plyr
+      - --chunk-names=omni-plyr-[name]-[hash]
+      - --alias:plyr/dist/plyr.svg=../../../node_modules/plyr/dist/plyr.svg
+      - --loader:.css=text
+      - --loader:.svg=text
+      - --watch
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+    preset: server

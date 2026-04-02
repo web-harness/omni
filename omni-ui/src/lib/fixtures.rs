@@ -7,7 +7,7 @@ const FIXTURE_MP4_BYTES: &[u8] = include_bytes!("../../fixtures/sample.mp4");
 
 pub enum FixtureContent {
     Text(&'static str),
-    Base64(&'static str),
+    Base64,
 }
 
 pub fn get_fixture(path: &str) -> FixtureContent {
@@ -25,10 +25,10 @@ pub fn get_fixture(path: &str) -> FixtureContent {
         "toml" => FixtureContent::Text(include_str!("../../fixtures/sample.toml")),
         "sh" | "bash" => FixtureContent::Text(include_str!("../../fixtures/sample.sh")),
         "svg" => FixtureContent::Text(include_str!("../../fixtures/sample.svg")),
-        "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "ico" => FixtureContent::Base64(""),
-        "wav" | "mp3" | "ogg" | "flac" | "aac" | "m4a" => FixtureContent::Base64(""),
-        "mp4" | "webm" | "ogv" | "mov" | "avi" => FixtureContent::Base64(""),
-        "pdf" => FixtureContent::Base64(""),
+        "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "ico" => FixtureContent::Base64,
+        "wav" | "mp3" | "ogg" | "flac" | "aac" | "m4a" => FixtureContent::Base64,
+        "mp4" | "webm" | "ogv" | "mov" | "avi" => FixtureContent::Base64,
+        "pdf" => FixtureContent::Base64,
         _ => FixtureContent::Text(""),
     }
 }
@@ -36,7 +36,7 @@ pub fn get_fixture(path: &str) -> FixtureContent {
 pub fn fixture_text(path: &str) -> String {
     match get_fixture(path) {
         FixtureContent::Text(s) => s.to_string(),
-        FixtureContent::Base64(_) => String::new(),
+        FixtureContent::Base64 => String::new(),
     }
 }
 

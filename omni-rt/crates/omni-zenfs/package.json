@@ -3,9 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "scripts": {
-    "build": "esbuild src/omni-zenfs.ts --bundle --format=esm --outfile=dist/omni-zenfs.js"
-  },
   "dependencies": {
     "@zenfs/core": "^2.3.11",
     "@zenfs/dom": "^1.2.7"

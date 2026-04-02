@@ -1,6 +1,8 @@
 import { configure, fs } from "@zenfs/core";
 import { IndexedDB } from "@zenfs/dom";
 
+export { fs };
+
 interface StatInfo {
   is_file: boolean;
   is_dir: boolean;
@@ -18,6 +20,123 @@ interface DirEntryInfo {
   is_dir: boolean;
   is_symlink: boolean;
 }
+
+function splitPath(value: string): string[] {
+  return String(value).split("/").filter(Boolean);
+}
+
+function normalizePath(value: string): string {
+  const input = String(value || ".");
+  const absolute = input.startsWith("/");
+  const segments: string[] = [];
+
+  for (const segment of splitPath(input)) {
+    if (segment === ".") {
+      continue;
+    }
+
+    if (segment === "..") {
+      if (segments.length > 0 && segments[segments.length - 1] !== "..") {
+        segments.pop();
+      } else if (!absolute) {
+        segments.push("..");
+      }
+      continue;
+    }
+
+    segments.push(segment);
+  }
+
+  if (absolute) {
+    return segments.length > 0 ? `/${segments.join("/")}` : "/";
+  }
+
+  return segments.join("/") || ".";
+}
+
+function isAbsolutePath(value: string): boolean {
+  return String(value).startsWith("/");
+}
+
+function joinPath(...parts: string[]): string {
+  return normalizePath(parts.filter(Boolean).join("/"));
+}
+
+function dirnamePath(value: string): string {
+  const normalized = normalizePath(value);
+  if (normalized === "/") {
+    return "/";
+  }
+  if (normalized === ".") {
+    return ".";
+  }
+
+  const segments = splitPath(normalized);
+  segments.pop();
+
+  if (isAbsolutePath(normalized)) {
+    return segments.length > 0 ? `/${segments.join("/")}` : "/";
+  }
+
+  return segments.join("/") || ".";
+}
+
+function basenamePath(value: string, suffix = ""): string {
+  const normalized = normalizePath(value);
+  const base = splitPath(normalized).at(-1) || (normalized === "/" ? "/" : "");
+  if (suffix && base.endsWith(suffix)) {
+    return base.slice(0, -suffix.length);
+  }
+  return base;
+}
+
+function extnamePath(value: string): string {
+  const base = basenamePath(value);
+  const index = base.lastIndexOf(".");
+  if (index <= 0) {
+    return "";
+  }
+  return base.slice(index);
+}
+
+function resolvePath(...parts: string[]): string {
+  let current = "/";
+  for (const part of parts.filter(Boolean)) {
+    current = isAbsolutePath(part) ? part : `${current}/${part}`;
+  }
+  return normalizePath(current);
+}
+
+function relativePath(from: string, to: string): string {
+  const normalizedFrom = normalizePath(from);
+  const normalizedTo = normalizePath(to);
+  if (isAbsolutePath(normalizedFrom) !== isAbsolutePath(normalizedTo)) {
+    return normalizedTo;
+  }
+
+  const fromSegments = splitPath(normalizedFrom);
+  const toSegments = splitPath(normalizedTo);
+
+  while (fromSegments.length > 0 && toSegments.length > 0 && fromSegments[0] === toSegments[0]) {
+    fromSegments.shift();
+    toSegments.shift();
+  }
+
+  return [...Array(fromSegments.length).fill(".."), ...toSegments].join("/") || ".";
+}
+
+export const path = {
+  sep: "/",
+  delimiter: ":",
+  basename: basenamePath,
+  dirname: dirnamePath,
+  extname: extnamePath,
+  isAbsolute: isAbsolutePath,
+  join: joinPath,
+  normalize: normalizePath,
+  relative: relativePath,
+  resolve: resolvePath,
+};
 
 export async function init(): Promise<void> {
   await configure({

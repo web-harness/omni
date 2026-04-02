@@ -23,7 +23,7 @@ export class OmniHarness extends LitElement {
   `;
 
   @property({ type: Array }) agents: AgentConfig[] = [];
-  @property({ type: String }) src = "http://localhost:8080";
+  @property({ type: String }) src = "http://127.0.0.1:8080";
   @property({ type: String }) theme: "light" | "dark" = "dark";
 
   private get iframeSrc(): string {

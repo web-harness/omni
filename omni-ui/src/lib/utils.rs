@@ -1,19 +1,3 @@
-pub fn cn(parts: &[&str]) -> String {
-    parts
-        .iter()
-        .filter(|s| !s.is_empty())
-        .copied()
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-pub fn truncate(input: &str, max: usize) -> String {
-    if input.len() <= max {
-        return input.to_string();
-    }
-    format!("{}...", &input[..max])
-}
-
 pub fn relative_time(input: &str) -> String {
     use chrono::{DateTime, Utc};
     let Ok(then) = DateTime::parse_from_rfc3339(input) else {

@@ -30,6 +30,6 @@ gloo-timers = { version = "0.3", features = ["futures"] }
 
 [features]
 default = ["web"]
-web = ["dioxus/web", "omni-rt/wasm"]
+web = ["dioxus/web", "omni-rt/deepagents"]
 desktop = ["dioxus/desktop", "omni-rt/native"]
 mobile = ["dioxus/mobile"]

@@ -1,0 +1,9 @@
+javascript:
+  packageManager: npm
+  inferTasksFromScripts: false
+
+node: {}
+
+npm: {}
+
+rust: {}

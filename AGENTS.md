@@ -7,6 +7,8 @@ Provide concise code examples with detailed descriptions.
 Follow your instructions carefully and do not deviate from them. If you are unsure about something, ask for clarification instead of making assumptions.
 
 - [Core Principles](#core-principles)
+- [Implementation Principles](#implementation-principles)
+- [Repo Conventions](#repo-conventions)
 - [Dioxus Dependency](#dioxus-dependency)
 - [Debugging this application](#debugging-this-application)
 - [UI with RSX](#ui-with-rsx)
@@ -35,6 +37,9 @@ Follow your instructions carefully and do not deviate from them. If you are unsu
 - You are not allowed to use RequestAnimationFrame, setTimeout or any other shortcuts to achieve your goals.
 - You are only allowed to use the official Dioxus APIs, concepts and features to achieve your goals
 - You are strictly forbidden from doubting the Dioxus APIs, concepts and features. If you think something is missing, you are to make it yourself using Dioxus APIs, concepts and features. You are not allowed to doubt the Dioxus team or their decisions. They know best.
+- Follow repo's README.md for general project information.
+
+## Implementation Principles
 
 When implementing plans:
 
@@ -47,6 +52,28 @@ Implement This plan. Continue until 100% completion. No interrupts.
 - No hacks or workarounds
 - Do. Not. Stop. Until. 100%.
 - Stay true to the plan.
+- Think before acting. Read existing files before writing code.
+- Be concise in output but thorough in reasoning.
+- Prefer editing over rewriting whole files.
+- Do not re-read files you have already read unless the file may have changed.
+- Test your code before declaring done.
+- No sycophantic openers or closing fluff.
+- Keep solutions simple and direct.
+- User instructions always override this file.
+
+## Repo Conventions
+
+- `omni-rt/crates/` is for Rust crates and Rust-driven WebAssembly crates.
+- `omni-rt/packages/` is for pure JavaScript and TypeScript packages.
+- Do not put pure JS/TS projects under `omni-rt/crates/`.
+- `omni-rt/crates/omni-zenfs` stays under `crates` because it is not a pure JS/TS package.
+- The Moon workspace is the source of truth for build orchestration. Keep project paths aligned with `.moon/workspace.yml`.
+- Prefer direct Moon task commands over helper scripts when the task can be expressed cleanly in Moon config.
+- Prefer direct `esbuild` commands in Moon tasks for JS/TS package build and watch flows.
+- Keep per-package cleanup local to that package. Do not introduce centralized cleanup tasks that serialize unrelated builds.
+- `omni-ui/public/` is a generated asset sink for package outputs. Treat it as build output, not handwritten source.
+- Moon `format` tasks must always set `cache: false` so formatting runs fresh every time.
+- When moving packages between `crates` and `packages`, update `package.json`, `package-lock.json`, `.moon/workspace.yml`, README/AGENTS docs, and any hard-coded sample paths that reference the old location.
 
 ## Dioxus Dependency
 
@@ -166,15 +193,17 @@ The Dioxus app can consume all sorts of third party libraries and components. Yo
 
 ### Rust libraries
 
-Check them in under the runtime directory as a nested crate. They are directly compiled to webassembly when consumed by the UI. No further bundling or configuration is needed.
+Check them in under `omni-rt/crates/` as nested crates. They are directly compiled to webassembly when consumed by the UI. No further bundling or configuration is needed.
 
 ### TypeScript libraries
 
-Expose them by using "wasm-bindgen" in a runtime crate. They will be available as an importable module in the UI. Follow existing patterns in the runtime directory for how to do this.
+Pure TypeScript and JavaScript packages belong under `omni-rt/packages/`. Build them with Moon plus direct `esbuild` tasks and consume their generated assets from `omni-ui/public`.
+
+If a TypeScript-facing library must be exposed through Rust and `wasm-bindgen`, keep that Rust wrapper under `omni-rt/crates/` and follow the existing Rust crate patterns.
 
 ### DOM libraries (JSX, TSX, Vue, Svelte, etc.)
 
-Wrap these as Web Components and Dioxus can consume them directly in RSX. You must use the "Lit" library to create consistent Web Components that work across all browsers. Follow existing patterns in the runtime directory for how to do this.
+Wrap these as Web Components and Dioxus can consume them directly in RSX. You must use the "Lit" library to create consistent Web Components that work across all browsers. Follow the existing `omni-rt/packages/` patterns for how to do this.
 
 ## State
 

@@ -21,15 +21,6 @@ const FONT_REGULAR: Asset = asset!("/assets/fonts/JetBrainsMono-Regular.woff2");
 const FONT_MEDIUM: Asset = asset!("/assets/fonts/JetBrainsMono-Medium.woff2");
 const FONT_SEMIBOLD: Asset = asset!("/assets/fonts/JetBrainsMono-SemiBold.woff2");
 const FONT_BOLD: Asset = asset!("/assets/fonts/JetBrainsMono-Bold.woff2");
-const OMNI_DOCK_JS: Asset = asset!("/public/omni-dock.js");
-const OMNI_POPPER_JS: Asset = asset!("/public/omni-popper.js");
-const OMNI_MONACO_JS: Asset = asset!("/public/omni-monaco.js");
-const OMNI_MDX_JS: Asset = asset!("/public/omni-mdx.js");
-const OMNI_PDFJS_JS: Asset = asset!("/public/omni-pdfjs.js");
-const OMNI_PDFJS_WORKER_JS: Asset = asset!("/public/omni-pdfjs.worker.js");
-const OMNI_PLYR_JS: Asset = asset!("/public/omni-plyr.js");
-const OMNI_PRETEXT_JS: Asset = asset!("/public/omni-pretext.js");
-const OMNI_SW_REGISTER_JS: Asset = asset!("/public/omni-sw-register.js");
 
 #[cfg(target_arch = "wasm32")]
 fn provider_prefix(provider: &lib::ProviderId) -> &'static str {
@@ -49,13 +40,36 @@ fn main() {
 fn App() -> Element {
     let (threads, chat, tasks, workspace, model, ui, subagents) = default_states();
 
+    #[cfg(target_arch = "wasm32")]
     let thread_signal = use_context_provider(|| Signal::new(threads));
+    #[cfg(not(target_arch = "wasm32"))]
+    use_context_provider(|| Signal::new(threads));
+
+    #[cfg(target_arch = "wasm32")]
     let chat_signal = use_context_provider(|| Signal::new(chat));
+    #[cfg(not(target_arch = "wasm32"))]
+    use_context_provider(|| Signal::new(chat));
+
+    #[cfg(target_arch = "wasm32")]
     let tasks_signal = use_context_provider(|| Signal::new(tasks));
+    #[cfg(not(target_arch = "wasm32"))]
+    use_context_provider(|| Signal::new(tasks));
+
+    #[cfg(target_arch = "wasm32")]
     let workspace_signal = use_context_provider(|| Signal::new(workspace));
+    #[cfg(not(target_arch = "wasm32"))]
+    use_context_provider(|| Signal::new(workspace));
+
+    #[cfg(target_arch = "wasm32")]
     let model_signal = use_context_provider(|| Signal::new(model));
+    #[cfg(not(target_arch = "wasm32"))]
+    use_context_provider(|| Signal::new(model));
+
     use_context_provider(|| Signal::new(ui));
+    #[cfg(target_arch = "wasm32")]
     let subagent_signal = use_context_provider(|| Signal::new(subagents));
+    #[cfg(not(target_arch = "wasm32"))]
+    use_context_provider(|| Signal::new(subagents));
 
     #[cfg(target_arch = "wasm32")]
     use_future(move || {
@@ -79,16 +93,16 @@ fn App() -> Element {
             @font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:600;font-display:swap;src:url('{FONT_SEMIBOLD}') format('woff2')}}
             @font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:700;font-display:swap;src:url('{FONT_BOLD}') format('woff2')}}"
         }
-        document::Script { src: OMNI_DOCK_JS, r#type: "module", defer: true }
-        document::Script { src: OMNI_POPPER_JS, r#type: "module", defer: true }
-        document::Script { src: OMNI_MONACO_JS, r#type: "module", defer: true }
-        document::Script { src: OMNI_MDX_JS, r#type: "module", defer: true }
-        document::Meta { name: "omni-pdfjs-worker", content: "{OMNI_PDFJS_WORKER_JS}" }
-        document::Script { src: OMNI_PDFJS_JS, r#type: "module", defer: true }
-        document::Script { src: OMNI_PLYR_JS, r#type: "module", defer: true }
-        document::Script { src: OMNI_PRETEXT_JS, r#type: "module", defer: true }
+        document::Script { src: "/omni-dock.js", r#type: "module", defer: true }
+        document::Script { src: "/omni-popper.js", r#type: "module", defer: true }
+        document::Script { src: "/omni-monaco.js", r#type: "module", defer: true }
+        document::Script { src: "/omni-marked.js", r#type: "module", defer: true }
+        document::Meta { name: "omni-pdfjs-worker", content: "/omni-pdfjs.worker.js" }
+        document::Script { src: "/omni-pdfjs.js", r#type: "module", defer: true }
+        document::Script { src: "/omni-plyr.js", r#type: "module", defer: true }
+        document::Script { src: "/omni-pretext.js", r#type: "module", defer: true }
         document::Meta { name: "omni-sw-url", content: "/omni-sw.js" }
-        document::Script { src: OMNI_SW_REGISTER_JS, r#type: "module", defer: true }
+        document::Script { src: "/omni-sw-register.js", r#type: "module", defer: true }
 
         Router::<Route> {}
     }

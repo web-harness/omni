@@ -13,6 +13,7 @@ use crate::lib::{
     WorkspaceState,
 };
 
+#[cfg(target_arch = "wasm32")]
 #[derive(Clone)]
 struct StreamRequest {
     thread_id: String,
@@ -20,19 +21,47 @@ struct StreamRequest {
     model_id: String,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone)]
+struct StreamRequest;
+
+#[cfg(target_arch = "wasm32")]
+fn send_stream_request(
+    stream: &Coroutine<StreamRequest>,
+    thread_id: String,
+    input: String,
+    model_id: String,
+) {
+    stream.send(StreamRequest {
+        thread_id,
+        input,
+        model_id,
+    });
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn send_stream_request(
+    stream: &Coroutine<StreamRequest>,
+    _thread_id: String,
+    _input: String,
+    _model_id: String,
+) {
+    stream.send(StreamRequest);
+}
+
 #[component]
 pub fn ChatContainer(thread_id: String) -> Element {
-    let thread_state = use_context::<Signal<ThreadState>>();
-    let mut chat_state = use_context::<Signal<ChatState>>();
-    let mut tasks_state = use_context::<Signal<TasksState>>();
+    #[cfg(target_arch = "wasm32")]
+    let stream = {
+        let thread_state = use_context::<Signal<ThreadState>>();
+        let mut chat_state = use_context::<Signal<ChatState>>();
+        let mut tasks_state = use_context::<Signal<TasksState>>();
 
-    let stream = use_coroutine(move |mut rx: UnboundedReceiver<StreamRequest>| async move {
-        while let Some(req) = rx.next().await {
-            chat_state.write().is_streaming = true;
-            chat_state.write().error = None;
+        use_coroutine(move |mut rx: UnboundedReceiver<StreamRequest>| async move {
+            while let Some(req) = rx.next().await {
+                chat_state.write().is_streaming = true;
+                chat_state.write().error = None;
 
-            #[cfg(target_arch = "wasm32")]
-            {
                 use omni_rt::deepagents::sse::{SseEvent, SseStream};
                 let body = serde_json::json!({
                     "thread_id": req.thread_id,
@@ -84,12 +113,12 @@ pub fn ChatContainer(thread_id: String) -> Element {
                     }
                 }
             }
+        })
+    };
 
-            #[cfg(not(target_arch = "wasm32"))]
-            {
-                chat_state.write().is_streaming = false;
-            }
-        }
+    #[cfg(not(target_arch = "wasm32"))]
+    let stream = use_coroutine(move |mut rx: UnboundedReceiver<StreamRequest>| async move {
+        while rx.next().await.is_some() {}
     });
 
     let chat_state = use_context::<Signal<ChatState>>();
@@ -386,7 +415,12 @@ fn ChatInput(thread_id: String, stream: Coroutine<StreamRequest>) -> Element {
                                             write.input_draft.clear();
                                             write.stream_buffer.clear();
                                         }
-                                        stream.send(StreamRequest { thread_id: thread_id.clone(), input, model_id: model_state.read().selected_model_for(&active_id) });
+                                        send_stream_request(
+                                            &stream,
+                                            thread_id.clone(),
+                                            input,
+                                            model_state.read().selected_model_for(&active_id),
+                                        );
                                     }
                                 }
                             }
@@ -415,7 +449,12 @@ fn ChatInput(thread_id: String, stream: Coroutine<StreamRequest>) -> Element {
                                     write.input_draft.clear();
                                     write.stream_buffer.clear();
                                 }
-                                stream.send(StreamRequest { thread_id: thread_id.clone(), input, model_id: model_state.read().selected_model_for(&active_id) });
+                                send_stream_request(
+                                    &stream,
+                                    thread_id.clone(),
+                                    input,
+                                    model_state.read().selected_model_for(&active_id),
+                                );
                             }
                         },
                         Icon { width: 13, height: 13, icon: LdSend }

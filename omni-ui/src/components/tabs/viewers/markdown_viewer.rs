@@ -4,7 +4,7 @@ use dioxus::prelude::*;
 pub fn MarkdownViewer(path: String, content: String) -> Element {
     rsx! {
         div { class: "h-full w-full overflow-auto",
-            omni-mdx {
+            omni-marked {
                 class: "block w-full h-full",
                 "data-value": "{content}",
                 "data-readonly": "true",

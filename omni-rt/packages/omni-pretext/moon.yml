@@ -1,0 +1,46 @@
+language: typescript
+layer: library
+stack: frontend
+
+tasks:
+  clean-public:
+    command: shx
+    args:
+      - rm
+      - -f
+      - ../../../omni-ui/public/omni-pretext.js
+      - ../../../omni-ui/public/omni-pretext-*.js
+    inputs:
+      - '@group(configs)'
+    options:
+      internal: true
+  build:
+    command: esbuild
+    args:
+      - src/omni-pretext.ts
+      - --bundle
+      - --format=esm
+      - --splitting
+      - --outdir=../../../omni-ui/public
+      - --entry-names=omni-pretext
+      - --chunk-names=omni-pretext-[name]-[hash]
+    deps:
+      - clean-public
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+  watch:
+    command: esbuild
+    args:
+      - src/omni-pretext.ts
+      - --bundle
+      - --format=esm
+      - --splitting
+      - --outdir=../../../omni-ui/public
+      - --entry-names=omni-pretext
+      - --chunk-names=omni-pretext-[name]-[hash]
+      - --watch
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+    preset: server

@@ -1,0 +1,59 @@
+language: typescript
+layer: library
+stack: frontend
+
+tasks:
+  clean-public:
+    command: shx
+    args:
+      - rm
+      - -f
+      - ../../../omni-ui/public/omni-monaco.js
+      - ../../../omni-ui/public/omni-monaco-*.js
+      - ../../../omni-ui/public/omni-monaco-*.ttf
+      - ../../../omni-ui/public/omni-monaco-*.woff
+      - ../../../omni-ui/public/omni-monaco-*.woff2
+    inputs:
+      - '@group(configs)'
+    options:
+      internal: true
+  build:
+    command: esbuild
+    args:
+      - src/omni-monaco.ts
+      - --bundle
+      - --splitting
+      - --format=esm
+      - --outdir=../../../omni-ui/public
+      - --entry-names=omni-monaco
+      - --chunk-names=omni-monaco-[name]-[hash]
+      - --asset-names=omni-monaco-[name]-[hash]
+      - --loader:.css=text
+      - --loader:.ttf=file
+      - --loader:.woff=file
+      - --loader:.woff2=file
+    deps:
+      - clean-public
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+  watch:
+    command: esbuild
+    args:
+      - src/omni-monaco.ts
+      - --bundle
+      - --splitting
+      - --format=esm
+      - --outdir=../../../omni-ui/public
+      - --entry-names=omni-monaco
+      - --chunk-names=omni-monaco-[name]-[hash]
+      - --asset-names=omni-monaco-[name]-[hash]
+      - --loader:.css=text
+      - --loader:.ttf=file
+      - --loader:.woff=file
+      - --loader:.woff2=file
+      - --watch
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+    preset: server

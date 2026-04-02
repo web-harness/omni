@@ -1,0 +1,20 @@
+language: rust
+layer: library
+stack: systems
+
+tasks:
+  test:
+    command: cargo
+    args:
+      - test
+      - -p
+      - omni-protocol
+    inputs:
+      - '@group(sources)'
+      - '@group(tests)'
+      - '@group(configs)'
+      - specs/agent-protocol.json
+      - build.rs
+    options:
+      cache: false
+      runFromWorkspaceRoot: true

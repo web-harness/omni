@@ -1,0 +1,18 @@
+language: rust
+layer: library
+stack: systems
+
+tasks:
+  test:
+    command: cargo
+    args:
+      - test
+      - -p
+      - omni-deepagents
+    inputs:
+      - '@group(sources)'
+      - '@group(tests)'
+      - '@group(configs)'
+    options:
+      cache: false
+      runFromWorkspaceRoot: true

@@ -1,12 +1,17 @@
-use std::collections::HashMap;
-
+#[cfg(target_arch = "wasm32")]
 use gloo_net::http::Request;
+#[cfg(target_arch = "wasm32")]
 use serde::Deserialize;
 
+#[cfg(target_arch = "wasm32")]
 use super::{
     FileInfo, ModelConfig, Provider, Subagent, Todo, ToolCall, ToolResult, UiMessage, UiThread,
 };
 
+#[cfg(target_arch = "wasm32")]
+use std::collections::HashMap;
+
+#[cfg(target_arch = "wasm32")]
 #[derive(Deserialize)]
 pub struct BootstrapPayload {
     pub threads: Vec<UiThread>,
@@ -23,11 +28,13 @@ pub struct BootstrapPayload {
     pub default_model: String,
 }
 
+#[cfg(target_arch = "wasm32")]
 #[derive(Deserialize)]
 struct ApiKeyResponse {
     value: String,
 }
 
+#[cfg(target_arch = "wasm32")]
 #[derive(Deserialize)]
 struct CreateThreadResponse {
     id: String,
@@ -36,6 +43,7 @@ struct CreateThreadResponse {
     updated_at: String,
 }
 
+#[cfg(target_arch = "wasm32")]
 #[derive(Deserialize)]
 struct ProvidersResponseItem {
     id: super::ProviderId,
@@ -43,10 +51,17 @@ struct ProvidersResponseItem {
     has_api_key: bool,
 }
 
+#[cfg(target_arch = "wasm32")]
 fn err_msg(err: impl ToString) -> std::io::Error {
     std::io::Error::other(err.to_string())
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+fn unavailable() -> std::io::Error {
+    std::io::Error::other("sw_api is only available on wasm32 targets")
+}
+
+#[cfg(target_arch = "wasm32")]
 pub async fn fetch_bootstrap() -> Result<BootstrapPayload, std::io::Error> {
     let response = Request::get("/api/store/bootstrap")
         .send()
@@ -63,6 +78,7 @@ pub async fn fetch_bootstrap() -> Result<BootstrapPayload, std::io::Error> {
     response.json::<BootstrapPayload>().await.map_err(err_msg)
 }
 
+#[cfg(target_arch = "wasm32")]
 pub async fn create_thread() -> Result<UiThread, std::io::Error> {
     let response = Request::post("/api/store/threads")
         .send()
@@ -89,6 +105,7 @@ pub async fn create_thread() -> Result<UiThread, std::io::Error> {
     })
 }
 
+#[cfg(target_arch = "wasm32")]
 pub async fn delete_thread(thread_id: &str) -> Result<(), std::io::Error> {
     let response = Request::delete(&format!("/api/store/threads/{thread_id}"))
         .send()
@@ -105,6 +122,7 @@ pub async fn delete_thread(thread_id: &str) -> Result<(), std::io::Error> {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 pub async fn get_api_key(provider: &str) -> Result<String, std::io::Error> {
     let response = Request::get(&format!("/api/store/config/api-keys/{provider}"))
         .send()
@@ -122,6 +140,7 @@ pub async fn get_api_key(provider: &str) -> Result<String, std::io::Error> {
     Ok(payload.value)
 }
 
+#[cfg(target_arch = "wasm32")]
 pub async fn set_api_key(provider: &str, value: &str) -> Result<(), std::io::Error> {
     let response = Request::put(&format!("/api/store/config/api-keys/{provider}"))
         .json(&serde_json::json!({ "value": value }))
@@ -140,6 +159,7 @@ pub async fn set_api_key(provider: &str, value: &str) -> Result<(), std::io::Err
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 pub async fn delete_api_key(provider: &str) -> Result<(), std::io::Error> {
     let response = Request::delete(&format!("/api/store/config/api-keys/{provider}"))
         .send()
@@ -156,6 +176,7 @@ pub async fn delete_api_key(provider: &str) -> Result<(), std::io::Error> {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 pub async fn list_providers_with_keys() -> Result<Vec<Provider>, std::io::Error> {
     let response = Request::get("/api/store/providers")
         .send()
@@ -184,6 +205,7 @@ pub async fn list_providers_with_keys() -> Result<Vec<Provider>, std::io::Error>
         .collect())
 }
 
+#[cfg(target_arch = "wasm32")]
 pub async fn set_default_model(model_id: &str) -> Result<(), std::io::Error> {
     let response = Request::put("/api/store/config/default-model")
         .json(&serde_json::json!({ "model_id": model_id }))
@@ -202,6 +224,7 @@ pub async fn set_default_model(model_id: &str) -> Result<(), std::io::Error> {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 pub async fn list_workspace_files(workspace: &str) -> Result<Vec<super::FileInfo>, std::io::Error> {
     let encoded = js_sys::encode_uri_component(workspace)
         .as_string()
@@ -222,4 +245,11 @@ pub async fn list_workspace_files(workspace: &str) -> Result<Vec<super::FileInfo
         .json::<Vec<super::FileInfo>>()
         .await
         .map_err(err_msg)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub async fn list_workspace_files(
+    _workspace: &str,
+) -> Result<Vec<super::FileInfo>, std::io::Error> {
+    Err(unavailable())
 }

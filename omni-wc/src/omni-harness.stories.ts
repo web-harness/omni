@@ -3,7 +3,8 @@ import { html } from "lit";
 import "./omni-harness.js";
 import type { OmniHarness } from "./omni-harness.js";
 
-const appSrc = import.meta.env.DEV ? "http://localhost:8080" : "./app/";
+const DEV_APP_SRC = "http://127.0.0.1:8080";
+const appSrc = import.meta.env.DEV ? DEV_APP_SRC : "./app/";
 
 const meta: Meta<OmniHarness> = {
   title: "Components/OmniHarness",

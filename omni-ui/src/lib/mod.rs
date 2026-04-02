@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 
 pub mod file_types;
 pub mod fixtures;
-#[cfg(target_arch = "wasm32")]
 pub mod sw_api;
+#[cfg(target_arch = "wasm32")]
 pub mod thread_context;
 pub mod utils;
 
@@ -121,6 +121,7 @@ pub struct ModelConfig {
     pub provider: ProviderId,
 }
 
+#[cfg(target_arch = "wasm32")]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum StreamEvent {
     Token(String),
@@ -142,12 +143,6 @@ pub struct ThreadState {
     pub threads: Vec<UiThread>,
     pub active_thread_id: Option<String>,
     pub show_kanban: bool,
-}
-
-impl ThreadState {
-    pub fn current_thread_id(&self) -> Option<&str> {
-        self.active_thread_id.as_deref()
-    }
 }
 
 #[derive(Clone, PartialEq)]
@@ -176,10 +171,6 @@ pub struct TasksState {
 impl TasksState {
     pub fn todos_for(&self, thread_id: &str) -> Vec<Todo> {
         self.todos.get(thread_id).cloned().unwrap_or_default()
-    }
-
-    pub fn files_for(&self, thread_id: &str) -> Vec<FileInfo> {
-        self.files.get(thread_id).cloned().unwrap_or_default()
     }
 
     pub fn tool_calls_for(&self, thread_id: &str) -> Vec<ToolCall> {

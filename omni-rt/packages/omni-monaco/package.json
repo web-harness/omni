@@ -1,0 +1,15 @@
+{
+  "name": "@omni/omni-monaco",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/omni-monaco.js",
+  "module": "dist/omni-monaco.js",
+  "dependencies": {
+    "lit": "^3.2.0",
+    "monaco-editor": "^0.52.2"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.2"
+  }
+}

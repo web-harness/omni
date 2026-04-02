@@ -20,3 +20,10 @@ getrandom = { version = "0.3", features = ["wasm_js"] }
 [profile.release]
 debug = false
 strip = "debuginfo"
+
+[profile.wasm-dev]
+inherits = "dev"
+strip = "debuginfo"
+panic = "abort"
+incremental = true
+codegen-units = 256
