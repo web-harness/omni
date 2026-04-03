@@ -3,6 +3,17 @@ layer: library
 stack: systems
 
 tasks:
+  clean-public:
+    command: shx
+    args:
+      - rm
+      - -f
+      - ../../../omni-ui/public/omni-zenfs.js
+      - ../../../omni-ui/public/wasm/omni-zenfs.js
+    inputs:
+      - '@group(configs)'
+    options:
+      internal: true
   build:
     command: esbuild
     args:
@@ -10,6 +21,24 @@ tasks:
       - --bundle
       - --format=esm
       - --outfile=../../../omni-ui/public/omni-zenfs.js
+    deps:
+      - clean-public
+    inputs:
+      - src/omni-zenfs.ts
+      - package.json
+      - build.rs
+      - Cargo.toml
+    toolchains:
+      - node
+  build-wasm:
+    command: esbuild
+    args:
+      - src/omni-zenfs.ts
+      - --bundle
+      - --format=esm
+      - --outfile=../../../omni-ui/public/wasm/omni-zenfs.js
+    deps:
+      - clean-public
     inputs:
       - src/omni-zenfs.ts
       - package.json
@@ -24,6 +53,22 @@ tasks:
       - --bundle
       - --format=esm
       - --outfile=../../../omni-ui/public/omni-zenfs.js
+      - --watch
+    inputs:
+      - src/omni-zenfs.ts
+      - package.json
+      - build.rs
+      - Cargo.toml
+    preset: server
+    toolchains:
+      - node
+  watch-wasm:
+    command: esbuild
+    args:
+      - src/omni-zenfs.ts
+      - --bundle
+      - --format=esm
+      - --outfile=../../../omni-ui/public/wasm/omni-zenfs.js
       - --watch
     inputs:
       - src/omni-zenfs.ts

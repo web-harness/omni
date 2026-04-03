@@ -25,6 +25,7 @@
     "dev": "moon run --interactive omni-ui:dev",
     "storybook": "moon run --interactive omni-wc:dev",
     "build": "moon run omni-ui:build omni-wc:build",
+    "build:nocache": "npm run build -- --force",
     "build:pages": "moon run omni-ui:build-pages omni-wc:build-pages",
     "test": "moon run omni-sw:test omni-ui:test omni-rt:test omni-protocol:test omni-zenfs:test omni-bashkit:test omni-deepagents:test",
     "format:biome": "moon run omni-ui:format-biome",

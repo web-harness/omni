@@ -42,6 +42,7 @@ tasks:
       - omni-pretext:build
       - omni-sheetjs:build
       - omni-zenfs:build
+      - omni-zenfs:build-wasm
       - omni-deepagents:build
       - omni-bashkit:build
       - omni-sw:build-main
@@ -75,6 +76,8 @@ tasks:
       - web
     deps:
       - omni-bashkit:build
+      - omni-zenfs:build
+      - omni-zenfs:build-wasm
       - omni-util:watch
       - omni-docxjs:watch
       - omni-dock:watch
@@ -87,6 +90,7 @@ tasks:
       - omni-pretext:watch
       - omni-sheetjs:watch
       - omni-zenfs:watch
+      - omni-zenfs:watch-wasm
       - omni-deepagents:build
       - omni-sw:copy-sql-wasm
       - omni-sw:watch-main
