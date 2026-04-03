@@ -75,9 +75,11 @@ export class OmniPdfjs extends LitElement {
   @state() private pageCount = 0;
   @state() private scale = 1.5;
   @state() private status = "";
+  @state() private fitToWidth = true;
 
   private pdfDoc: PDFDocumentProxy | null = null;
   private loadVersion = 0;
+  private resizeObserver: ResizeObserver | null = null;
 
   render() {
     return html`
@@ -88,12 +90,23 @@ export class OmniPdfjs extends LitElement {
         <button @click=${() => this.setScale(this.scale - 0.25)}>−</button>
         <span>${Math.round(this.scale * 100)}%</span>
         <button @click=${() => this.setScale(this.scale + 0.25)}>+</button>
-        <button @click=${() => this.setScale(1.5)}>Reset</button>
+        <button @click=${() => void this.resetScale()}>Fit</button>
       </div>
       <div class="scroll-area" id="scroll">
         ${this.status ? html`<div class="status">${this.status}</div>` : ""}
       </div>
     `;
+  }
+
+  firstUpdated() {
+    const scrollArea = this.getScrollArea();
+    if (!scrollArea) return;
+
+    this.resizeObserver = new ResizeObserver(() => {
+      if (!this.fitToWidth || !this.pdfDoc) return;
+      void this.syncFitScale();
+    });
+    this.resizeObserver.observe(scrollArea);
   }
 
   updated(changed: Map<string, unknown>) {
@@ -106,7 +119,13 @@ export class OmniPdfjs extends LitElement {
   }
 
   private setScale(s: number) {
+    this.fitToWidth = false;
     this.scale = Math.max(0.5, Math.min(4.0, s));
+  }
+
+  private async resetScale() {
+    this.fitToWidth = true;
+    await this.syncFitScale();
   }
 
   private async getPdfJs(): Promise<PdfJsModule> {
@@ -148,11 +167,35 @@ export class OmniPdfjs extends LitElement {
     this.pdfDoc = nextPdfDoc;
     this.pageCount = this.pdfDoc.numPages;
     this.status = "";
+    await this.syncFitScale();
     await this.renderAllPages();
   }
 
   private getScrollArea(): HTMLDivElement | null {
     return this.shadowRoot?.querySelector<HTMLDivElement>("#scroll") ?? null;
+  }
+
+  private async syncFitScale() {
+    if (!this.pdfDoc) return;
+    const fitScale = await this.getFitScale();
+    if (fitScale === null) return;
+    this.scale = fitScale;
+  }
+
+  private async getFitScale(): Promise<number | null> {
+    if (!this.pdfDoc) return null;
+    const scrollArea = this.getScrollArea();
+    if (!scrollArea) return null;
+
+    const styles = getComputedStyle(scrollArea);
+    const horizontalPadding = parseFloat(styles.paddingLeft || "0") + parseFloat(styles.paddingRight || "0");
+    const availableWidth = scrollArea.clientWidth - horizontalPadding;
+    if (availableWidth <= 0) return null;
+
+    const firstPage = await this.pdfDoc.getPage(1);
+    const baseViewport = firstPage.getViewport({ scale: 1 });
+    const fitScale = availableWidth / baseViewport.width;
+    return Math.max(0.5, Math.min(1.5, fitScale));
   }
 
   private async renderAllPages() {
@@ -178,6 +221,8 @@ export class OmniPdfjs extends LitElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
     this.pdfDoc?.destroy();
     this.pdfDoc = null;
   }
