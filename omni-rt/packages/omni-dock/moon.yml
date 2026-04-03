@@ -1,0 +1,53 @@
+language: typescript
+layer: library
+stack: frontend
+
+tasks:
+  clean-public:
+    command: shx
+    args:
+      - rm
+      - -f
+      - ../../../omni-ui/public/omni-dock.js
+      - ../../../omni-ui/public/omni-dock-*.js
+    inputs:
+      - '@group(configs)'
+    options:
+      internal: true
+  build:
+    command: esbuild
+    args:
+      - src/omni-dock.ts
+      - --bundle
+      - --format=esm
+      - --splitting
+      - --outdir=../../../omni-ui/public
+      - --entry-names=omni-dock
+      - --chunk-names=omni-dock-[name]-[hash]
+      - --loader:.css=text
+      - --loader:.svg=text
+    deps:
+      - omni-util:build
+      - clean-public
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+  watch:
+    command: esbuild
+    args:
+      - src/omni-dock.ts
+      - --bundle
+      - --format=esm
+      - --splitting
+      - --outdir=../../../omni-ui/public
+      - --entry-names=omni-dock
+      - --chunk-names=omni-dock-[name]-[hash]
+      - --loader:.css=text
+      - --loader:.svg=text
+      - --watch
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+    deps:
+      - omni-util:build
+    preset: server

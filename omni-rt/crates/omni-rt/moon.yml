@@ -1,0 +1,24 @@
+language: rust
+layer: library
+stack: systems
+
+dependsOn:
+  - omni-protocol
+  - omni-bashkit
+  - omni-zenfs
+  - omni-deepagents
+
+tasks:
+  test:
+    command: cargo
+    args:
+      - test
+      - -p
+      - omni-rt
+    inputs:
+      - '@group(sources)'
+      - '@group(tests)'
+      - '@group(configs)'
+    options:
+      cache: false
+      runFromWorkspaceRoot: true

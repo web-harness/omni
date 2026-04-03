@@ -5,7 +5,7 @@ pub mod run;
 pub mod store;
 pub mod thread;
 
-pub use agent::{Agent, AgentCapabilities, AgentSchema};
+pub use agent::{Agent, AgentCapabilities, AgentSchema, AgentSearchRequest};
 pub use error::ErrorResponse;
 pub use message::Message;
 pub use run::{Run, RunCreate, RunSearchRequest, RunStatus, RunStream, RunWaitResponse};

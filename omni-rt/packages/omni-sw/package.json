@@ -1,0 +1,27 @@
+{
+  "name": "@omni/omni-sw",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@langchain/anthropic": "^0.3.20",
+    "@langchain/core": "^0.3.41",
+    "@langchain/google-genai": "^0.2.10",
+    "@langchain/langgraph": "^0.2.67",
+    "@langchain/langgraph-checkpoint": "^0.0.16",
+    "@langchain/openai": "^0.5.9",
+    "@omni/omni-zenfs": "file:../../crates/omni-zenfs",
+    "@zenfs/core": "^2.3.11",
+    "@zenfs/dom": "^1.2.7",
+    "buffer": "^6.0.3",
+    "deepagents": "^1.8.7",
+    "process": "^0.11.10",
+    "serwist": "^9.0.14",
+    "sql.js": "^1.12.0"
+  },
+  "devDependencies": {
+    "@types/sql.js": "^1.4.9",
+    "esbuild": "^0.25.2",
+    "vitest": "^2.1.8"
+  }
+}

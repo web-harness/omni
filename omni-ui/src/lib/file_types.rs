@@ -2,6 +2,9 @@
 pub enum FileType {
     Code,
     Markdown,
+    Spreadsheet,
+    Document,
+    Presentation,
     Image,
     Video,
     Audio,
@@ -15,6 +18,9 @@ pub fn get_file_type(filename: &str) -> FileType {
     let ext = filename.rsplit('.').next().unwrap_or("").to_lowercase();
     match ext.as_str() {
         "md" | "mdx" => FileType::Markdown,
+        "xlsx" | "xls" | "xlsm" | "ods" => FileType::Spreadsheet,
+        "docx" => FileType::Document,
+        "pptx" | "pptm" | "potx" => FileType::Presentation,
         "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg" | "bmp" | "ico" => FileType::Image,
         "mp4" | "webm" | "ogv" | "mov" | "avi" => FileType::Video,
         "mp3" | "wav" | "ogg" | "flac" | "aac" | "m4a" => FileType::Audio,
@@ -69,6 +75,10 @@ pub fn ext_to_monaco_language(ext: &str) -> &str {
 
 pub fn ext_to_mime_type(ext: &str) -> &str {
     match ext.to_lowercase().as_str() {
+        "xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "xls" => "application/vnd.ms-excel",
+        "docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",
         "gif" => "image/gif",

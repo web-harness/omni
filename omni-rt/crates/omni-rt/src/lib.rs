@@ -1,10 +1,10 @@
 pub use omni_protocol as protocol;
 
-#[cfg(feature = "native")]
+#[cfg(any(feature = "native", feature = "bashkit"))]
 pub use omni_bashkit as bashkit;
 
-#[cfg(feature = "wasm")]
+#[cfg(feature = "zenfs")]
 pub use omni_zenfs as zenfs;
 
-#[cfg(feature = "wasm")]
+#[cfg(feature = "deepagents")]
 pub use omni_deepagents as deepagents;

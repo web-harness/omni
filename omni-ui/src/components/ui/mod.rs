@@ -4,51 +4,23 @@ use dioxus::prelude::*;
 pub enum ButtonVariant {
     Default,
     Secondary,
-    Ghost,
-    Destructive,
-    Outline,
-    Nominal,
-    Warning,
-    Critical,
-    Info,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ButtonSize {
     Default,
-    Sm,
-    Lg,
-    Icon,
 }
 
 fn button_variant_class(variant: ButtonVariant) -> &'static str {
     match variant {
         ButtonVariant::Default => "bg-primary text-primary-foreground hover:bg-primary/90",
         ButtonVariant::Secondary => "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ButtonVariant::Ghost => "bg-transparent text-foreground hover:bg-accent/20",
-        ButtonVariant::Destructive => {
-            "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-        }
-        ButtonVariant::Outline => "border border-border bg-transparent hover:bg-accent/15",
-        ButtonVariant::Nominal => {
-            "bg-status-nominal/20 text-status-nominal hover:bg-status-nominal/30"
-        }
-        ButtonVariant::Warning => {
-            "bg-status-warning/20 text-status-warning hover:bg-status-warning/30"
-        }
-        ButtonVariant::Critical => {
-            "bg-status-critical/20 text-status-critical hover:bg-status-critical/30"
-        }
-        ButtonVariant::Info => "bg-status-info/20 text-status-info hover:bg-status-info/30",
     }
 }
 
 fn button_size_class(size: ButtonSize) -> &'static str {
     match size {
         ButtonSize::Default => "h-9 px-4 py-2 text-xs",
-        ButtonSize::Sm => "h-8 px-3 text-[11px]",
-        ButtonSize::Lg => "h-10 px-6 text-sm",
-        ButtonSize::Icon => "h-8 w-8",
     }
 }
 
@@ -77,9 +49,6 @@ pub fn Button(
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum BadgeVariant {
     Default,
-    Secondary,
-    Destructive,
-    Outline,
     Nominal,
     Warning,
     Critical,
@@ -89,9 +58,6 @@ pub enum BadgeVariant {
 fn badge_variant_class(variant: BadgeVariant) -> &'static str {
     match variant {
         BadgeVariant::Default => "bg-primary/20 text-primary border-primary/30",
-        BadgeVariant::Secondary => "bg-secondary/30 text-secondary-foreground border-border",
-        BadgeVariant::Destructive => "bg-destructive/20 text-destructive border-destructive/30",
-        BadgeVariant::Outline => "bg-transparent text-muted-foreground border-border",
         BadgeVariant::Nominal => {
             "bg-status-nominal/20 text-status-nominal border-status-nominal/30"
         }
@@ -109,10 +75,11 @@ fn badge_variant_class(variant: BadgeVariant) -> &'static str {
 pub fn Badge(
     children: Element,
     #[props(default = BadgeVariant::Default)] variant: BadgeVariant,
+    #[props(default = String::new())] class: String,
 ) -> Element {
     rsx! {
         span {
-            class: "inline-flex items-center rounded-sm border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {badge_variant_class(variant)}",
+            class: "inline-flex items-center rounded-sm border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {badge_variant_class(variant)} {class}",
             {children}
         }
     }

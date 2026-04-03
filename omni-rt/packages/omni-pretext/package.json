@@ -1,0 +1,13 @@
+{
+  "name": "@omni/omni-pretext",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@omni/omni-util": "*",
+    "@chenglou/pretext": "^0.0.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.2"
+  }
+}

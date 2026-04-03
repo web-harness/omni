@@ -1,0 +1,34 @@
+language: typescript
+layer: application
+stack: frontend
+
+tasks:
+  build:
+    command: storybook
+    args:
+      - build
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+      - .storybook/**/*
+    outputs:
+      - storybook-static/
+  build-pages:
+    extends: build
+    env:
+      BASE_PATH: /omni/
+    options:
+      mergeArgs: replace
+  dev:
+    command: storybook
+    args:
+      - dev
+      - -p
+      - '6006'
+    deps:
+      - omni-ui:dev
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+      - .storybook/**/*
+    preset: server

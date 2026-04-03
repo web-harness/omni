@@ -1,0 +1,27 @@
+fileGroups:
+  sources:
+    - src/**/*
+  configs:
+    - Cargo.toml
+    - package.json
+    - tsconfig.json
+    - tsconfig.*.json
+    - Dioxus.toml
+    - build.rs
+    - build.ts
+    - build.mjs
+    - clippy.toml
+    - '*.config.*'
+  tests:
+    - tests/**/*
+    - '**/*.test.*'
+    - '**/*.spec.*'
+  build-artifacts:
+    - dist/**/*
+    - storybook-static/**/*
+    - public/**/*
+
+implicitInputs:
+  - /.moon/*.{yml,yaml,jsonc,json,pkl,hcl,toml}
+  - /Cargo.lock
+  - /package-lock.json

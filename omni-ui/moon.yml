@@ -1,0 +1,130 @@
+language: rust
+layer: application
+stack: frontend
+
+dependsOn:
+  - omni-rt
+  - omni-deepagents
+  - omni-util
+  - omni-docxjs
+  - omni-dock
+  - omni-marked
+  - omni-monaco
+  - omni-pdfjs
+  - omni-pptx-renderer
+  - omni-plyr
+  - omni-popper
+  - omni-pretext
+  - omni-sheetjs
+  - omni-sw
+  - omni-zenfs
+  - omni-bashkit
+
+tasks:
+  build:
+    command: dx
+    args:
+      - bundle
+      - --platform
+      - web
+      - --out-dir
+      - dist
+    deps:
+      - omni-util:build
+      - omni-docxjs:build
+      - omni-dock:build
+      - omni-popper:build
+      - omni-marked:build
+      - omni-monaco:build
+      - omni-pdfjs:build
+      - omni-pptx-renderer:build
+      - omni-plyr:build
+      - omni-pretext:build
+      - omni-sheetjs:build
+      - omni-zenfs:build
+      - omni-zenfs:build-wasm
+      - omni-deepagents:build
+      - omni-bashkit:build
+      - omni-sw:build-main
+      - omni-sw:build-register
+      - omni-sw:copy-sql-wasm
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+    outputs:
+      - dist/
+    toolchains:
+      - system
+  build-pages:
+    extends: build
+    args:
+      - bundle
+      - --platform
+      - web
+      - --release
+      - --base-path
+      - /omni/app
+      - --out-dir
+      - dist
+    options:
+      mergeArgs: replace
+  dev:
+    command: dx
+    args:
+      - serve
+      - --platform
+      - web
+    deps:
+      - omni-bashkit:build
+      - omni-zenfs:build
+      - omni-zenfs:build-wasm
+      - omni-util:watch
+      - omni-docxjs:watch
+      - omni-dock:watch
+      - omni-popper:watch
+      - omni-monaco:watch
+      - omni-marked:watch
+      - omni-pdfjs:watch
+      - omni-pptx-renderer:watch
+      - omni-plyr:watch
+      - omni-pretext:watch
+      - omni-sheetjs:watch
+      - omni-zenfs:watch
+      - omni-zenfs:watch-wasm
+      - omni-deepagents:build
+      - omni-sw:copy-sql-wasm
+      - omni-sw:watch-main
+      - omni-sw:watch-register
+    preset: server
+    toolchains:
+      - system
+  test:
+    command: cargo
+    args:
+      - test
+      - -p
+      - omni-ui
+    inputs:
+      - '@group(sources)'
+      - '@group(tests)'
+      - '@group(configs)'
+    options:
+      cache: false
+      runFromWorkspaceRoot: true
+  format-biome:
+    command: biome
+    args:
+      - format
+      - --write
+      - .
+    options:
+      cache: false
+      runFromWorkspaceRoot: true
+  format-cargo:
+    command: cargo
+    args:
+      - fmt
+      - --all
+    options:
+      cache: false
+      runFromWorkspaceRoot: true

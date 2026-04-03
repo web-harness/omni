@@ -4,6 +4,7 @@ use dioxus_free_icons::icons::ld_icons::{
 };
 use dioxus_free_icons::Icon;
 
+use crate::lib::utils::relative_time;
 use crate::lib::{Theme, ThreadState, ThreadStatus, UiState};
 use crate::routes::Route;
 
@@ -20,15 +21,37 @@ pub fn ThreadSidebar() -> Element {
                 button {
                     class: "inline-flex w-full items-center justify-center gap-2 rounded-sm bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground",
                     onclick: move |_| {
-                        let new_id = format!("thread-{}", thread_state.read().threads.len() + 1);
+                        // Optimistic UI: insert a placeholder immediately, then persist async
+                        let temp_id = format!("thread-{}", thread_state.read().threads.len() + 1);
                         thread_state.write().threads.insert(0, crate::lib::UiThread {
-                            id: new_id.clone(),
+                            id: temp_id.clone(),
                             title: "New Thread".to_string(),
-                            status: ThreadStatus::Idle,
+                            status: crate::lib::ThreadStatus::Idle,
                             updated_at: "now".to_string(),
                         });
-                        thread_state.write().active_thread_id = Some(new_id.clone());
-                        navigator.push(Route::ThreadView { id: new_id });
+                        thread_state.write().active_thread_id = Some(temp_id.clone());
+                        navigator.push(Route::ThreadView { id: temp_id.clone() });
+
+                        #[cfg(target_arch = "wasm32")]
+                        {
+                            let mut t_state = thread_state;
+                            let tid = temp_id.clone();
+                            let nav = navigator.clone();
+                            spawn(async move {
+                                if let Ok(thread) = crate::lib::sw_api::create_thread().await {
+                                    let real_id = thread.id;
+                                    // Replace the temporary thread with the persisted one
+                                    if let Some(entry) = t_state.write().threads.iter_mut().find(|t| t.id == tid) {
+                                        entry.id = real_id.clone();
+                                        entry.updated_at = thread.updated_at;
+                                    }
+                                    if t_state.read().active_thread_id.as_deref() == Some(&tid) {
+                                        t_state.write().active_thread_id = Some(real_id.clone());
+                                        nav.push(Route::ThreadView { id: real_id });
+                                    }
+                                }
+                            });
+                        }
                     },
                     Icon { width: 14, height: 14, icon: LdPlus }
                     span { "New Thread" }
@@ -102,16 +125,29 @@ fn ThreadRow(thread: crate::lib::UiThread) -> Element {
             div { class: "flex items-center gap-2",
                 StatusIcon { status: thread.status.clone() }
                 div { class: "min-w-0 flex-1",
-                    div { class: "truncate text-xs font-semibold", "{thread.title}" }
-                    div { class: "text-[10px] text-muted-foreground", "{thread.updated_at}" }
+                    omni-text {
+                        "data-text": "{thread.title}",
+                        "data-strategy": "truncate",
+                        "data-max-lines": "1",
+                        class: "text-xs font-semibold",
+                    }
+                    div { class: "text-[10px] text-muted-foreground", "{relative_time(&thread.updated_at)}" }
                 }
                 button {
                     class: "rounded px-1 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-status-critical transition-opacity",
                     onclick: move |evt| {
                         evt.stop_propagation();
-                        thread_state.write().threads.retain(|t| t.id != thread_id_for_delete);
+                        let id = thread_id_for_delete.clone();
+                        thread_state.write().threads.retain(|t| t.id != id);
                         if thread_state.read().threads.is_empty() {
                             thread_state.write().active_thread_id = None;
+                        }
+                        #[cfg(target_arch = "wasm32")]
+                        {
+                            let id2 = id.clone();
+                            spawn(async move {
+                                let _ = crate::lib::sw_api::delete_thread(&id2).await;
+                            });
                         }
                     },
                     Icon { width: 12, height: 12, icon: LdTrash2 }

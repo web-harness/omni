@@ -26,11 +26,12 @@ target
 **/*.rs.bk
 
 /omni-ui/target
-/omni-ui/fixtures
+/omni-ui/public/*
+/omni-rt/crates/*/omni-*.js
 /omni-ui/assets/tailwind.css
-/omni-ui/public/omni-*.js
 
 node_modules
 /dist
 dist/
 storybook-static/
+.moon/cache/

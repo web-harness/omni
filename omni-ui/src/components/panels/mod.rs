@@ -1,7 +1,6 @@
 use dioxus::prelude::*;
 use dioxus_free_icons::icons::ld_icons::{
-    LdBot, LdChevronDown, LdChevronRight, LdFile, LdFileCode2, LdFileText, LdFolder, LdGitBranch,
-    LdListTodo, LdRefreshCw,
+    LdBot, LdFile, LdFileCode2, LdFileText, LdFolder, LdRefreshCw,
 };
 use dioxus_free_icons::Icon;
 
@@ -10,84 +9,6 @@ use crate::lib::utils::fmt_size;
 use crate::lib::{
     FileInfo, SubagentState, SubagentStatus, TasksState, ThreadState, TodoStatus, WorkspaceState,
 };
-
-#[component]
-pub fn RightPanel() -> Element {
-    let mut tasks_open = use_signal(|| true);
-    let mut files_open = use_signal(|| true);
-    let mut agents_open = use_signal(|| true);
-
-    let thread_state = use_context::<Signal<ThreadState>>();
-    let tasks_state = use_context::<Signal<TasksState>>();
-    let subagent_state = use_context::<Signal<SubagentState>>();
-    let tid = thread_state
-        .read()
-        .active_thread_id
-        .clone()
-        .unwrap_or_default();
-
-    let todos = tasks_state.read().todos_for(&tid);
-    let files = tasks_state.read().files_for(&tid);
-    let agents = subagent_state.read().subagents_for(&tid);
-
-    let todo_count = todos.len();
-    let file_count = files.iter().filter(|f| !f.is_dir).count();
-    let agent_count = agents.len();
-
-    rsx! {
-        aside {
-            class: "h-full w-full border-l border-border bg-sidebar flex flex-col overflow-auto text-[11px]",
-
-            button {
-                class: "flex w-full items-center gap-2 px-3 py-2 text-section-header border-b border-border hover:bg-background-interactive",
-                onclick: move |_| tasks_open.set(!tasks_open()),
-                if tasks_open() {
-                    Icon { width: 10, height: 10, icon: LdChevronDown, class: "text-muted-foreground" }
-                } else {
-                    Icon { width: 10, height: 10, icon: LdChevronRight, class: "text-muted-foreground" }
-                }
-                Icon { width: 12, height: 12, icon: LdListTodo }
-                span { "TASKS" }
-                span { class: "ml-auto rounded bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground", "{todo_count}" }
-            }
-            if tasks_open() {
-                TasksSection {}
-            }
-
-            button {
-                class: "flex w-full items-center gap-2 px-3 py-2 text-section-header border-b border-t border-border hover:bg-background-interactive",
-                onclick: move |_| files_open.set(!files_open()),
-                if files_open() {
-                    Icon { width: 10, height: 10, icon: LdChevronDown, class: "text-muted-foreground" }
-                } else {
-                    Icon { width: 10, height: 10, icon: LdChevronRight, class: "text-muted-foreground" }
-                }
-                Icon { width: 12, height: 12, icon: LdFolder }
-                span { "FILES" }
-                span { class: "ml-auto rounded bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground", "{file_count}" }
-            }
-            if files_open() {
-                FilesSection {}
-            }
-
-            button {
-                class: "flex w-full items-center gap-2 px-3 py-2 text-section-header border-b border-t border-border hover:bg-background-interactive",
-                onclick: move |_| agents_open.set(!agents_open()),
-                if agents_open() {
-                    Icon { width: 10, height: 10, icon: LdChevronDown, class: "text-muted-foreground" }
-                } else {
-                    Icon { width: 10, height: 10, icon: LdChevronRight, class: "text-muted-foreground" }
-                }
-                Icon { width: 12, height: 12, icon: LdGitBranch }
-                span { "AGENTS" }
-                span { class: "ml-auto rounded bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground", "{agent_count}" }
-            }
-            if agents_open() {
-                AgentsSection {}
-            }
-        }
-    }
-}
 
 #[component]
 pub fn TasksSection() -> Element {
@@ -129,10 +50,16 @@ pub fn TasksSection() -> Element {
                             }
                         }
                         div { class: "min-w-0 flex-1",
-                            p { class: "text-[11px] leading-4", "{todo.content}" }
+                            omni-text {
+                                "data-text": "{todo.content}",
+                                "data-strategy": "shrink-truncate",
+                                "data-max-lines": "2",
+                                "data-min-size": "9",
+                                class: "text-[11px] leading-4",
+                            }
                         }
                         if todo.status == TodoStatus::InProgress {
-                            Badge { variant: BadgeVariant::Info, "IN PROGRESS" }
+                            Badge { variant: BadgeVariant::Info, class: "shrink-0", "IN PROGRESS" }
                         }
                     }
                 }
@@ -152,13 +79,46 @@ pub fn FilesSection() -> Element {
         .unwrap_or_default();
     let files = workspace_state.read().files_for_thread(&tid);
     let workspace = workspace_state.read().workspace_for(&tid);
+    let mut workspace_state_for_sync = workspace_state;
+
+    {
+        let workspace_path = workspace.clone();
+        let mut ws_state = workspace_state;
+        let should_fetch = files.is_empty();
+        use_effect(move || {
+            if should_fetch {
+                let workspace_path_for_task = workspace_path.clone();
+                spawn(async move {
+                    if let Ok(fetched) =
+                        crate::lib::sw_api::list_workspace_files(&workspace_path_for_task).await
+                    {
+                        ws_state
+                            .write()
+                            .workspace_files
+                            .insert(workspace_path_for_task, fetched);
+                    }
+                });
+            }
+        });
+    }
 
     rsx! {
         div { class: "overflow-auto",
             div { class: "flex items-center justify-between px-3 py-1.5 border-b border-border",
-                span { class: "text-[10px] font-semibold text-muted-foreground tracking-wide", "{workspace}" }
+                omni-text { "data-text": "{workspace}", "data-strategy": "truncate", "data-max-lines": "1", class: "text-[10px] font-semibold text-muted-foreground tracking-wide" }
                 button {
                     class: "flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground",
+                    onclick: move |_| {
+                        let workspace_path = workspace.clone();
+                        spawn(async move {
+                            if let Ok(files) = crate::lib::sw_api::list_workspace_files(&workspace_path).await {
+                                workspace_state_for_sync
+                                    .write()
+                                    .workspace_files
+                                    .insert(workspace_path, files);
+                            }
+                        });
+                    },
                     Icon { width: 10, height: 10, icon: LdRefreshCw }
                     span { "Sync" }
                 }
@@ -175,7 +135,7 @@ pub fn FilesSection() -> Element {
                                 ws.open_tabs.entry(tid.clone()).or_default().push(path.clone());
                             }
                             ws.active_tab.insert(tid.clone(), path);
-                        }}}
+                        }, workspace_root: workspace.clone() }}
                     }
                 }
             }
@@ -184,8 +144,14 @@ pub fn FilesSection() -> Element {
 }
 
 #[component]
-fn FileRow(file: FileInfo, on_open: EventHandler<String>) -> Element {
-    let depth = file.path.matches('/').count();
+fn FileRow(file: FileInfo, on_open: EventHandler<String>, workspace_root: String) -> Element {
+    let root = workspace_root.trim_end_matches('/');
+    let relative = file
+        .path
+        .strip_prefix(&format!("{root}/"))
+        .unwrap_or(&file.path)
+        .to_string();
+    let depth = relative.matches('/').count();
     let name = file
         .path
         .split('/')
@@ -229,7 +195,7 @@ fn FileRow(file: FileInfo, on_open: EventHandler<String>) -> Element {
             } else {
                 Icon { width: 12, height: 12, icon: LdFileCode2, class: "{icon_color} shrink-0" }
             }
-            span { class: "flex-1 truncate text-[11px]", "{name}" }
+            omni-text { "data-text": "{name}", "data-strategy": "truncate", "data-max-lines": "1", class: "flex-1 text-[11px]" }
             if !size_str.is_empty() {
                 span { class: "shrink-0 text-[10px] text-muted-foreground", "{size_str}" }
             }
@@ -254,7 +220,7 @@ pub fn AgentsSection() -> Element {
                 div { key: "{agent.id}", class: "px-3 py-2 border-b border-border/50",
                     div { class: "flex items-center gap-2 mb-1",
                         Icon { width: 12, height: 12, icon: LdBot, class: "text-status-info shrink-0" }
-                        span { class: "flex-1 text-[11px] font-semibold truncate", "{agent.name}" }
+                        omni-text { "data-text": "{agent.name}", "data-strategy": "truncate", "data-max-lines": "1", class: "flex-1 text-[11px] font-semibold" }
                         {
                             let (variant, label) = match agent.status {
                                 SubagentStatus::Running => (BadgeVariant::Info, "RUNNING"),
@@ -265,7 +231,7 @@ pub fn AgentsSection() -> Element {
                             rsx! { Badge { variant, "{label}" } }
                         }
                     }
-                    p { class: "text-[10px] text-muted-foreground leading-4 line-clamp-3", "{agent.description}" }
+                    omni-text { "data-text": "{agent.description}", "data-strategy": "truncate", "data-max-lines": "3", class: "text-[10px] text-muted-foreground leading-4" }
                 }
             }
         }

@@ -1,0 +1,49 @@
+language: typescript
+layer: library
+stack: frontend
+
+tasks:
+  clean-public:
+    command: shx
+    args:
+      - rm
+      - -f
+      - ../../../omni-ui/public/omni-popper.js
+      - ../../../omni-ui/public/omni-popper-*.js
+    inputs:
+      - '@group(configs)'
+    options:
+      internal: true
+  build:
+    command: esbuild
+    args:
+      - src/omni-popper.ts
+      - --bundle
+      - --format=esm
+      - --splitting
+      - --outdir=../../../omni-ui/public
+      - --entry-names=omni-popper
+      - --chunk-names=omni-popper-[name]-[hash]
+    deps:
+      - omni-util:build
+      - clean-public
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+  watch:
+    command: esbuild
+    args:
+      - src/omni-popper.ts
+      - --bundle
+      - --format=esm
+      - --splitting
+      - --outdir=../../../omni-ui/public
+      - --entry-names=omni-popper
+      - --chunk-names=omni-popper-[name]-[hash]
+      - --watch
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+    deps:
+      - omni-util:build
+    preset: server

@@ -2,6 +2,7 @@ use dioxus::prelude::*;
 use dioxus_free_icons::icons::ld_icons::{LdCircleDot, LdGitBranch};
 use dioxus_free_icons::Icon;
 
+use crate::lib::utils::relative_time;
 use crate::lib::{SubagentState, SubagentStatus, ThreadState, ThreadStatus, UiThread};
 use crate::routes::Route;
 
@@ -112,8 +113,14 @@ pub fn KanbanCard(thread: UiThread) -> Element {
             onclick: move |_| {
                 navigator.push(Route::ThreadView { id: thread.id.clone() });
             },
-            div { class: "text-[11px] font-semibold truncate", "{thread.title}" }
-            div { class: "mt-1 text-[10px] text-muted-foreground", "{thread.updated_at}" }
+            omni-text {
+                "data-text": "{thread.title}",
+                "data-strategy": "shrink",
+                "data-max-lines": "1",
+                "data-min-size": "9",
+                class: "text-[11px] font-semibold",
+            }
+            div { class: "mt-1 text-[10px] text-muted-foreground", "{relative_time(&thread.updated_at)}" }
         }
     }
 }
@@ -131,9 +138,14 @@ pub fn SubagentKanbanCard(agent: crate::lib::Subagent) -> Element {
         div { class: "rounded-sm border border-dashed border-border px-2 py-2",
             div { class: "inline-flex items-center gap-2 text-[11px] {tone}",
                 Icon { width: 12, height: 12, icon: LdGitBranch }
-                span { "{agent.name}" }
+                omni-text { "data-text": "{agent.name}", "data-strategy": "truncate", "data-max-lines": "1", class: "text-[11px]" }
             }
-            div { class: "text-[10px] text-muted-foreground", "{agent.description}" }
+            omni-text {
+                "data-text": "{agent.description}",
+                "data-strategy": "truncate",
+                "data-max-lines": "2",
+                class: "text-[10px] text-muted-foreground",
+            }
         }
     }
 }

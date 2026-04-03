@@ -1,0 +1,16 @@
+{
+  "name": "@omni/omni-util",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./async-loader": "./dist/async-loader.js",
+    "./object-url": "./dist/object-url.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.2"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "@omni/omni-dock",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@omni/omni-util": "*",
+    "dockview-core": "^5.1.0",
+    "lit": "^3.2.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.2"
+  }
+}

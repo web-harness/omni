@@ -1,0 +1,27 @@
+language: typescript
+layer: library
+stack: frontend
+
+tasks:
+  build:
+    command: esbuild
+    args:
+      - src/omni-marked.ts
+      - --bundle
+      - --format=esm
+      - --outfile=../../../omni-ui/public/omni-marked.js
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+  watch:
+    command: esbuild
+    args:
+      - src/omni-marked.ts
+      - --bundle
+      - --format=esm
+      - --outfile=../../../omni-ui/public/omni-marked.js
+      - --watch
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+    preset: server

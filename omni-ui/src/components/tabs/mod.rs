@@ -7,13 +7,14 @@ use dioxus_free_icons::Icon;
 use crate::components::chat::ChatContainer;
 use crate::lib::{
     file_types::{ext_to_mime_type, get_file_type, FileType},
-    fixtures::{fixture_b64, fixture_text},
+    fixtures::{fixture_text, fixture_url},
     ThreadState, WorkspaceState,
 };
 
 pub mod viewers;
 use viewers::{
-    BinaryViewer, CodeViewer, HtmlViewer, ImageViewer, MarkdownViewer, MediaViewer, PdfViewer,
+    BinaryViewer, CodeViewer, DocxViewer, HtmlViewer, ImageViewer, MarkdownViewer, MediaViewer,
+    PdfViewer, PptxViewer, SpreadsheetViewer,
 };
 
 #[component]
@@ -67,7 +68,7 @@ fn TabChip(tab: String, active: bool) -> Element {
                 span { "Agent" }
             } else {
                 FileIcon { path: tab.clone() }
-                span { class: "max-w-[180px] truncate", "{tab}" }
+                omni-text { "data-text": "{tab}", "data-strategy": "truncate", "data-max-lines": "1", class: "max-w-[180px] text-[11px]" }
                 button {
                     class: "rounded p-0.5 hover:bg-background",
                     onclick: {
@@ -91,9 +92,10 @@ fn TabChip(tab: String, active: bool) -> Element {
 fn FileIcon(path: String) -> Element {
     match get_file_type(&path) {
         FileType::Code => rsx! { Icon { width: 13, height: 13, icon: LdFileCode } },
-        FileType::Markdown | FileType::Text => {
+        FileType::Markdown | FileType::Text | FileType::Spreadsheet | FileType::Document => {
             rsx! { Icon { width: 13, height: 13, icon: LdFileText } }
         }
+        FileType::Presentation => rsx! { Icon { width: 13, height: 13, icon: LdFile } },
         FileType::Image => rsx! { Icon { width: 13, height: 13, icon: LdFileImage } },
         FileType::Video | FileType::Audio => {
             rsx! { Icon { width: 13, height: 13, icon: LdFileVideo } }
@@ -134,32 +136,38 @@ pub fn FileViewer(path: String, thread_id: String) -> Element {
             FileType::Markdown => rsx! {
                 MarkdownViewer { path: path.clone(), content: fixture_text(&path) }
             },
+            FileType::Spreadsheet => rsx! {
+                SpreadsheetViewer { path: path.clone(), source_url: fixture_url(&path) }
+            },
+            FileType::Document => rsx! {
+                DocxViewer { path: path.clone(), source_url: fixture_url(&path) }
+            },
+            FileType::Presentation => rsx! {
+                PptxViewer { path: path.clone(), source_url: fixture_url(&path) }
+            },
             FileType::Html => rsx! {
                 HtmlViewer { path: path.clone(), content: fixture_text(&path) }
             },
             FileType::Image => rsx! {
                 ImageViewer {
                     path: path.clone(),
-                    base64_content: fixture_b64(&path),
-                    mime_type: mime,
+                    source_url: fixture_url(&path),
                 }
             },
             FileType::Video => rsx! {
                 MediaViewer {
-                    path: path.clone(),
-                    base64_content: fixture_b64(&path),
+                    source_url: fixture_url(&path),
                     mime_type: mime,
                 }
             },
             FileType::Audio => rsx! {
                 MediaViewer {
-                    path: path.clone(),
-                    base64_content: fixture_b64(&path),
+                    source_url: fixture_url(&path),
                     mime_type: mime,
                 }
             },
             FileType::Pdf => rsx! {
-                PdfViewer { path: path.clone(), base64_content: fixture_b64(&path) }
+                PdfViewer { path: path.clone(), source_url: fixture_url(&path) }
             },
             FileType::Binary => rsx! {
                 BinaryViewer { path: path.clone(), size: None }
@@ -170,7 +178,7 @@ pub fn FileViewer(path: String, thread_id: String) -> Element {
     rsx! {
         div { class: "h-full w-full flex flex-col",
             div { class: "flex items-center justify-between px-3 py-1 bg-sidebar border-b border-border text-[11px] shrink-0",
-                span { class: "text-muted-foreground truncate", "{path}" }
+                omni-text { "data-text": "{path}", "data-strategy": "truncate", "data-max-lines": "1", class: "text-muted-foreground" }
                 button {
                     class: "ml-2 text-muted-foreground hover:text-foreground leading-none",
                     onclick: move |_| {

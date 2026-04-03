@@ -3,10 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "scripts": {
-    "dev": "storybook dev -p 6006",
-    "build": "storybook build"
-  },
   "dependencies": {
     "lit": "^3.2.0"
   },

@@ -1,0 +1,17 @@
+{
+  "name": "@omni/omni-pptx-renderer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/omni-pptx-renderer.js",
+  "module": "dist/omni-pptx-renderer.js",
+  "dependencies": {
+    "@aiden0z/pptx-renderer": "^1.0.2",
+    "@omni/omni-util": "*",
+    "lit": "^3.2.0",
+    "pdfjs-dist": "^4.10.38"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.2"
+  }
+}

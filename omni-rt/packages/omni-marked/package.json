@@ -1,0 +1,16 @@
+{
+  "name": "@omni/omni-marked",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/omni-marked.js",
+  "module": "dist/omni-marked.js",
+  "dependencies": {
+    "dompurify": "^3.3.3",
+    "lit": "^3.2.0",
+    "marked": "^17.0.5"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.2"
+  }
+}

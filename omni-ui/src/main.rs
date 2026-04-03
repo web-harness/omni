@@ -1,4 +1,4 @@
-use std::rc::Rc;
+#![allow(special_module_name)]
 
 use dioxus::prelude::*;
 use serde_json::json;
@@ -11,10 +11,7 @@ use components::{
     AgentsSection, Button, ButtonVariant, ChatContainer, Dialog, FilesSection, Input, KanbanView,
     TasksSection, ThreadSidebar,
 };
-use lib::{
-    bootstrap, DataProvider, MockDataProvider, ModelState, Theme, ThreadState, UiState,
-    WorkspaceState,
-};
+use lib::{default_states, ModelState, Theme, ThreadState, UiState, WorkspaceState};
 use routes::Route;
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
@@ -24,13 +21,16 @@ const FONT_REGULAR: Asset = asset!("/assets/fonts/JetBrainsMono-Regular.woff2");
 const FONT_MEDIUM: Asset = asset!("/assets/fonts/JetBrainsMono-Medium.woff2");
 const FONT_SEMIBOLD: Asset = asset!("/assets/fonts/JetBrainsMono-SemiBold.woff2");
 const FONT_BOLD: Asset = asset!("/assets/fonts/JetBrainsMono-Bold.woff2");
-const OMNI_DOCK_JS: Asset = asset!("/public/omni-dock.js");
-const OMNI_POPPER_JS: Asset = asset!("/public/omni-popper.js");
-const OMNI_MONACO_JS: Asset = asset!("/public/omni-monaco.js");
-const OMNI_MDX_JS: Asset = asset!("/public/omni-mdx.js");
-const OMNI_PDFJS_JS: Asset = asset!("/public/omni-pdfjs.js");
-const OMNI_PDFJS_WORKER_JS: Asset = asset!("/public/omni-pdfjs.worker.js");
-const OMNI_PLYR_JS: Asset = asset!("/public/omni-plyr.js");
+
+#[cfg(target_arch = "wasm32")]
+fn provider_prefix(provider: &lib::ProviderId) -> &'static str {
+    match provider {
+        lib::ProviderId::Anthropic => "anthropic",
+        lib::ProviderId::OpenAI => "openai",
+        lib::ProviderId::Google => "google",
+        lib::ProviderId::Ollama => "ollama",
+    }
+}
 
 fn main() {
     dioxus::launch(App);
@@ -38,17 +38,50 @@ fn main() {
 
 #[component]
 fn App() -> Element {
-    let provider: Rc<dyn DataProvider> = Rc::new(MockDataProvider::new());
-    let (threads, chat, tasks, workspace, model, ui, subagents) = bootstrap(provider.clone());
+    let (threads, chat, tasks, workspace, model, ui, subagents) = default_states();
 
-    use_context_provider(|| provider);
+    #[cfg(target_arch = "wasm32")]
+    let thread_signal = use_context_provider(|| Signal::new(threads));
+    #[cfg(not(target_arch = "wasm32"))]
     use_context_provider(|| Signal::new(threads));
+
+    #[cfg(target_arch = "wasm32")]
+    let chat_signal = use_context_provider(|| Signal::new(chat));
+    #[cfg(not(target_arch = "wasm32"))]
     use_context_provider(|| Signal::new(chat));
+
+    #[cfg(target_arch = "wasm32")]
+    let tasks_signal = use_context_provider(|| Signal::new(tasks));
+    #[cfg(not(target_arch = "wasm32"))]
     use_context_provider(|| Signal::new(tasks));
+
+    #[cfg(target_arch = "wasm32")]
+    let workspace_signal = use_context_provider(|| Signal::new(workspace));
+    #[cfg(not(target_arch = "wasm32"))]
     use_context_provider(|| Signal::new(workspace));
+
+    #[cfg(target_arch = "wasm32")]
+    let model_signal = use_context_provider(|| Signal::new(model));
+    #[cfg(not(target_arch = "wasm32"))]
     use_context_provider(|| Signal::new(model));
+
     use_context_provider(|| Signal::new(ui));
+    #[cfg(target_arch = "wasm32")]
+    let subagent_signal = use_context_provider(|| Signal::new(subagents));
+    #[cfg(not(target_arch = "wasm32"))]
     use_context_provider(|| Signal::new(subagents));
+
+    #[cfg(target_arch = "wasm32")]
+    use_future(move || {
+        lib::async_init(
+            thread_signal,
+            chat_signal,
+            tasks_signal,
+            workspace_signal,
+            model_signal,
+            subagent_signal,
+        )
+    });
 
     rsx! {
         document::Link { rel: "icon", href: FAVICON }
@@ -60,13 +93,19 @@ fn App() -> Element {
             @font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:600;font-display:swap;src:url('{FONT_SEMIBOLD}') format('woff2')}}
             @font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:700;font-display:swap;src:url('{FONT_BOLD}') format('woff2')}}"
         }
-        document::Script { src: OMNI_DOCK_JS, r#type: "module", defer: true }
-        document::Script { src: OMNI_POPPER_JS, r#type: "module", defer: true }
-        document::Script { src: OMNI_MONACO_JS, r#type: "module", defer: true }
-        document::Script { src: OMNI_MDX_JS, r#type: "module", defer: true }
-        document::Meta { name: "omni-pdfjs-worker", content: "{OMNI_PDFJS_WORKER_JS}" }
-        document::Script { src: OMNI_PDFJS_JS, r#type: "module", defer: true }
-        document::Script { src: OMNI_PLYR_JS, r#type: "module", defer: true }
+        document::Script { src: "/omni-dock.js", r#type: "module", defer: true }
+        document::Script { src: "/omni-popper.js", r#type: "module", defer: true }
+        document::Script { src: "/omni-monaco.js", r#type: "module", defer: true }
+        document::Script { src: "/omni-marked.js", r#type: "module", defer: true }
+        document::Script { src: "/omni-sheetjs.js", r#type: "module", defer: true }
+        document::Script { src: "/omni-docxjs.js", r#type: "module", defer: true }
+        document::Meta { name: "omni-pdfjs-worker", content: "/omni-pdfjs.worker.js" }
+        document::Script { src: "/omni-pdfjs.js", r#type: "module", defer: true }
+        document::Script { src: "/omni-pptx-renderer.js", r#type: "module", defer: true }
+        document::Script { src: "/omni-plyr.js", r#type: "module", defer: true }
+        document::Script { src: "/omni-pretext.js", r#type: "module", defer: true }
+        document::Meta { name: "omni-sw-url", content: "/omni-sw.js" }
+        document::Script { src: "/omni-sw-register.js", r#type: "module", defer: true }
 
         Router::<Route> {}
     }
@@ -84,7 +123,7 @@ pub fn AppLayout() -> Element {
         .active_thread_id
         .clone()
         .unwrap_or_default();
-    let active_panel = "chat";
+    let active_panel = workspace_state.read().active_tab_for(&thread_id);
 
     let open_tabs = workspace_state.read().open_tabs_for(&thread_id);
     let mut panels = vec![
@@ -120,7 +159,7 @@ pub fn AppLayout() -> Element {
             omni-dock {
                 class: "h-screen w-screen",
                 "data-panels": panel_config,
-                "data-active-panel": active_panel,
+                "data-active-panel": active_panel.clone(),
                 "data-proportions": "20,60,20",
                 input {
                     r#type: "hidden",
@@ -183,7 +222,7 @@ pub fn AppLayout() -> Element {
                 open: ui_state.read().api_key_dialog_open,
                 on_close: move |_| ui_state.write().api_key_dialog_open = false,
                 h3 { class: "text-sm font-semibold", "Provider API Key" }
-                p { class: "mt-2 text-xs text-muted-foreground", "Mocked dialog for API key setup." }
+                p { class: "mt-2 text-xs text-muted-foreground", "API keys are stored in /home/config/.env." }
                 p { class: "mt-2 text-[11px]", "Provider: {ui_state.read().api_key_provider:?}" }
                 Input {
                     value: ui_state.read().api_key_draft.clone(),
@@ -201,6 +240,26 @@ pub fn AppLayout() -> Element {
                     }
                     Button {
                         onclick: move |_| {
+                            #[cfg(target_arch = "wasm32")]
+                            {
+                                let provider = ui_state.read().api_key_provider.clone();
+                                let value = ui_state.read().api_key_draft.trim().to_string();
+                                let mut model_state_for_save = model_state;
+                                spawn(async move {
+                                    let prefix = provider_prefix(&provider);
+                                    if value.is_empty() {
+                                        let _ = lib::sw_api::delete_api_key(prefix).await;
+                                    } else {
+                                        let _ = lib::sw_api::set_api_key(prefix, &value).await;
+                                    }
+
+                                    if let Ok(providers) = lib::sw_api::list_providers_with_keys().await {
+                                        model_state_for_save.write().providers = providers;
+                                    }
+                                });
+                            }
+
+                            ui_state.write().api_key_draft.clear();
                             ui_state.write().api_key_dialog_open = false;
                         },
                         "Save"
@@ -229,13 +288,32 @@ pub fn Home() -> Element {
 #[component]
 pub fn ThreadView(id: String) -> Element {
     let mut thread_state = use_context::<Signal<ThreadState>>();
+    let navigator = use_navigator();
     let id_clone = id.clone();
     use_effect(move || {
-        let current = thread_state.read().active_thread_id.clone();
-        if current.as_deref() != Some(&id_clone) || thread_state.read().show_kanban {
-            let mut s = thread_state.write();
-            s.active_thread_id = Some(id_clone.clone());
-            s.show_kanban = false;
+        let snapshot = thread_state.read();
+        let exists = snapshot.threads.iter().any(|t| t.id == id_clone);
+        let current = snapshot.active_thread_id.clone();
+        let was_kanban = snapshot.show_kanban;
+        let first = snapshot.threads.first().map(|t| t.id.clone());
+        drop(snapshot);
+
+        if exists {
+            if current.as_deref() != Some(&id_clone) || was_kanban {
+                let mut s = thread_state.write();
+                s.active_thread_id = Some(id_clone.clone());
+                s.show_kanban = false;
+            }
+            return;
+        }
+
+        if let Some(valid_id) = first {
+            {
+                let mut s = thread_state.write();
+                s.active_thread_id = Some(valid_id.clone());
+                s.show_kanban = false;
+            }
+            navigator.replace(Route::ThreadView { id: valid_id });
         }
     });
     rsx! { div {} }
