@@ -1,0 +1,41 @@
+language: typescript
+layer: library
+stack: frontend
+
+tasks:
+  build:
+    command: esbuild
+    args:
+      - src/index.ts
+      - src/async-loader.ts
+      - src/object-url.ts
+      - --bundle
+      - --format=esm
+      - --outdir=dist
+      - --entry-names=[name]
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+    outputs:
+      - dist/index.js
+      - dist/async-loader.js
+      - dist/object-url.js
+    options:
+      shell: false
+  watch:
+    command: esbuild
+    args:
+      - src/index.ts
+      - src/async-loader.ts
+      - src/object-url.ts
+      - --bundle
+      - --format=esm
+      - --outdir=dist
+      - --entry-names=[name]
+      - --watch
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+    preset: server
+    options:
+      shell: false

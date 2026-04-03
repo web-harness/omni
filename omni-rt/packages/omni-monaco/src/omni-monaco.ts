@@ -1,4 +1,6 @@
 import editorCss from "monaco-editor/min/vs/editor/editor.main.css";
+import { createCachedLoader } from "@omni/omni-util/async-loader";
+import { createObjectUrl, revokeObjectUrl } from "@omni/omni-util/object-url";
 import { LitElement, html, css, unsafeCSS } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
@@ -13,19 +15,14 @@ type MonacoEnvironmentHost = typeof globalThis & {
 (globalThis as MonacoEnvironmentHost).MonacoEnvironment = {
   getWorker: () => {
     const workerSrc = `self.onmessage = function() {};`;
-    const blob = new Blob([workerSrc], { type: "application/javascript" });
-    return new Worker(URL.createObjectURL(blob));
+    const workerUrl = createObjectUrl([workerSrc], { type: "application/javascript" });
+    const worker = new Worker(workerUrl);
+    revokeObjectUrl(workerUrl);
+    return worker;
   },
 };
 
-let monacoPromise: Promise<MonacoModule> | null = null;
-
-function loadMonaco(): Promise<MonacoModule> {
-  if (!monacoPromise) {
-    monacoPromise = import("monaco-editor/esm/vs/editor/editor.api");
-  }
-  return monacoPromise;
-}
+const loadMonaco = createCachedLoader(() => import("monaco-editor/esm/vs/editor/editor.api"));
 
 @customElement("omni-monaco")
 export class OmniMonaco extends LitElement {

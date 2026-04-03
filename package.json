@@ -5,13 +5,17 @@
   "description": "Omni is a harness that stays out of your way, compatible with LangGraph Agent Protocol.",
   "workspaces": [
     "omni-wc",
+    "omni-rt/packages/omni-util",
+    "omni-rt/packages/omni-docxjs",
     "omni-rt/packages/omni-dock",
     "omni-rt/packages/omni-marked",
     "omni-rt/packages/omni-monaco",
     "omni-rt/packages/omni-pdfjs",
+    "omni-rt/packages/omni-pptx-renderer",
     "omni-rt/packages/omni-plyr",
     "omni-rt/packages/omni-popper",
     "omni-rt/packages/omni-pretext",
+    "omni-rt/packages/omni-sheetjs",
     "omni-rt/packages/omni-sw",
     "omni-rt/crates/omni-zenfs"
   ],

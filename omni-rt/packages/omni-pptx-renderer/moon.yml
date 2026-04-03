@@ -1,0 +1,52 @@
+language: typescript
+layer: library
+stack: frontend
+
+tasks:
+  clean-public:
+    command: shx
+    args:
+      - rm
+      - -f
+      - ../../../omni-ui/public/omni-pptx-renderer.js
+      - ../../../omni-ui/public/omni-pptx-renderer-*.js
+    inputs:
+      - '@group(configs)'
+    options:
+      internal: true
+  build:
+    command: esbuild
+    args:
+      - src/omni-pptx-renderer.ts
+      - --bundle
+      - --format=esm
+      - --splitting
+      - --outdir=../../../omni-ui/public
+      - --entry-names=omni-pptx-renderer
+      - --chunk-names=omni-pptx-renderer-[name]-[hash]
+    deps:
+      - clean-public
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+    options:
+      shell: false
+  watch:
+    command: esbuild
+    args:
+      - src/omni-pptx-renderer.ts
+      - --bundle
+      - --format=esm
+      - --splitting
+      - --outdir=../../../omni-ui/public
+      - --entry-names=omni-pptx-renderer
+      - --chunk-names=omni-pptx-renderer-[name]-[hash]
+      - --watch
+    deps:
+      - clean-public
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+    preset: server
+    options:
+      shell: false

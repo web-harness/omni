@@ -6,6 +6,7 @@
   "main": "dist/omni-pdfjs.js",
   "module": "dist/omni-pdfjs.js",
   "dependencies": {
+    "@omni/omni-util": "*",
     "lit": "^3.2.0",
     "pdfjs-dist": "^4.10.38"
   },

@@ -1,5 +1,6 @@
 import cssText from "dockview-core/dist/styles/dockview.css";
 import xSvg from "./icons/x.svg";
+import { createCachedLoader } from "@omni/omni-util/async-loader";
 
 import { LitElement, html, css, unsafeCSS, type PropertyValues } from "lit";
 import { customElement, property } from "lit/decorators.js";
@@ -17,12 +18,7 @@ import type {
 
 type DockviewModule = typeof import("dockview-core");
 
-let dockviewPromise: Promise<DockviewModule> | null = null;
-
-function loadDockviewModule(): Promise<DockviewModule> {
-  dockviewPromise ??= import("dockview-core");
-  return dockviewPromise;
-}
+const loadDockviewModule = createCachedLoader(() => import("dockview-core"));
 
 const PERMANENT_PANELS = new Set(["sidebar", "chat", "tasks", "files", "agents"]);
 

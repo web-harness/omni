@@ -5,13 +5,17 @@ stack: frontend
 dependsOn:
   - omni-rt
   - omni-deepagents
+  - omni-util
+  - omni-docxjs
   - omni-dock
   - omni-marked
   - omni-monaco
   - omni-pdfjs
+  - omni-pptx-renderer
   - omni-plyr
   - omni-popper
   - omni-pretext
+  - omni-sheetjs
   - omni-sw
   - omni-zenfs
   - omni-bashkit
@@ -26,13 +30,17 @@ tasks:
       - --out-dir
       - dist
     deps:
+      - omni-util:build
+      - omni-docxjs:build
       - omni-dock:build
       - omni-popper:build
       - omni-marked:build
       - omni-monaco:build
       - omni-pdfjs:build
+      - omni-pptx-renderer:build
       - omni-plyr:build
       - omni-pretext:build
+      - omni-sheetjs:build
       - omni-zenfs:build
       - omni-deepagents:build
       - omni-bashkit:build
@@ -67,13 +75,17 @@ tasks:
       - web
     deps:
       - omni-bashkit:build
+      - omni-util:watch
+      - omni-docxjs:watch
       - omni-dock:watch
       - omni-popper:watch
       - omni-monaco:watch
       - omni-marked:watch
       - omni-pdfjs:watch
+      - omni-pptx-renderer:watch
       - omni-plyr:watch
       - omni-pretext:watch
+      - omni-sheetjs:watch
       - omni-zenfs:watch
       - omni-deepagents:build
       - omni-sw:copy-sql-wasm

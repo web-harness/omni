@@ -97,8 +97,11 @@ fn App() -> Element {
         document::Script { src: "/omni-popper.js", r#type: "module", defer: true }
         document::Script { src: "/omni-monaco.js", r#type: "module", defer: true }
         document::Script { src: "/omni-marked.js", r#type: "module", defer: true }
+        document::Script { src: "/omni-sheetjs.js", r#type: "module", defer: true }
+        document::Script { src: "/omni-docxjs.js", r#type: "module", defer: true }
         document::Meta { name: "omni-pdfjs-worker", content: "/omni-pdfjs.worker.js" }
         document::Script { src: "/omni-pdfjs.js", r#type: "module", defer: true }
+        document::Script { src: "/omni-pptx-renderer.js", r#type: "module", defer: true }
         document::Script { src: "/omni-plyr.js", r#type: "module", defer: true }
         document::Script { src: "/omni-pretext.js", r#type: "module", defer: true }
         document::Meta { name: "omni-sw-url", content: "/omni-sw.js" }

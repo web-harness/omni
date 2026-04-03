@@ -26,14 +26,9 @@ target
 **/*.rs.bk
 
 /omni-ui/target
-/omni-ui/assets/tailwind.css
-/omni-ui/public/*-*.js
-/omni-ui/public/omni-*.wasm
-/omni-ui/public/omni-*.wasm.d.ts
+/omni-ui/public/*
 /omni-rt/crates/*/omni-*.js
-/omni-ui/public/*.wasm
-/omni-ui/public/wasm/omni-*.js
-/omni-ui/public/snippets/omni-*/*.js
+/omni-ui/assets/tailwind.css
 
 node_modules
 /dist

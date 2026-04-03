@@ -1,15 +1,11 @@
 import { LitElement, html, css, type PropertyValues } from "lit";
+import { createCachedLoader } from "@omni/omni-util/async-loader";
 import { customElement, property } from "lit/decorators.js";
 import type { Instance, Placement } from "@popperjs/core";
 
 type PopperModule = typeof import("@popperjs/core");
 
-let popperPromise: Promise<PopperModule> | null = null;
-
-function loadPopperModule(): Promise<PopperModule> {
-  popperPromise ??= import("@popperjs/core");
-  return popperPromise;
-}
+const loadPopperModule = createCachedLoader(() => import("@popperjs/core"));
 
 @customElement("omni-popper")
 class OmniPopper extends LitElement {

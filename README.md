@@ -49,11 +49,16 @@ The Omni runtime is meant to be a reference implementation of the environment ne
 - [x] Improved PDF viewer with [PDF.js](https://www.npmjs.com/package/pdfjs-dist).
 - [x] Improved code viewer with [Monaco Editor](https://www.npmjs.com/package/monaco-editor).
 - [x] Improved media viewer with [Plyr](https://www.npmjs.com/package/plyr).
+- [x] Improved spreadsheet viewer with [SheetJS](https://sheetjs.com/).
+- [x] Improved DOCX viewer with [docxjs](https://github.com/VolodymyrBaydalka/docxjs).
+- [x] Improved PowerPoint viewer with [pptx-renderer](https://github.com/aiden0z/pptx-renderer).
 - [x] Improved dialog system with [Popper.js](https://www.npmjs.com/package/@popperjs/core).
 - [x] Reusability with Storybook integration and Web Component export.
 - [x] Automatic client generation for the Agent Protocol.
 - [x] ZenFS integration for file system access.
 - [x] Bashkit integration for sandbox shell access.
 - [x] Deep Agent integration as harness' main agent loop.
+- [x] Full compatibility with the Agent Protocol through Service Workers.
+- [x] [Moon](https://moonrepo.dev/) for fast builds and convenient developer experience.
 - [ ] Auto UI mocking via auto openapi mocking with [Mockoon](https://github.com/mockoon/mockoon).
 - [ ] Comprehensive test suite with unit, integration, and E2E tests.

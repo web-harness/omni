@@ -1,16 +1,12 @@
 import { LitElement, html, css } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { createCachedLoader } from "@omni/omni-util/async-loader";
 
 import type { PDFDocumentProxy } from "pdfjs-dist/types/src/display/api";
 
 type PdfJsModule = typeof import("pdfjs-dist");
 
-let pdfjsPromise: Promise<PdfJsModule> | null = null;
-
-function loadPdfJsModule(): Promise<PdfJsModule> {
-  pdfjsPromise ??= import("pdfjs-dist");
-  return pdfjsPromise;
-}
+const loadPdfJsModule = createCachedLoader(() => import("pdfjs-dist"));
 
 @customElement("omni-pdfjs")
 export class OmniPdfjs extends LitElement {
@@ -69,7 +65,7 @@ export class OmniPdfjs extends LitElement {
     }
   `;
 
-  @property({ attribute: "data-src" }) dataSrc = "";
+  @property({ attribute: "data-source-url" }) dataSourceUrl = "";
   @property({ attribute: "data-filename" }) dataFilename = "document.pdf";
 
   @state() private pageCount = 0;
@@ -110,7 +106,7 @@ export class OmniPdfjs extends LitElement {
   }
 
   updated(changed: Map<string, unknown>) {
-    if (changed.has("dataSrc") && this.dataSrc) {
+    if (changed.has("dataSourceUrl")) {
       void this.loadPdf();
     }
     if (changed.has("scale") && this.pdfDoc) {
@@ -138,6 +134,11 @@ export class OmniPdfjs extends LitElement {
 
   private async loadPdf() {
     const loadVersion = ++this.loadVersion;
+    const src = this.dataSourceUrl;
+    if (!src) {
+      this.status = "No document data available.";
+      return;
+    }
     this.status = "Loading…";
     this.pdfDoc?.destroy();
     this.pdfDoc = null;
@@ -146,12 +147,12 @@ export class OmniPdfjs extends LitElement {
     let nextPdfDoc: PDFDocumentProxy | null = null;
 
     try {
-      nextPdfDoc = await pdfjs.getDocument({ url: this.dataSrc }).promise;
+      nextPdfDoc = await pdfjs.getDocument({ url: src }).promise;
     } catch {
       console.warn("[omni-pdfjs] Worker unavailable, retrying without worker (sync fallback)");
       pdfjs.GlobalWorkerOptions.workerSrc = "";
       try {
-        nextPdfDoc = await pdfjs.getDocument({ url: this.dataSrc }).promise;
+        nextPdfDoc = await pdfjs.getDocument({ url: src }).promise;
       } catch (e) {
         this.status = `Failed to load PDF: ${e}`;
         return;

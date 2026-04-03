@@ -38,6 +38,8 @@ Follow your instructions carefully and do not deviate from them. If you are unsu
 - You are only allowed to use the official Dioxus APIs, concepts and features to achieve your goals
 - You are strictly forbidden from doubting the Dioxus APIs, concepts and features. If you think something is missing, you are to make it yourself using Dioxus APIs, concepts and features. You are not allowed to doubt the Dioxus team or their decisions. They know best.
 - Follow repo's README.md for general project information.
+- Backwards compatibility and defensive programming is forbidden, until asked explicitly by the user.
+- Do not enter runtime debugging or browser testing unless explicitly asked by the user. Focus on your code and let the tooling do its job.
 
 ## Implementation Principles
 

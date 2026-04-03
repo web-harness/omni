@@ -1,11 +1,9 @@
 use dioxus::prelude::*;
 
 #[component]
-pub fn ImageViewer(path: String, base64_content: String, mime_type: String) -> Element {
+pub fn ImageViewer(path: String, source_url: String) -> Element {
     let mut zoom = use_signal(|| 100u32);
     let mut rotation = use_signal(|| 0u32);
-
-    let data_url = format!("data:{mime_type};base64,{base64_content}");
 
     let scale = *zoom.read() as f32 / 100.0;
     let rot = *rotation.read();
@@ -38,7 +36,7 @@ pub fn ImageViewer(path: String, base64_content: String, mime_type: String) -> E
             }
             div { class: "flex flex-1 items-center justify-center overflow-auto bg-background p-4",
                 img {
-                    src: "{data_url}",
+                    src: "{source_url}",
                     alt: "{path}",
                     style: "transform: rotate({rot}deg) scale({scale}); transition: transform 0.2s; max-width: 100%; max-height: 100%; object-fit: contain;"
                 }

@@ -1,11 +1,8 @@
+import { createCachedLoader } from "@omni/omni-util/async-loader";
+
 type PretextModule = typeof import("@chenglou/pretext");
 
-let pretextPromise: Promise<PretextModule> | null = null;
-
-function loadPretextModule(): Promise<PretextModule> {
-  pretextPromise ??= import("@chenglou/pretext");
-  return pretextPromise;
-}
+const loadPretextModule = createCachedLoader(() => import("@chenglou/pretext"));
 
 function buildFont(style: string, weight: string, size: number, family: string): string {
   const s = style !== "normal" ? style + " " : "";

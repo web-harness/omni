@@ -1,0 +1,16 @@
+{
+  "name": "@omni/omni-sheetjs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/omni-sheetjs.js",
+  "module": "dist/omni-sheetjs.js",
+  "dependencies": {
+    "dompurify": "^3.3.3",
+    "lit": "^3.2.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.2"
+  }
+}

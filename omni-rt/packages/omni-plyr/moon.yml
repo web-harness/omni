@@ -28,6 +28,7 @@ tasks:
       - --loader:.css=text
       - --loader:.svg=text
     deps:
+      - omni-util:build
       - clean-public
     inputs:
       - '@group(sources)'
@@ -49,4 +50,6 @@ tasks:
     inputs:
       - '@group(sources)'
       - '@group(configs)'
+    deps:
+      - omni-util:build
     preset: server

@@ -1,8 +1,10 @@
 use dioxus::prelude::*;
 
+use crate::lib::utils::file_name;
+
 #[component]
 pub fn BinaryViewer(path: String, size: Option<u64>) -> Element {
-    let filename = path.rsplit('/').next().unwrap_or(&path).to_string();
+    let filename = file_name(&path);
     let ext = path
         .rsplit('.')
         .next()

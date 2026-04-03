@@ -8,13 +8,17 @@ projects:
   omni-bashkit: omni-rt/crates/omni-bashkit
   omni-zenfs: omni-rt/crates/omni-zenfs
   omni-deepagents: omni-rt/crates/omni-deepagents
+  omni-util: omni-rt/packages/omni-util
+  omni-docxjs: omni-rt/packages/omni-docxjs
   omni-dock: omni-rt/packages/omni-dock
   omni-marked: omni-rt/packages/omni-marked
   omni-monaco: omni-rt/packages/omni-monaco
   omni-pdfjs: omni-rt/packages/omni-pdfjs
+  omni-pptx-renderer: omni-rt/packages/omni-pptx-renderer
   omni-plyr: omni-rt/packages/omni-plyr
   omni-popper: omni-rt/packages/omni-popper
   omni-pretext: omni-rt/packages/omni-pretext
+  omni-sheetjs: omni-rt/packages/omni-sheetjs
   omni-sw: omni-rt/packages/omni-sw
   omni-wc: omni-wc
 

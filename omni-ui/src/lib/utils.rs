@@ -27,3 +27,7 @@ pub fn fmt_size(bytes: u64) -> String {
         format!("{:.1}MB", bytes as f64 / 1_000_000.0)
     }
 }
+
+pub fn file_name(path: &str) -> String {
+    path.rsplit('/').next().unwrap_or(path).to_string()
+}

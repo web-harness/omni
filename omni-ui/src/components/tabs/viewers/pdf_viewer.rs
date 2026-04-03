@@ -1,18 +1,15 @@
 use dioxus::prelude::*;
 
+use crate::lib::utils::file_name;
+
 #[component]
-pub fn PdfViewer(path: String, base64_content: String) -> Element {
-    let filename = path.rsplit('/').next().unwrap_or(&path).to_string();
-    let src = if base64_content.is_empty() {
-        String::new()
-    } else {
-        format!("data:application/pdf;base64,{base64_content}")
-    };
+pub fn PdfViewer(path: String, source_url: String) -> Element {
+    let filename = file_name(&path);
 
     rsx! {
         omni-pdfjs {
             class: "flex w-full h-full",
-            "data-src": "{src}",
+            "data-source-url": "{source_url}",
             "data-filename": "{filename}",
         }
     }

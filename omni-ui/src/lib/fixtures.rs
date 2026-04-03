@@ -1,13 +1,16 @@
-use base64::{engine::general_purpose::STANDARD, Engine as _};
+use dioxus::prelude::*;
 
-const FIXTURE_PNG_BYTES: &[u8] = include_bytes!("../../fixtures/sample.png");
-const FIXTURE_WAV_BYTES: &[u8] = include_bytes!("../../fixtures/sample.wav");
-const FIXTURE_PDF_BYTES: &[u8] = include_bytes!("../../fixtures/sample.pdf");
-const FIXTURE_MP4_BYTES: &[u8] = include_bytes!("../../fixtures/sample.mp4");
+const FIXTURE_PNG: Asset = asset!("/fixtures/sample.png");
+const FIXTURE_WAV: Asset = asset!("/fixtures/sample.wav");
+const FIXTURE_PDF: Asset = asset!("/fixtures/sample.pdf");
+const FIXTURE_MP4: Asset = asset!("/fixtures/sample.mp4");
+const FIXTURE_XLSX: Asset = asset!("/fixtures/sample.xlsx");
+const FIXTURE_DOCX: Asset = asset!("/fixtures/sample.docx");
+const FIXTURE_PPTX: Asset = asset!("/fixtures/sample.pptx");
 
 pub enum FixtureContent {
     Text(&'static str),
-    Base64,
+    SourceUrl(Asset),
 }
 
 pub fn get_fixture(path: &str) -> FixtureContent {
@@ -25,10 +28,15 @@ pub fn get_fixture(path: &str) -> FixtureContent {
         "toml" => FixtureContent::Text(include_str!("../../fixtures/sample.toml")),
         "sh" | "bash" => FixtureContent::Text(include_str!("../../fixtures/sample.sh")),
         "svg" => FixtureContent::Text(include_str!("../../fixtures/sample.svg")),
-        "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "ico" => FixtureContent::Base64,
-        "wav" | "mp3" | "ogg" | "flac" | "aac" | "m4a" => FixtureContent::Base64,
-        "mp4" | "webm" | "ogv" | "mov" | "avi" => FixtureContent::Base64,
-        "pdf" => FixtureContent::Base64,
+        "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "ico" => {
+            FixtureContent::SourceUrl(FIXTURE_PNG)
+        }
+        "wav" | "mp3" | "ogg" | "flac" | "aac" | "m4a" => FixtureContent::SourceUrl(FIXTURE_WAV),
+        "mp4" | "webm" | "ogv" | "mov" | "avi" => FixtureContent::SourceUrl(FIXTURE_MP4),
+        "pdf" => FixtureContent::SourceUrl(FIXTURE_PDF),
+        "xlsx" | "xls" | "xlsm" | "ods" => FixtureContent::SourceUrl(FIXTURE_XLSX),
+        "docx" => FixtureContent::SourceUrl(FIXTURE_DOCX),
+        "pptx" | "pptm" | "potx" => FixtureContent::SourceUrl(FIXTURE_PPTX),
         _ => FixtureContent::Text(""),
     }
 }
@@ -36,19 +44,13 @@ pub fn get_fixture(path: &str) -> FixtureContent {
 pub fn fixture_text(path: &str) -> String {
     match get_fixture(path) {
         FixtureContent::Text(s) => s.to_string(),
-        FixtureContent::Base64 => String::new(),
+        FixtureContent::SourceUrl(_) => String::new(),
     }
 }
 
-pub fn fixture_b64(path: &str) -> String {
-    let ext = path.rsplit('.').next().unwrap_or("");
-    match ext {
-        "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "ico" => {
-            STANDARD.encode(FIXTURE_PNG_BYTES)
-        }
-        "wav" | "mp3" | "ogg" | "flac" | "aac" | "m4a" => STANDARD.encode(FIXTURE_WAV_BYTES),
-        "mp4" | "webm" | "ogv" | "mov" | "avi" => STANDARD.encode(FIXTURE_MP4_BYTES),
-        "pdf" => STANDARD.encode(FIXTURE_PDF_BYTES),
-        _ => String::new(),
+pub fn fixture_url(path: &str) -> String {
+    match get_fixture(path) {
+        FixtureContent::SourceUrl(asset) => asset.to_string(),
+        FixtureContent::Text(_) => String::new(),
     }
 }

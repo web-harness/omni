@@ -6,6 +6,7 @@
   "main": "dist/omni-monaco.js",
   "module": "dist/omni-monaco.js",
   "dependencies": {
+    "@omni/omni-util": "*",
     "lit": "^3.2.0",
     "monaco-editor": "^0.52.2"
   },

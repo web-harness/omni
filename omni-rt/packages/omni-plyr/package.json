@@ -6,6 +6,7 @@
   "main": "dist/omni-plyr.js",
   "module": "dist/omni-plyr.js",
   "dependencies": {
+    "@omni/omni-util": "*",
     "lit": "^3.2.0",
     "plyr": "^3.8.4"
   },

@@ -33,6 +33,7 @@ tasks:
       - --loader:.woff=file
       - --loader:.woff2=file
     deps:
+      - omni-util:build
       - clean-public
     inputs:
       - '@group(sources)'
@@ -56,4 +57,6 @@ tasks:
     inputs:
       - '@group(sources)'
       - '@group(configs)'
+    deps:
+      - omni-util:build
     preset: server

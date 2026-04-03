@@ -1,19 +1,15 @@
 import plyrCss from "plyr/dist/plyr.css";
 import plyrSvg from "plyr/dist/plyr.svg";
 import { LitElement, html, unsafeCSS } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { createCachedLoader } from "@omni/omni-util/async-loader";
+import { customElement, property } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 
 import type Plyr from "plyr";
 
 type PlyrModule = typeof import("plyr");
 
-let plyrPromise: Promise<PlyrModule> | null = null;
-
-function loadPlyrModule(): Promise<PlyrModule> {
-  plyrPromise ??= import("plyr");
-  return plyrPromise;
-}
+const loadPlyrModule = createCachedLoader(() => import("plyr"));
 
 @customElement("omni-plyr")
 export class OmniPlyr extends LitElement {
@@ -44,35 +40,14 @@ export class OmniPlyr extends LitElement {
     `),
   ];
 
-  @property({ attribute: "data-base64" }) dataBase64 = "";
+  @property({ attribute: "data-source-url" }) dataSourceUrl = "";
   @property({ attribute: "data-mime" }) dataMime = "";
   @property({ attribute: "data-type" }) dataType: "video" | "audio" = "video";
-  @property({ attribute: "data-src" }) dataSrc = "";
-
-  @state() private blobUrl = "";
   private player: Plyr | null = null;
-  private pendingBase64 = "";
-  private pendingMime = "";
   private initVersion = 0;
 
   updated(changed: Map<string, unknown>) {
-    if (changed.has("dataBase64") && this.dataBase64) {
-      this.pendingBase64 = this.dataBase64;
-      this.pendingMime = this.dataMime;
-      this.removeAttribute("data-base64");
-      return;
-    }
-
-    if (changed.has("dataBase64") && !this.dataBase64 && this.pendingBase64 && !this.dataSrc) {
-      const oldUrl = this.blobUrl;
-      const bytes = Uint8Array.from(atob(this.pendingBase64), (c) => c.charCodeAt(0));
-      const blob = new Blob([bytes], { type: this.pendingMime });
-      this.blobUrl = URL.createObjectURL(blob);
-      this.pendingBase64 = "";
-      if (oldUrl) URL.revokeObjectURL(oldUrl);
-    }
-
-    if (changed.has("blobUrl") || changed.has("dataSrc")) {
+    if (changed.has("dataSourceUrl") || changed.has("dataType")) {
       void this.initPlayer();
     }
   }
@@ -82,7 +57,7 @@ export class OmniPlyr extends LitElement {
       this.player.destroy();
       this.player = null;
     }
-    const src = this.dataSrc || this.blobUrl;
+    const src = this.dataSourceUrl;
     if (!src) return;
     const initVersion = ++this.initVersion;
     const plyr = await loadPlyrModule();
@@ -101,10 +76,6 @@ export class OmniPlyr extends LitElement {
     super.disconnectedCallback();
     this.player?.destroy();
     this.player = null;
-    if (this.blobUrl) {
-      URL.revokeObjectURL(this.blobUrl);
-      this.blobUrl = "";
-    }
   }
 
   render() {
