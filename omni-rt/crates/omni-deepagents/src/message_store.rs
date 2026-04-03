@@ -1,23 +1,47 @@
+use omni_protocol::Message;
 use omni_zenfs as zenfs;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 const MESSAGES_DIR: &str = "/home/db/messages";
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum Role {
-    User,
-    Assistant,
-    Tool,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoredMessage {
     pub id: String,
     pub thread_id: String,
-    pub role: Role,
-    pub content: String,
+    pub role: String,
+    pub content: Value,
     pub created_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Value>,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, Value>,
+}
+
+impl StoredMessage {
+    pub fn from_protocol_message(thread_id: String, created_at: String, message: Message) -> Self {
+        Self {
+            id: message
+                .id
+                .unwrap_or_else(|| uuid::Uuid::new_v4().to_string()),
+            thread_id,
+            role: message.role,
+            content: message.content,
+            created_at,
+            metadata: message.metadata,
+            extra: message.extra,
+        }
+    }
+
+    pub fn into_protocol_message(self) -> Message {
+        Message {
+            role: self.role,
+            content: self.content,
+            id: Some(self.id),
+            metadata: self.metadata,
+            extra: self.extra,
+        }
+    }
 }
 
 pub async fn list_messages(thread_id: &str) -> Result<Vec<StoredMessage>, std::io::Error> {

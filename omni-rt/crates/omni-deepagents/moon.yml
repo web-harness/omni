@@ -3,6 +3,69 @@ layer: library
 stack: systems
 
 tasks:
+  clean-public:
+    command: shx
+    args:
+      - rm
+      - -f
+      - ../../../omni-ui/public/omni-deepagents.d.ts
+      - ../../../omni-ui/public/omni-deepagents.js
+      - ../../../omni-ui/public/omni-deepagents_bg.wasm
+      - ../../../omni-ui/public/omni-deepagents_bg.wasm.d.ts
+    inputs:
+      - '@group(configs)'
+    options:
+      internal: true
+  build-wasm:
+    command: cargo
+    args:
+      - build
+      - -p
+      - omni-deepagents
+      - --target
+      - wasm32-unknown-unknown
+      - --release
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+      - Cargo.toml
+    outputs:
+      - /target/wasm32-unknown-unknown/release/omni_deepagents.wasm
+    options:
+      runFromWorkspaceRoot: true
+  build-bindgen:
+    command: wasm-bindgen
+    args:
+      - --target
+      - web
+      - --no-typescript
+      - --out-dir
+      - omni-ui/public
+      - --out-name
+      - omni-deepagents
+      - target/wasm32-unknown-unknown/release/omni_deepagents.wasm
+    deps:
+      - clean-public
+      - build-wasm
+    inputs:
+      - /target/wasm32-unknown-unknown/release/omni_deepagents.wasm
+      - '@group(configs)'
+    options:
+      internal: true
+      runFromWorkspaceRoot: true
+  build:
+    command: shx
+    args:
+      - rm
+      - -f
+      - omni-ui/public/package.json
+    deps:
+      - build-bindgen
+    inputs:
+      - '@group(configs)'
+    options:
+      internal: true
+      runFromWorkspaceRoot: true
   test:
     command: cargo
     args:

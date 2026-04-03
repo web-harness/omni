@@ -4,6 +4,7 @@ stack: frontend
 
 dependsOn:
   - omni-rt
+  - omni-deepagents
   - omni-dock
   - omni-marked
   - omni-monaco
@@ -33,6 +34,7 @@ tasks:
       - omni-plyr:build
       - omni-pretext:build
       - omni-zenfs:build
+      - omni-deepagents:build
       - omni-bashkit:build
       - omni-sw:build-main
       - omni-sw:build-register
@@ -73,6 +75,7 @@ tasks:
       - omni-plyr:watch
       - omni-pretext:watch
       - omni-zenfs:watch
+      - omni-deepagents:build
       - omni-sw:copy-sql-wasm
       - omni-sw:watch-main
       - omni-sw:watch-register

@@ -85,9 +85,28 @@ pub async fn get_default_model() -> Result<String, std::io::Error> {
     Ok(String::from_utf8_lossy(&data).trim().to_string())
 }
 
+pub async fn get_stored_default_model() -> Result<Option<String>, std::io::Error> {
+    if !zenfs::exists(DEFAULT_MODEL_FILE).await? {
+        return Ok(None);
+    }
+    let data = zenfs::read_file(DEFAULT_MODEL_FILE).await?;
+    let model_id = String::from_utf8_lossy(&data).trim().to_string();
+    if model_id.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(model_id))
+}
+
 pub async fn set_default_model(model_id: &str) -> Result<(), std::io::Error> {
     zenfs::mkdir(CONFIG_DIR, true).await?;
     zenfs::write_file(DEFAULT_MODEL_FILE, model_id.as_bytes()).await
+}
+
+pub async fn delete_default_model() -> Result<(), std::io::Error> {
+    if zenfs::exists(DEFAULT_MODEL_FILE).await? {
+        zenfs::remove(DEFAULT_MODEL_FILE, false).await?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

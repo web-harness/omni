@@ -6,6 +6,25 @@ use uuid::Uuid;
 
 const THREADS_DIR: &str = "/home/db/threads";
 
+fn thread_path(id: Uuid) -> String {
+    format!("{}/{}.json", THREADS_DIR, id)
+}
+
+fn thread_path_candidates(id: &str) -> Vec<String> {
+    let mut candidates = vec![format!("{}/{}.json", THREADS_DIR, id)];
+    if let Ok(uuid) = Uuid::parse_str(id) {
+        let canonical = format!("{}/{}.json", THREADS_DIR, uuid);
+        if !candidates.contains(&canonical) {
+            candidates.push(canonical);
+        }
+        let legacy = format!("{}/{}.json", THREADS_DIR, uuid.simple());
+        if !candidates.contains(&legacy) {
+            candidates.push(legacy);
+        }
+    }
+    candidates
+}
+
 pub async fn list_threads() -> Result<Vec<Thread>, std::io::Error> {
     if !zenfs::exists(THREADS_DIR).await? {
         return Ok(vec![]);
@@ -30,14 +49,16 @@ pub async fn list_threads() -> Result<Vec<Thread>, std::io::Error> {
 }
 
 pub async fn get_thread(id: &str) -> Result<Option<Thread>, std::io::Error> {
-    let path = format!("{}/{}.json", THREADS_DIR, id);
-    if !zenfs::exists(&path).await? {
-        return Ok(None);
+    for path in thread_path_candidates(id) {
+        if !zenfs::exists(&path).await? {
+            continue;
+        }
+        let data = zenfs::read_file(&path).await?;
+        let thread = serde_json::from_slice::<Thread>(&data)
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        return Ok(Some(thread));
     }
-    let data = zenfs::read_file(&path).await?;
-    let thread = serde_json::from_slice::<Thread>(&data)
-        .map_err(|e| std::io::Error::other(e.to_string()))?;
-    Ok(Some(thread))
+    Ok(None)
 }
 
 pub async fn create_thread(title: Option<&str>) -> Result<Thread, std::io::Error> {
@@ -84,14 +105,10 @@ pub async fn create_thread_from_request(req: ThreadCreate) -> Result<Thread, std
             return Err(e);
         }
     }
-    let id = req
-        .thread_id
-        .unwrap_or_else(Uuid::new_v4)
-        .simple()
-        .to_string();
+    let id = req.thread_id.unwrap_or_else(Uuid::new_v4);
     let now = Utc::now();
     let thread = Thread {
-        thread_id: Uuid::parse_str(&id).map_err(|e| std::io::Error::other(e.to_string()))?,
+        thread_id: id,
         created_at: now,
         updated_at: now,
         metadata: req.metadata.unwrap_or_default(),
@@ -126,15 +143,48 @@ pub async fn update_thread(id: &str, patch: ThreadPatch) -> Result<Option<Thread
 }
 
 pub async fn delete_thread(id: &str) -> Result<(), std::io::Error> {
-    let path = format!("{}/{}.json", THREADS_DIR, id);
-    if zenfs::exists(&path).await? {
-        zenfs::remove(&path, false).await?;
+    for path in thread_path_candidates(id) {
+        if zenfs::exists(&path).await? {
+            zenfs::remove(&path, false).await?;
+        }
     }
     Ok(())
 }
 
+pub async fn set_thread_status(
+    id: &str,
+    status: ThreadStatus,
+) -> Result<Option<Thread>, std::io::Error> {
+    let mut thread = match get_thread(id).await? {
+        Some(thread) => thread,
+        None => return Ok(None),
+    };
+
+    thread.status = status;
+    thread.updated_at = Utc::now();
+    persist_thread(&thread).await?;
+    Ok(Some(thread))
+}
+
+pub async fn save_thread(thread: &Thread) -> Result<(), std::io::Error> {
+    if let Err(error) = zenfs::mkdir(THREADS_DIR, true).await {
+        if !error.to_string().contains("EEXIST") {
+            return Err(error);
+        }
+    }
+    persist_thread(thread).await
+}
+
 async fn persist_thread(thread: &Thread) -> Result<(), std::io::Error> {
     let data = serde_json::to_vec(thread).map_err(|e| std::io::Error::other(e.to_string()))?;
-    let path = format!("{}/{}.json", THREADS_DIR, thread.thread_id.simple());
+    let path = thread_path(thread.thread_id);
+    if let Some(legacy_path) = thread_path_candidates(&thread.thread_id.to_string())
+        .into_iter()
+        .find(|candidate| candidate.ends_with(&format!("/{}.json", thread.thread_id.simple())))
+    {
+        if legacy_path != path && zenfs::exists(&legacy_path).await? {
+            zenfs::remove(&legacy_path, false).await?;
+        }
+    }
     zenfs::write_file(&path, &data).await
 }

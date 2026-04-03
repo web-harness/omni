@@ -1,9 +1,11 @@
 pub mod config_store;
 pub mod message_store;
 pub mod model_registry;
+pub mod run_store;
 pub mod seed;
 pub mod sse;
 pub mod subagent_store;
 pub mod thread_store;
 pub mod title_generator;
 pub mod todo_store;
+pub mod wasm_api;

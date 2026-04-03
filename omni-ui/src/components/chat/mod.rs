@@ -65,23 +65,40 @@ pub fn ChatContainer(thread_id: String) -> Element {
                 use omni_rt::deepagents::sse::{SseEvent, SseStream};
                 let body = serde_json::json!({
                     "thread_id": req.thread_id,
-                    "input": req.input,
-                    "model_id": req.model_id,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": req.input,
+                        }
+                    ],
+                    "stream_mode": ["messages", "values"],
+                    "metadata": {
+                        "model_id": req.model_id,
+                    },
                 })
                 .to_string();
 
-                match SseStream::connect("/api/runs/stream", &body).await {
+                match SseStream::connect("/runs/stream", &body).await {
                     Ok(mut stream) => loop {
                         match stream.next_event().await {
-                            Ok(Some(SseEvent::Token(tok))) => {
-                                let active_tid = thread_state.read().active_thread_id.clone();
-                                apply_stream_event(
-                                    active_tid.as_deref(),
-                                    &mut chat_state.write(),
-                                    &mut tasks_state.write(),
-                                    crate::lib::StreamEvent::Token(tok),
-                                );
+                            Ok(Some(SseEvent::Message(value))) => {
+                                let content = value
+                                    .get("content")
+                                    .and_then(|content| content.as_str())
+                                    .map(str::to_string)
+                                    .unwrap_or_else(|| value.to_string());
+                                if !content.is_empty() {
+                                    let active_tid = thread_state.read().active_thread_id.clone();
+                                    apply_stream_event(
+                                        active_tid.as_deref(),
+                                        &mut chat_state.write(),
+                                        &mut tasks_state.write(),
+                                        crate::lib::StreamEvent::Token(content),
+                                    );
+                                }
                             }
+                            Ok(Some(SseEvent::MessageComplete(_))) => {}
+                            Ok(Some(SseEvent::Values(_))) => {}
                             Ok(Some(SseEvent::Done)) => {
                                 apply_stream_event(
                                     Some(&req.thread_id),

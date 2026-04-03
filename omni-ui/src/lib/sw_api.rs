@@ -30,16 +30,16 @@ pub struct BootstrapPayload {
 
 #[cfg(target_arch = "wasm32")]
 #[derive(Deserialize)]
-struct ApiKeyResponse {
-    value: String,
+struct ItemResponse {
+    value: serde_json::Value,
 }
 
 #[cfg(target_arch = "wasm32")]
 #[derive(Deserialize)]
-struct CreateThreadResponse {
-    id: String,
-    title: String,
-    status: super::ThreadStatus,
+struct ProtocolThreadResponse {
+    thread_id: String,
+    metadata: HashMap<String, serde_json::Value>,
+    status: String,
     updated_at: String,
 }
 
@@ -62,11 +62,37 @@ fn unavailable() -> std::io::Error {
 }
 
 #[cfg(target_arch = "wasm32")]
+fn parse_thread_status(raw: &str) -> super::ThreadStatus {
+    match raw {
+        "busy" => super::ThreadStatus::Busy,
+        "interrupted" => super::ThreadStatus::Interrupted,
+        "error" => super::ThreadStatus::Error,
+        _ => super::ThreadStatus::Idle,
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn store_item_url(namespace: &[&str], key: &str) -> String {
+    let mut url = "/store/items?".to_string();
+    for segment in namespace {
+        let encoded = js_sys::encode_uri_component(segment)
+            .as_string()
+            .unwrap_or_else(|| (*segment).to_string());
+        url.push_str("namespace=");
+        url.push_str(&encoded);
+        url.push('&');
+    }
+    let encoded_key = js_sys::encode_uri_component(key)
+        .as_string()
+        .unwrap_or_else(|| key.to_string());
+    url.push_str("key=");
+    url.push_str(&encoded_key);
+    url
+}
+
+#[cfg(target_arch = "wasm32")]
 pub async fn fetch_bootstrap() -> Result<BootstrapPayload, std::io::Error> {
-    let response = Request::get("/api/store/bootstrap")
-        .send()
-        .await
-        .map_err(err_msg)?;
+    let response = Request::get("/x/bootstrap").send().await.map_err(err_msg)?;
 
     if !response.ok() {
         return Err(std::io::Error::other(format!(
@@ -80,7 +106,13 @@ pub async fn fetch_bootstrap() -> Result<BootstrapPayload, std::io::Error> {
 
 #[cfg(target_arch = "wasm32")]
 pub async fn create_thread() -> Result<UiThread, std::io::Error> {
-    let response = Request::post("/api/store/threads")
+    let response = Request::post("/threads")
+        .json(&serde_json::json!({
+            "metadata": {
+                "title": "New Thread"
+            }
+        }))
+        .map_err(err_msg)?
         .send()
         .await
         .map_err(err_msg)?;
@@ -93,21 +125,26 @@ pub async fn create_thread() -> Result<UiThread, std::io::Error> {
     }
 
     let created = response
-        .json::<CreateThreadResponse>()
+        .json::<ProtocolThreadResponse>()
         .await
         .map_err(err_msg)?;
 
     Ok(UiThread {
-        id: created.id,
-        title: created.title,
-        status: created.status,
+        id: created.thread_id,
+        title: created
+            .metadata
+            .get("title")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("New Thread")
+            .to_string(),
+        status: parse_thread_status(&created.status),
         updated_at: created.updated_at,
     })
 }
 
 #[cfg(target_arch = "wasm32")]
 pub async fn delete_thread(thread_id: &str) -> Result<(), std::io::Error> {
-    let response = Request::delete(&format!("/api/store/threads/{thread_id}"))
+    let response = Request::delete(&format!("/threads/{thread_id}"))
         .send()
         .await
         .map_err(err_msg)?;
@@ -124,7 +161,7 @@ pub async fn delete_thread(thread_id: &str) -> Result<(), std::io::Error> {
 
 #[cfg(target_arch = "wasm32")]
 pub async fn get_api_key(provider: &str) -> Result<String, std::io::Error> {
-    let response = Request::get(&format!("/api/store/config/api-keys/{provider}"))
+    let response = Request::get(&store_item_url(&["config", "api-keys"], provider))
         .send()
         .await
         .map_err(err_msg)?;
@@ -136,14 +173,18 @@ pub async fn get_api_key(provider: &str) -> Result<String, std::io::Error> {
         )));
     }
 
-    let payload = response.json::<ApiKeyResponse>().await.map_err(err_msg)?;
-    Ok(payload.value)
+    let payload = response.json::<ItemResponse>().await.map_err(err_msg)?;
+    Ok(payload.value.as_str().unwrap_or_default().to_string())
 }
 
 #[cfg(target_arch = "wasm32")]
 pub async fn set_api_key(provider: &str, value: &str) -> Result<(), std::io::Error> {
-    let response = Request::put(&format!("/api/store/config/api-keys/{provider}"))
-        .json(&serde_json::json!({ "value": value }))
+    let response = Request::put("/store/items")
+        .json(&serde_json::json!({
+            "namespace": ["config", "api-keys"],
+            "key": provider,
+            "value": value,
+        }))
         .map_err(err_msg)?
         .send()
         .await
@@ -161,7 +202,12 @@ pub async fn set_api_key(provider: &str, value: &str) -> Result<(), std::io::Err
 
 #[cfg(target_arch = "wasm32")]
 pub async fn delete_api_key(provider: &str) -> Result<(), std::io::Error> {
-    let response = Request::delete(&format!("/api/store/config/api-keys/{provider}"))
+    let response = Request::delete("/store/items")
+        .json(&serde_json::json!({
+            "namespace": ["config", "api-keys"],
+            "key": provider,
+        }))
+        .map_err(err_msg)?
         .send()
         .await
         .map_err(err_msg)?;
@@ -178,10 +224,7 @@ pub async fn delete_api_key(provider: &str) -> Result<(), std::io::Error> {
 
 #[cfg(target_arch = "wasm32")]
 pub async fn list_providers_with_keys() -> Result<Vec<Provider>, std::io::Error> {
-    let response = Request::get("/api/store/providers")
-        .send()
-        .await
-        .map_err(err_msg)?;
+    let response = Request::get("/x/providers").send().await.map_err(err_msg)?;
 
     if !response.ok() {
         return Err(std::io::Error::other(format!(
@@ -207,8 +250,12 @@ pub async fn list_providers_with_keys() -> Result<Vec<Provider>, std::io::Error>
 
 #[cfg(target_arch = "wasm32")]
 pub async fn set_default_model(model_id: &str) -> Result<(), std::io::Error> {
-    let response = Request::put("/api/store/config/default-model")
-        .json(&serde_json::json!({ "model_id": model_id }))
+    let response = Request::put("/store/items")
+        .json(&serde_json::json!({
+            "namespace": ["config"],
+            "key": "default_model",
+            "value": model_id,
+        }))
         .map_err(err_msg)?
         .send()
         .await
@@ -229,7 +276,7 @@ pub async fn list_workspace_files(workspace: &str) -> Result<Vec<super::FileInfo
     let encoded = js_sys::encode_uri_component(workspace)
         .as_string()
         .unwrap_or_else(|| "/home/workspace".to_string());
-    let response = Request::get(&format!("/api/store/files?workspace={encoded}"))
+    let response = Request::get(&format!("/x/files?workspace={encoded}"))
         .send()
         .await
         .map_err(err_msg)?;

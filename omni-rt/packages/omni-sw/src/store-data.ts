@@ -8,7 +8,24 @@ import {
   writeFile as zenWriteFile,
 } from "./zenfs.js";
 import {
+  createThread as createDeepagentsThread,
+  deleteApiKey as deleteDeepagentsApiKey,
+  deleteDefaultModel as deleteDeepagentsDefaultModel,
+  deleteThread as deleteDeepagentsThread,
+  deleteThreadMessages,
+  getApiKey as getDeepagentsApiKey,
+  getDefaultModel as getDeepagentsDefaultModel,
+  getStoredDefaultModel as getDeepagentsStoredDefaultModel,
+  listMessages as listDeepagentsMessages,
+  listThreads as listDeepagentsThreads,
+  saveMessage as saveDeepagentsMessage,
+  setApiKey as setDeepagentsApiKey,
+  setDefaultModel as setDeepagentsDefaultModel,
+  setThreadStatus as setDeepagentsThreadStatus,
+} from "./deepagents.js";
+import {
   DEFAULT_WORKSPACE_ORDER,
+  MOCK_THREAD_IDS,
   SCAFFOLD_FILES,
   getMockThreadFiles,
   getMockToolCalls,
@@ -17,13 +34,8 @@ import {
   seedThreads,
 } from "./store-mocks.js";
 
-const THREADS_DIR = "/home/db/threads";
-const MESSAGES_DIR = "/home/db/messages";
 const TODOS_DIR = "/home/db/todos";
 const SUBAGENTS_DIR = "/home/db/subagents";
-const CONFIG_DIR = "/home/config";
-const ENV_FILE = "/home/config/.env";
-const DEFAULT_MODEL_FILE = "/home/config/default_model";
 
 type ProviderId = "Anthropic" | "OpenAI" | "Google" | "Ollama";
 
@@ -154,27 +166,17 @@ function modelDefs(): Array<{ id: string; name: string; provider: ProviderId }> 
 
 async function seedIfEmpty(): Promise<void> {
   await ensureZenFs();
-  await zenMkdir(THREADS_DIR, { recursive: true });
-  const existing = await readJsonFiles(THREADS_DIR);
+  const existing = await listDeepagentsThreads();
   if (existing.length === 0) {
     for (const thread of seedThreads()) {
-      const threadDoc = {
+      await createDeepagentsThread({
         thread_id: thread.id,
-        created_at: thread.updated_at,
-        updated_at: thread.updated_at,
         metadata: { title: thread.title },
-        status: thread.status,
-        values: null,
-        messages: null,
-      };
-      await zenWriteFile(`${THREADS_DIR}/${thread.id}.json`, encoder.encode(JSON.stringify(threadDoc)));
+      });
+      await setDeepagentsThreadStatus(thread.id, thread.status);
 
-      await zenMkdir(`${MESSAGES_DIR}/${thread.id}`, { recursive: true });
       for (const msg of thread.messages) {
-        await zenWriteFile(
-          `${MESSAGES_DIR}/${thread.id}/${msg.id}.json`,
-          encoder.encode(JSON.stringify({ ...msg, thread_id: thread.id })),
-        );
+        await saveDeepagentsMessage(thread.id, thread.updated_at, { ...msg, thread_id: thread.id });
       }
 
       await zenMkdir(`${TODOS_DIR}/${thread.id}`, { recursive: true });
@@ -247,34 +249,12 @@ export async function listWorkspaceFiles(
   return out;
 }
 
-function parseEnv(env: string): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const line of env.split("\n")) {
-    const idx = line.indexOf("=");
-    if (idx <= 0) continue;
-    const key = line.slice(0, idx).trim();
-    const value = line.slice(idx + 1).trim();
-    if (key) out[key] = value;
-  }
-  return out;
-}
-
-async function readEnvMap(): Promise<Record<string, string>> {
-  if (!(await exists(ENV_FILE))) return {};
-  return parseEnv(await readText(ENV_FILE));
-}
-
-async function writeEnvMap(env: Record<string, string>): Promise<void> {
-  const body = Object.entries(env)
-    .map(([k, v]) => `${k}=${v}`)
-    .join("\n");
-  await zenMkdir(CONFIG_DIR, { recursive: true });
-  await zenWriteFile(ENV_FILE, encoder.encode(body));
-}
-
 export async function getDefaultModel(): Promise<string> {
-  if (!(await exists(DEFAULT_MODEL_FILE))) return "claude-3-7-sonnet";
-  return (await readText(DEFAULT_MODEL_FILE)).trim() || "claude-3-7-sonnet";
+  return await getDeepagentsDefaultModel();
+}
+
+export async function getStoredDefaultModel(): Promise<string | null> {
+  return await getDeepagentsStoredDefaultModel();
 }
 
 export async function buildBootstrap(): Promise<BootstrapPayload> {
@@ -285,7 +265,7 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
   const providers = await readProvidersWithKeys();
   const models = modelDefs();
 
-  const threadRows = await readJsonFiles(THREADS_DIR);
+  const threadRows = await listDeepagentsThreads();
   const threads = threadRows
     .map((row) => {
       const rec = row as Record<string, unknown>;
@@ -300,7 +280,13 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
     })
     .filter((t) => t.id.length > 0)
     .sort((a, b) => {
-      const order = ["thread-gtd", "thread-auth", "thread-db", "thread-ci", "thread-idea"];
+      const order = [
+        MOCK_THREAD_IDS.gtd,
+        MOCK_THREAD_IDS.auth,
+        MOCK_THREAD_IDS.db,
+        MOCK_THREAD_IDS.ci,
+        MOCK_THREAD_IDS.idea,
+      ];
       const ai = order.indexOf(a.id);
       const bi = order.indexOf(b.id);
       if (ai >= 0 && bi >= 0) return ai - bi;
@@ -323,14 +309,14 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
   for (const [index, thread] of threads.entries()) {
     const seeded = seedById.get(thread.id);
 
-    const msgRows = await readJsonFiles(`${MESSAGES_DIR}/${thread.id}`);
+    const msgRows = await listDeepagentsMessages(thread.id);
     let parsedMessages = msgRows
       .map((row) => {
         const rec = row as Record<string, unknown>;
         return {
           id: String(rec.id ?? ""),
           role: toRole(rec.role),
-          content: String(rec.content ?? ""),
+          content: typeof rec.content === "string" ? rec.content : JSON.stringify(rec.content ?? ""),
           created_at: String(rec.created_at ?? ""),
         };
       })
@@ -401,63 +387,52 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
 }
 
 export async function createThread(): Promise<{ id: string; title: string; status: string; updated_at: string }> {
-  await ensureZenFs();
-  const id = `thread-${crypto.randomUUID().replace(/-/g, "")}`;
-  const now = "now";
-  const doc = {
-    thread_id: id,
-    created_at: now,
-    updated_at: now,
-    metadata: { title: "New Thread" },
-    status: "Idle",
-    values: null,
-    messages: null,
+  const thread = await createDeepagentsThread({ metadata: { title: "New Thread" } });
+  return {
+    id: String(thread.thread_id ?? ""),
+    title: String((thread.metadata as Record<string, unknown> | undefined)?.title ?? "New Thread"),
+    status: toThreadStatus(thread.status),
+    updated_at: String(thread.updated_at ?? new Date().toISOString()),
   };
-  await zenMkdir(THREADS_DIR, { recursive: true });
-  await zenWriteFile(`${THREADS_DIR}/${id}.json`, encoder.encode(JSON.stringify(doc)));
-  return { id, title: "New Thread", status: "Idle", updated_at: now };
 }
 
 export async function deleteThread(threadId: string): Promise<void> {
-  await ensureZenFs();
-  await removePath(`${THREADS_DIR}/${threadId}.json`, false);
-  await removePath(`${MESSAGES_DIR}/${threadId}`, true);
+  await deleteDeepagentsThread(threadId);
+  await deleteThreadMessages(threadId);
   await removePath(`${TODOS_DIR}/${threadId}`, true);
   await removePath(`${SUBAGENTS_DIR}/${threadId}`, true);
 }
 
 export async function readProvidersWithKeys(): Promise<Array<{ id: ProviderId; name: string; has_api_key: boolean }>> {
-  const env = await readEnvMap();
-  const hasAny = Object.keys(env).length > 0;
-  return providerDefs().map((p) => ({
-    id: p.id,
-    name: p.name,
-    has_api_key: hasAny ? Boolean(env[`${p.prefix.toUpperCase()}_API_KEY`]) : p.id === "Anthropic" || p.id === "Ollama",
+  const providers = await Promise.all(
+    providerDefs().map(async (provider) => ({
+      id: provider.id,
+      name: provider.name,
+      has_api_key: Boolean(await getDeepagentsApiKey(provider.prefix)),
+    })),
+  );
+  return providers.map((provider) => ({
+    ...provider,
+    has_api_key: provider.has_api_key || provider.id === "Ollama",
   }));
 }
 
 export async function getApiKey(provider: string): Promise<string> {
-  await ensureZenFs();
-  const env = await readEnvMap();
-  return env[`${provider.toUpperCase()}_API_KEY`] ?? "";
+  return (await getDeepagentsApiKey(provider)) ?? "";
 }
 
 export async function setApiKey(provider: string, value: string): Promise<void> {
-  await ensureZenFs();
-  const env = await readEnvMap();
-  env[`${provider.toUpperCase()}_API_KEY`] = value;
-  await writeEnvMap(env);
+  await setDeepagentsApiKey(provider, value);
 }
 
 export async function deleteApiKey(provider: string): Promise<void> {
-  await ensureZenFs();
-  const env = await readEnvMap();
-  delete env[`${provider.toUpperCase()}_API_KEY`];
-  await writeEnvMap(env);
+  await deleteDeepagentsApiKey(provider);
 }
 
 export async function setDefaultModel(modelId: string): Promise<void> {
-  await ensureZenFs();
-  await zenMkdir(CONFIG_DIR, { recursive: true });
-  await zenWriteFile(DEFAULT_MODEL_FILE, encoder.encode(modelId));
+  await setDeepagentsDefaultModel(modelId);
+}
+
+export async function deleteDefaultModel(): Promise<void> {
+  await deleteDeepagentsDefaultModel();
 }

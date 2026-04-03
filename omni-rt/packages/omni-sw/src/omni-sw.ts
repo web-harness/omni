@@ -3,22 +3,20 @@ import { handleStoreRoute, matchStoreRoute } from "./store-api.js";
 
 declare const self: ServiceWorkerGlobalScope;
 
-export type RunRoute = "runs-stream" | "runs-wait" | null;
-export type StoreRoute =
-  | "store-bootstrap"
-  | "store-create-thread"
-  | "store-delete-thread"
-  | "store-providers"
-  | "store-get-api-key"
-  | "store-set-api-key"
-  | "store-delete-api-key"
-  | "store-get-default-model"
-  | "store-set-default-model"
+export type RunRoute =
+  | "runs-create"
+  | "runs-search"
+  | "runs-stream"
+  | "runs-wait"
+  | "run-get"
+  | "run-delete"
+  | "run-wait"
+  | "run-stream"
+  | "run-cancel"
   | null;
 
 type RuntimeModule = {
-  handleRunStream(request: Request): Promise<Response>;
-  handleRunWait(request: Request): Promise<Response>;
+  handleRunRoute(request: Request, route: Exclude<RunRoute, null>): Promise<Response>;
 };
 
 let runtimeModulePromise: Promise<RuntimeModule> | null = null;
@@ -31,12 +29,37 @@ function loadRuntimeModule(): Promise<RuntimeModule> {
 }
 
 export function matchRunRoute(request: Request): RunRoute {
-  const url = new URL(request.url);
-  if (url.pathname === "/api/runs/stream" && request.method === "POST") {
+  const parts = new URL(request.url).pathname.split("/").filter(Boolean);
+  if (parts[0] !== "runs") {
+    return null;
+  }
+
+  if (parts.length === 1 && request.method === "POST") {
+    return "runs-create";
+  }
+  if (parts[1] === "search" && request.method === "POST") {
+    return "runs-search";
+  }
+  if (parts[1] === "stream" && request.method === "POST") {
     return "runs-stream";
   }
-  if (url.pathname === "/api/runs/wait" && request.method === "POST") {
+  if (parts[1] === "wait" && request.method === "POST") {
     return "runs-wait";
+  }
+  if (parts.length === 2 && request.method === "GET") {
+    return "run-get";
+  }
+  if (parts.length === 2 && request.method === "DELETE") {
+    return "run-delete";
+  }
+  if (parts[2] === "wait" && request.method === "GET") {
+    return "run-wait";
+  }
+  if (parts[2] === "stream" && request.method === "GET") {
+    return "run-stream";
+  }
+  if (parts[2] === "cancel" && request.method === "POST") {
+    return "run-cancel";
   }
   return null;
 }
@@ -60,13 +83,8 @@ export function setupServiceWorker(scope: ServiceWorkerGlobalScope): void {
 
     const route = matchRunRoute(event.request);
 
-    if (route === "runs-stream") {
-      event.respondWith(loadRuntimeModule().then((runtime) => runtime.handleRunStream(event.request)));
-      return;
-    }
-
-    if (route === "runs-wait") {
-      event.respondWith(loadRuntimeModule().then((runtime) => runtime.handleRunWait(event.request)));
+    if (route) {
+      event.respondWith(loadRuntimeModule().then((runtime) => runtime.handleRunRoute(event.request, route)));
       return;
     }
   });

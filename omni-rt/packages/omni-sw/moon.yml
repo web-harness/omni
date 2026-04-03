@@ -76,6 +76,8 @@ tasks:
       - --inject:./shims/node-globals.ts
       - --external:./omni-bashkit.js
       - --external:/omni-bashkit.js
+      - --external:./omni-deepagents.js
+      - --external:/omni-deepagents.js
       - --external:./omni-zenfs.js
       - --external:/omni-zenfs.js
       - '--define:process.env.NODE_ENV="production"'
@@ -161,6 +163,8 @@ tasks:
       - --inject:./shims/node-globals.ts
       - --external:./omni-bashkit.js
       - --external:/omni-bashkit.js
+      - --external:./omni-deepagents.js
+      - --external:/omni-deepagents.js
       - --external:./omni-zenfs.js
       - --external:/omni-zenfs.js
       - '--define:process.env.NODE_ENV="production"'

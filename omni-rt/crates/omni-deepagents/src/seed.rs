@@ -1,12 +1,30 @@
 use crate::{message_store, subagent_store, thread_store, todo_store};
 use chrono::Utc;
-use message_store::{Role, StoredMessage};
+use message_store::StoredMessage;
 use omni_protocol::ThreadStatus;
 use omni_zenfs as zenfs;
 use subagent_store::{StoredSubagent, SubagentStatus};
 use todo_store::{StoredTodo, TodoStatus};
 
 const THREADS_DIR: &str = "/home/db/threads";
+
+fn stored_message(
+    id: &str,
+    thread_id: String,
+    role: &str,
+    content: &str,
+    created_at: &str,
+) -> StoredMessage {
+    StoredMessage {
+        id: id.into(),
+        thread_id,
+        role: role.into(),
+        content: serde_json::Value::String(content.into()),
+        created_at: created_at.into(),
+        metadata: None,
+        extra: Default::default(),
+    }
+}
 
 pub async fn seed_if_empty() -> Result<(), std::io::Error> {
     match zenfs::mkdir(THREADS_DIR, true).await {
@@ -28,13 +46,13 @@ pub async fn seed_if_empty() -> Result<(), std::io::Error> {
         now.to_rfc3339(),
     )
     .await?;
-    let t1id = t1.thread_id.simple().to_string();
+    let t1id = t1.thread_id.to_string();
 
     for msg in [
-        StoredMessage { id: "m1".into(), thread_id: t1id.clone(), role: Role::User, content: "I need a full todo management system with CRUD operations, filtering by status, and persistence via ZenFS.".into(), created_at: "2025-03-30T10:00:00Z".into() },
-        StoredMessage { id: "m2".into(), thread_id: t1id.clone(), role: Role::Assistant, content: "I'll implement a comprehensive todo management system. Let me start by setting up the data layer.".into(), created_at: "2025-03-30T10:00:05Z".into() },
-        StoredMessage { id: "m3".into(), thread_id: t1id.clone(), role: Role::Tool, content: "```rust\n// todo_store.rs created\npub struct Todo { pub id: String, pub content: String, pub status: TodoStatus }\n```".into(), created_at: "2025-03-30T10:00:10Z".into() },
-        StoredMessage { id: "m4".into(), thread_id: t1id.clone(), role: Role::Assistant, content: "Data layer is ready. Now building the UI components with filtering and sorting capabilities.".into(), created_at: "2025-03-30T10:00:15Z".into() },
+        stored_message("m1", t1id.clone(), "user", "I need a full todo management system with CRUD operations, filtering by status, and persistence via ZenFS.", "2025-03-30T10:00:00Z"),
+        stored_message("m2", t1id.clone(), "assistant", "I'll implement a comprehensive todo management system. Let me start by setting up the data layer.", "2025-03-30T10:00:05Z"),
+        stored_message("m3", t1id.clone(), "tool", "```rust\n// todo_store.rs created\npub struct Todo { pub id: String, pub content: String, pub status: TodoStatus }\n```", "2025-03-30T10:00:10Z"),
+        stored_message("m4", t1id.clone(), "assistant", "Data layer is ready. Now building the UI components with filtering and sorting capabilities.", "2025-03-30T10:00:15Z"),
     ] { message_store::save_message(&msg).await?; }
 
     for todo in [
@@ -105,12 +123,12 @@ pub async fn seed_if_empty() -> Result<(), std::io::Error> {
         (now - chrono::Duration::hours(16)).to_rfc3339(),
     )
     .await?;
-    let t2id = t2.thread_id.simple().to_string();
+    let t2id = t2.thread_id.to_string();
 
     for msg in [
-        StoredMessage { id: "m5".into(), thread_id: t2id.clone(), role: Role::User, content: "Set up JWT-based auth with refresh tokens, protected routes, and session persistence.".into(), created_at: "2025-03-29T18:00:00Z".into() },
-        StoredMessage { id: "m6".into(), thread_id: t2id.clone(), role: Role::Assistant, content: "I'll implement a complete auth flow. Starting with the JWT middleware and token storage.".into(), created_at: "2025-03-29T18:00:05Z".into() },
-        StoredMessage { id: "m7".into(), thread_id: t2id.clone(), role: Role::User, content: "Also add Google OAuth as a second factor please.".into(), created_at: "2025-03-29T18:05:00Z".into() },
+        stored_message("m5", t2id.clone(), "user", "Set up JWT-based auth with refresh tokens, protected routes, and session persistence.", "2025-03-29T18:00:00Z"),
+        stored_message("m6", t2id.clone(), "assistant", "I'll implement a complete auth flow. Starting with the JWT middleware and token storage.", "2025-03-29T18:00:05Z"),
+        stored_message("m7", t2id.clone(), "user", "Also add Google OAuth as a second factor please.", "2025-03-29T18:05:00Z"),
     ] { message_store::save_message(&msg).await?; }
 
     for todo in [
@@ -168,12 +186,26 @@ pub async fn seed_if_empty() -> Result<(), std::io::Error> {
         (now - chrono::Duration::hours(46)).to_rfc3339(),
     )
     .await?;
-    let t3id = t3.thread_id.simple().to_string();
+    let t3id = t3.thread_id.to_string();
 
     for msg in [
-        StoredMessage { id: "m8".into(), thread_id: t3id.clone(), role: Role::User, content: "We need to migrate from SQLite to PostgreSQL without downtime. There are 2M records.".into(), created_at: "2025-03-28T12:00:00Z".into() },
-        StoredMessage { id: "m9".into(), thread_id: t3id.clone(), role: Role::Assistant, content: "I'll design a zero-downtime migration strategy using dual-write with a backfill job.".into(), created_at: "2025-03-28T12:00:05Z".into() },
-    ] { message_store::save_message(&msg).await?; }
+        stored_message(
+            "m8",
+            t3id.clone(),
+            "user",
+            "We need to migrate from SQLite to PostgreSQL without downtime. There are 2M records.",
+            "2025-03-28T12:00:00Z",
+        ),
+        stored_message(
+            "m9",
+            t3id.clone(),
+            "assistant",
+            "I'll design a zero-downtime migration strategy using dual-write with a backfill job.",
+            "2025-03-28T12:00:05Z",
+        ),
+    ] {
+        message_store::save_message(&msg).await?;
+    }
 
     for todo in [
         StoredTodo {
@@ -223,11 +255,11 @@ pub async fn seed_if_empty() -> Result<(), std::io::Error> {
         (now - chrono::Duration::hours(73)).to_rfc3339(),
     )
     .await?;
-    let t4id = t4.thread_id.simple().to_string();
+    let t4id = t4.thread_id.to_string();
 
     for msg in [
-        StoredMessage { id: "m10".into(), thread_id: t4id.clone(), role: Role::User, content: "Set up GitHub Actions with test, lint, build, deploy stages and environment-specific secrets.".into(), created_at: "2025-03-27T09:00:00Z".into() },
-        StoredMessage { id: "m11".into(), thread_id: t4id.clone(), role: Role::Assistant, content: "I'll create a comprehensive CI/CD pipeline. Let me start with the workflow configuration.".into(), created_at: "2025-03-27T09:00:05Z".into() },
+        stored_message("m10", t4id.clone(), "user", "Set up GitHub Actions with test, lint, build, deploy stages and environment-specific secrets.", "2025-03-27T09:00:00Z"),
+        stored_message("m11", t4id.clone(), "assistant", "I'll create a comprehensive CI/CD pipeline. Let me start with the workflow configuration.", "2025-03-27T09:00:05Z"),
     ] { message_store::save_message(&msg).await?; }
 
     for todo in [
@@ -266,11 +298,11 @@ pub async fn seed_if_empty() -> Result<(), std::io::Error> {
         (now - chrono::Duration::hours(111)).to_rfc3339(),
     )
     .await?;
-    let t5id = t5.thread_id.simple().to_string();
+    let t5id = t5.thread_id.to_string();
 
     for msg in [
-        StoredMessage { id: "m12".into(), thread_id: t5id.clone(), role: Role::User, content: "What would be a good approach to implement real-time collaboration features?".into(), created_at: "2025-03-26T15:00:00Z".into() },
-        StoredMessage { id: "m13".into(), thread_id: t5id.clone(), role: Role::Assistant, content: "For real-time collaboration, I'd recommend a CRDT-based approach using Yjs. Here's why:\n\n1. **Conflict-free merging** — no server coordination needed\n2. **Offline support** — changes sync when reconnected\n3. **Proven ecosystem** — works with CodeMirror, ProseMirror, etc.\n\nAlternatively, OT (Operational Transformation) works well if you need stricter ordering guarantees.".into(), created_at: "2025-03-26T15:00:05Z".into() },
+        stored_message("m12", t5id.clone(), "user", "What would be a good approach to implement real-time collaboration features?", "2025-03-26T15:00:00Z"),
+        stored_message("m13", t5id.clone(), "assistant", "For real-time collaboration, I'd recommend a CRDT-based approach using Yjs. Here's why:\n\n1. **Conflict-free merging** — no server coordination needed\n2. **Offline support** — changes sync when reconnected\n3. **Proven ecosystem** — works with CodeMirror, ProseMirror, etc.\n\nAlternatively, OT (Operational Transformation) works well if you need stricter ordering guarantees.", "2025-03-26T15:00:05Z"),
     ] { message_store::save_message(&msg).await?; }
 
     Ok(())

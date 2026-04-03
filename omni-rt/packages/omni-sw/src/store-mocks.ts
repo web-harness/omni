@@ -12,6 +12,13 @@ export type SeedThread = {
     status: "pending" | "running" | "completed" | "failed";
   }>;
 };
+export const MOCK_THREAD_IDS = {
+  gtd: "11111111-1111-4111-8111-111111111111",
+  auth: "22222222-2222-4222-8222-222222222222",
+  db: "33333333-3333-4333-8333-333333333333",
+  ci: "44444444-4444-4444-8444-444444444444",
+  idea: "55555555-5555-4555-8555-555555555555",
+} as const;
 
 export const DEFAULT_WORKSPACE_ORDER = [
   "/home/user/projects/test",
@@ -94,7 +101,7 @@ export function seedThreads(): SeedThread[] {
 
   return [
     {
-      id: "thread-gtd",
+      id: MOCK_THREAD_IDS.gtd,
       title: "Implement todo management sys...",
       status: "Busy",
       updated_at: "9m ago",
@@ -149,7 +156,7 @@ export function seedThreads(): SeedThread[] {
       ],
     },
     {
-      id: "thread-auth",
+      id: MOCK_THREAD_IDS.auth,
       title: "Implement Auth Flow",
       status: "Interrupted",
       updated_at: "49m ago",
@@ -166,7 +173,7 @@ export function seedThreads(): SeedThread[] {
       subagents: genericSubagents,
     },
     {
-      id: "thread-db",
+      id: MOCK_THREAD_IDS.db,
       title: "Database Migration",
       status: "Idle",
       updated_at: "52m ago",
@@ -183,7 +190,7 @@ export function seedThreads(): SeedThread[] {
       subagents: genericSubagents,
     },
     {
-      id: "thread-ci",
+      id: MOCK_THREAD_IDS.ci,
       title: "Setup CI Pipeline",
       status: "Idle",
       updated_at: "58m ago",
@@ -192,7 +199,7 @@ export function seedThreads(): SeedThread[] {
       subagents: genericSubagents,
     },
     {
-      id: "thread-idea",
+      id: MOCK_THREAD_IDS.idea,
       title: "What would be a good...",
       status: "Idle",
       updated_at: "1h ago",
@@ -204,7 +211,7 @@ export function seedThreads(): SeedThread[] {
 }
 
 export function getMockThreadFiles(threadId: string): Array<{ path: string; is_dir: boolean; size: number | null }> {
-  if (threadId === "thread-gtd") {
+  if (threadId === MOCK_THREAD_IDS.gtd) {
     return [
       { path: "public", is_dir: true, size: null },
       { path: "public/app.js", is_dir: false, size: 2600 },
@@ -315,7 +322,7 @@ export function getMockWorkspaceFiles(): Record<string, Array<{ path: string; is
 }
 
 export function getMockToolCalls(threadId: string): Array<{ id: string; name: string; args: unknown }> {
-  if (threadId !== "thread-gtd") return [];
+  if (threadId !== MOCK_THREAD_IDS.gtd) return [];
   return [
     {
       id: "tc-todos",
@@ -363,6 +370,6 @@ export function getMockToolCalls(threadId: string): Array<{ id: string; name: st
 export function getMockToolResults(
   threadId: string,
 ): Array<{ tool_call_id: string; content: string; is_error: boolean }> {
-  if (threadId !== "thread-gtd") return [];
+  if (threadId !== MOCK_THREAD_IDS.gtd) return [];
   return [{ tool_call_id: "tc-todos", content: "Synced", is_error: false }];
 }

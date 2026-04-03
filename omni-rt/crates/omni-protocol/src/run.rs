@@ -23,16 +23,20 @@ pub enum StreamMode {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum StreamModeSelection {
+    One(StreamMode),
+    Many(Vec<StreamMode>),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Run {
+    #[serde(flatten)]
+    pub stream: RunStream,
     pub run_id: Uuid,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub status: RunStatus,
-    pub metadata: HashMap<String, serde_json::Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub thread_id: Option<Uuid>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub agent_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,6 +49,7 @@ pub struct RunCreate {
     pub input: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub messages: Option<Vec<crate::Message>>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub metadata: HashMap<String, serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub config: Option<serde_json::Value>,
@@ -84,7 +89,7 @@ pub struct RunStream {
     #[serde(flatten)]
     pub create: RunCreate,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub stream_mode: Option<StreamMode>,
+    pub stream_mode: Option<StreamModeSelection>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
