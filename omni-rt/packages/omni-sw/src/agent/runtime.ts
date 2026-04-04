@@ -28,7 +28,12 @@ import {
   type ProtocolMessage,
   type StoredSseEvent,
 } from "../run-store.js";
-import { getApiKey as getProviderApiKey, getDefaultModel } from "../store-data.js";
+import {
+  deriveThreadTitle,
+  getApiKey as getProviderApiKey,
+  getDefaultModel,
+  isPlaceholderThreadTitle,
+} from "../store-data.js";
 import {
   exists as zenExists,
   fs,
@@ -726,6 +731,16 @@ async function executeRun(active: ActiveRun, body: RunRequest): Promise<Persiste
     const inputMessages = invocationMessages(body);
     const echoedInputMessages =
       body.messages ?? (body.input === undefined ? undefined : [{ role: "user", content: body.input }]);
+    const currentThread = threadId ? await readThreadRecord(threadId) : null;
+    const currentTitle = currentThread && isObject(currentThread.metadata) ? currentThread.metadata.title : undefined;
+    if (threadId && echoedInputMessages?.length && isPlaceholderThreadTitle(currentTitle)) {
+      const nextTitle = deriveThreadTitle(echoedInputMessages, currentTitle);
+      if (nextTitle !== String(currentTitle ?? "").trim()) {
+        await patchDeepagentsThread(threadId, {
+          metadata: { title: nextTitle },
+        });
+      }
+    }
     if (echoedInputMessages?.length) {
       for (const message of echoedInputMessages) {
         await appendThreadMessage(threadId, message);

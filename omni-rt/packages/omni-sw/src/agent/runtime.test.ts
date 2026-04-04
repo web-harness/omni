@@ -26,8 +26,20 @@ vi.mock("deepagents", () => ({
 }));
 
 vi.mock("../store-data.js", () => ({
+  deriveThreadTitle: vi.fn((messages: Array<{ role?: string; content?: unknown }>, currentTitle?: unknown) => {
+    const title = String(currentTitle ?? "").trim();
+    if (title && title !== "New Thread") {
+      return title;
+    }
+    const firstUser = messages.find((message) => String(message.role ?? "").toLowerCase() === "user");
+    return typeof firstUser?.content === "string" && firstUser.content.trim() ? firstUser.content.trim() : "New Thread";
+  }),
   getApiKey: vi.fn(async () => "test-key"),
   getDefaultModel: vi.fn(async () => "gpt-5"),
+  isPlaceholderThreadTitle: vi.fn((title: unknown) => {
+    const value = String(title ?? "").trim();
+    return value.length === 0 || value === "New Thread";
+  }),
 }));
 
 vi.mock("../zenfs.js", () => ({
@@ -426,5 +438,34 @@ describe("runtime parity", () => {
     expect(restoredThread.messages).toHaveLength(1);
     expect(mockState.files.get(`/home/db/messages/${threadId}/m0.json`)).toContain("before");
     expect(mockState.files.get(`/home/checkpoints/${threadId}.sqlite`)).toBe("checkpoint-bytes");
+  });
+
+  it("updates placeholder thread titles from the first user message", async () => {
+    const { handleRunRoute } = await import("./runtime.js");
+    const threadId = "55555555-5555-4555-8555-555555555555";
+    mockState.files.set(
+      `/home/db/threads/${threadId}.json`,
+      JSON.stringify({
+        thread_id: threadId,
+        created_at: "2026-01-01T00:00:00.000Z",
+        updated_at: "2026-01-01T00:00:00.000Z",
+        metadata: { title: "New Thread" },
+        status: "idle",
+      }),
+    );
+
+    const response = await handleRunRoute(
+      jsonRequest("https://example.test/runs/wait", "POST", {
+        thread_id: threadId,
+        input: "Plan release rollback",
+        on_completion: "keep",
+        if_not_exists: "reject",
+      }),
+      "runs-wait",
+    );
+
+    expect(response.status).toBe(200);
+    const storedThread = JSON.parse(mockState.files.get(`/home/db/threads/${threadId}.json`) ?? "{}");
+    expect(storedThread.metadata.title).toBe("Plan release rollback");
   });
 });

@@ -36,6 +36,7 @@ import {
 
 const TODOS_DIR = "/home/db/todos";
 const SUBAGENTS_DIR = "/home/db/subagents";
+export const DEFAULT_THREAD_TITLE = "New Thread";
 
 type ProviderId = "Anthropic" | "OpenAI" | "Google" | "Ollama";
 
@@ -70,6 +71,67 @@ async function ensureZenFs(): Promise<void> {
 
 function normalizeThreadId(id: unknown): string {
   return String(id ?? "").trim();
+}
+
+export function isPlaceholderThreadTitle(title: unknown): boolean {
+  const value = String(title ?? "").trim();
+  return value.length === 0 || value === DEFAULT_THREAD_TITLE;
+}
+
+function messageContentText(content: unknown): string {
+  if (typeof content === "string") {
+    return content;
+  }
+  if (Array.isArray(content)) {
+    return content
+      .map((entry) => {
+        if (typeof entry === "string") {
+          return entry;
+        }
+        if (entry && typeof entry === "object" && "text" in entry && typeof entry.text === "string") {
+          return entry.text;
+        }
+        return "";
+      })
+      .filter(Boolean)
+      .join(" ");
+  }
+  if (content && typeof content === "object" && "text" in content && typeof content.text === "string") {
+    return content.text;
+  }
+  return "";
+}
+
+function summarizeThreadTitle(content: unknown): string | null {
+  const normalized = messageContentText(content).replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return null;
+  }
+  if (normalized.length <= 48) {
+    return normalized;
+  }
+  return `${normalized.slice(0, 45).trimEnd()}...`;
+}
+
+export function deriveThreadTitle(
+  messages: Array<{ role?: unknown; content?: unknown }>,
+  currentTitle?: unknown,
+): string {
+  if (!isPlaceholderThreadTitle(currentTitle)) {
+    return String(currentTitle ?? "").trim();
+  }
+
+  for (const message of messages) {
+    if (String(message.role ?? "").toLowerCase() !== "user") {
+      continue;
+    }
+    const summary = summarizeThreadTitle(message.content);
+    if (summary) {
+      return summary;
+    }
+  }
+
+  return DEFAULT_THREAD_TITLE;
 }
 
 function toThreadStatus(raw: unknown): string {
@@ -273,7 +335,7 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
       const metadata = (rec.metadata as Record<string, unknown> | undefined) ?? {};
       return {
         id,
-        title: String(metadata.title ?? "New Thread"),
+        title: String(metadata.title ?? DEFAULT_THREAD_TITLE),
         status: toThreadStatus(rec.status),
         updated_at: String(rec.updated_at ?? new Date().toISOString()),
       };
@@ -325,6 +387,7 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
     if (parsedMessages.length === 0 && seeded) {
       parsedMessages = seeded.messages.map((m) => ({ id: m.id, role: toRole(m.role), content: m.content }));
     }
+    thread.title = deriveThreadTitle(parsedMessages, thread.title);
     messages[thread.id] = parsedMessages;
 
     const todoRows = await readJsonFiles(`${TODOS_DIR}/${thread.id}`);
@@ -387,10 +450,10 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
 }
 
 export async function createThread(): Promise<{ id: string; title: string; status: string; updated_at: string }> {
-  const thread = await createDeepagentsThread({ metadata: { title: "New Thread" } });
+  const thread = await createDeepagentsThread({ metadata: { title: DEFAULT_THREAD_TITLE } });
   return {
     id: String(thread.thread_id ?? ""),
-    title: String((thread.metadata as Record<string, unknown> | undefined)?.title ?? "New Thread"),
+    title: String((thread.metadata as Record<string, unknown> | undefined)?.title ?? DEFAULT_THREAD_TITLE),
     status: toThreadStatus(thread.status),
     updated_at: String(thread.updated_at ?? new Date().toISOString()),
   };
