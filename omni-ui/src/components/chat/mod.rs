@@ -9,8 +9,8 @@ use crate::components::ui::{Badge, BadgeVariant, Popover};
 #[cfg(target_arch = "wasm32")]
 use crate::lib::thread_context::apply_stream_event;
 use crate::lib::{
-    ChatState, ModelState, Role, TasksState, ThreadState, ToolCall, ToolResult, UiState,
-    WorkspaceState,
+    AgentEndpoint, AgentEndpointState, ChatState, ModelState, Role, TasksState, ThreadState,
+    ToolCall, ToolResult, UiState, WorkspaceState,
 };
 
 #[cfg(target_arch = "wasm32")]
@@ -19,6 +19,7 @@ struct StreamRequest {
     thread_id: String,
     input: String,
     model_id: String,
+    endpoint: Option<AgentEndpoint>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -31,11 +32,13 @@ fn send_stream_request(
     thread_id: String,
     input: String,
     model_id: String,
+    endpoint: Option<AgentEndpoint>,
 ) {
     stream.send(StreamRequest {
         thread_id,
         input,
         model_id,
+        endpoint,
     });
 }
 
@@ -45,6 +48,7 @@ fn send_stream_request(
     _thread_id: String,
     _input: String,
     _model_id: String,
+    _endpoint: Option<AgentEndpoint>,
 ) {
     stream.send(StreamRequest);
 }
@@ -74,6 +78,11 @@ pub fn ChatContainer(thread_id: String) -> Element {
                     "stream_mode": ["messages", "values"],
                     "metadata": {
                         "model_id": req.model_id,
+                        "agent_id": req.endpoint.as_ref().map(|endpoint| endpoint.id.clone()).unwrap_or_else(|| "main".to_string()),
+                        "agent_name": req.endpoint.as_ref().map(|endpoint| endpoint.name.clone()).unwrap_or_else(|| "Main Agent".to_string()),
+                        "agent_url": req.endpoint.as_ref().map(|endpoint| endpoint.url.clone()).unwrap_or_default(),
+                        "agent_bearer_token": req.endpoint.as_ref().map(|endpoint| endpoint.bearer_token.clone()).unwrap_or_default(),
+                        "agent_mode": if req.endpoint.as_ref().map(|endpoint| endpoint.removable).unwrap_or(false) { "direct" } else { "main" },
                     },
                 })
                 .to_string();
@@ -225,7 +234,7 @@ pub fn MessageBubble(message: crate::lib::UiMessage) -> Element {
 pub fn ToolCallRenderer(call: ToolCall, result: Option<ToolResult>) -> Element {
     match call.name.as_str() {
         "update_todos" => rsx! { UpdateTodosRenderer { call, result } },
-        "dispatch_subagent" => rsx! { SubagentTaskRenderer { call } },
+        "dispatch_subagent" => rsx! { BackgroundTaskRenderer { call } },
         _ => rsx! { GenericToolCallRenderer { call, result } },
     }
 }
@@ -310,7 +319,7 @@ fn UpdateTodosRenderer(call: ToolCall, result: Option<ToolResult>) -> Element {
 }
 
 #[component]
-fn SubagentTaskRenderer(call: ToolCall) -> Element {
+fn BackgroundTaskRenderer(call: ToolCall) -> Element {
     let mut open = use_signal(|| false);
     let task = call
         .args
@@ -330,7 +339,7 @@ fn SubagentTaskRenderer(call: ToolCall) -> Element {
                     Icon { width: 10, height: 10, icon: LdChevronRight, class: "text-muted-foreground shrink-0" }
                 }
                 Icon { width: 12, height: 12, icon: LdBot, class: "text-status-info shrink-0" }
-                span { class: "font-semibold", "Subagent Task" }
+                span { class: "font-semibold", "Background Task" }
             }
             div { class: "px-3 pb-3 pt-1 text-muted-foreground",
                 if open() {
@@ -388,6 +397,7 @@ fn ChatInput(thread_id: String, stream: Coroutine<StreamRequest>) -> Element {
     let mut chat_state = use_context::<Signal<ChatState>>();
     let thread_state = use_context::<Signal<ThreadState>>();
     let model_state = use_context::<Signal<ModelState>>();
+    let agent_state = use_context::<Signal<AgentEndpointState>>();
 
     #[cfg(target_arch = "wasm32")]
     let sw_ready = {
@@ -437,6 +447,7 @@ fn ChatInput(thread_id: String, stream: Coroutine<StreamRequest>) -> Element {
                                             thread_id.clone(),
                                             input,
                                             model_state.read().selected_model_for(&active_id),
+                                            agent_state.read().active_endpoint().cloned(),
                                         );
                                     }
                                 }
@@ -471,6 +482,7 @@ fn ChatInput(thread_id: String, stream: Coroutine<StreamRequest>) -> Element {
                                     thread_id.clone(),
                                     input,
                                     model_state.read().selected_model_for(&active_id),
+                                    agent_state.read().active_endpoint().cloned(),
                                 );
                             }
                         },
@@ -480,6 +492,18 @@ fn ChatInput(thread_id: String, stream: Coroutine<StreamRequest>) -> Element {
                 div { class: "mt-2 flex items-center gap-2",
                     ModelSwitcher {}
                     WorkspacePicker {}
+                    {
+                        let active_target = agent_state
+                            .read()
+                            .active_endpoint()
+                            .map(|endpoint| endpoint.name.clone())
+                            .unwrap_or_else(|| "Main Agent".to_string());
+                        rsx! {
+                            div { class: "text-[10px] text-muted-foreground whitespace-nowrap",
+                                "Target: {active_target}"
+                            }
+                        }
+                    }
                     div { class: "ml-auto text-[10px] text-muted-foreground whitespace-nowrap",
                         "~2.4k input · ~580 output · $0.012"
                     }

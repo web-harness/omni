@@ -1,15 +1,23 @@
 #![allow(special_module_name)]
 
 use dioxus::prelude::*;
+use serde::Deserialize;
 use serde_json::json;
+
+#[cfg(target_arch = "wasm32")]
+use gloo_events::EventListener;
+#[cfg(target_arch = "wasm32")]
+use std::cell::{Cell, RefCell};
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::JsCast;
 
 mod components;
 mod lib;
 mod routes;
 
 use components::{
-    AgentsSection, Button, ButtonVariant, ChatContainer, Dialog, FilesSection, Input, KanbanView,
-    TasksSection, ThreadSidebar,
+    AgentRail, BackgroundTasksSection, Button, ButtonVariant, ChatContainer, Dialog, FilesSection,
+    Input, KanbanView, TasksSection, ThreadSidebar,
 };
 use lib::{default_states, ModelState, Theme, ThreadState, UiState, WorkspaceState};
 use routes::Route;
@@ -21,6 +29,221 @@ const FONT_REGULAR: Asset = asset!("/assets/fonts/JetBrainsMono-Regular.woff2");
 const FONT_MEDIUM: Asset = asset!("/assets/fonts/JetBrainsMono-Medium.woff2");
 const FONT_SEMIBOLD: Asset = asset!("/assets/fonts/JetBrainsMono-SemiBold.woff2");
 const FONT_BOLD: Asset = asset!("/assets/fonts/JetBrainsMono-Bold.woff2");
+#[cfg(target_arch = "wasm32")]
+const IFRAME_BOOTSTRAP_EVENT: &str = "omni-iframe-config";
+#[cfg(target_arch = "wasm32")]
+const IFRAME_READY_EVENT: &str = "omni-iframe-ready";
+
+#[derive(Clone, Deserialize)]
+struct IframeAgentConfig {
+    url: String,
+    #[serde(rename = "apiKey")]
+    api_key: String,
+}
+
+#[derive(Clone, Default, Deserialize)]
+struct IframeBootstrapConfig {
+    #[serde(default)]
+    theme: String,
+    #[serde(default, rename = "dicebearStyle")]
+    dicebear_style: String,
+    #[serde(default)]
+    agents: Vec<IframeAgentConfig>,
+}
+
+#[cfg(target_arch = "wasm32")]
+#[derive(Clone, Default, Deserialize)]
+struct IframeBootstrapEnvelope {
+    #[serde(rename = "type")]
+    kind: String,
+    #[serde(default)]
+    payload: IframeBootstrapConfig,
+}
+
+#[cfg(target_arch = "wasm32")]
+thread_local! {
+    static IFRAME_BOOTSTRAP: RefCell<Option<IframeBootstrapConfig>> = RefCell::new(None);
+    static IFRAME_BOOTSTRAP_LISTENER: RefCell<Option<EventListener>> = RefCell::new(None);
+    static IFRAME_APP_STARTED: Cell<bool> = Cell::new(false);
+    static IFRAME_RUNTIME_LISTENER: RefCell<Option<EventListener>> = RefCell::new(None);
+}
+
+fn iframe_agent_endpoints(configs: Vec<IframeAgentConfig>) -> Vec<lib::AgentEndpoint> {
+    configs
+        .into_iter()
+        .filter_map(|agent| {
+            let url = agent.url.trim().to_string();
+            if url.is_empty() {
+                return None;
+            }
+            let bearer_token = agent.api_key.trim().to_string();
+            Some(lib::AgentEndpoint {
+                id: lib::agent_config_hash(&url, &bearer_token),
+                name: lib::derive_agent_name(&url),
+                url,
+                bearer_token,
+                removable: true,
+            })
+        })
+        .collect()
+}
+
+fn iframe_theme(theme: &str) -> Option<Theme> {
+    match theme.trim() {
+        "" => None,
+        theme if theme.eq_ignore_ascii_case("light") => Some(Theme::Light),
+        _ => Some(Theme::Dark),
+    }
+}
+
+fn iframe_dicebear_style(style: &str) -> Option<String> {
+    let trimmed = style.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(lib::normalize_dicebear_style(trimmed))
+    }
+}
+
+fn iframe_agent_endpoints_override(
+    config: &IframeBootstrapConfig,
+) -> Option<Vec<lib::AgentEndpoint>> {
+    if config.agents.is_empty() {
+        None
+    } else {
+        Some(iframe_agent_endpoints(config.agents.clone()))
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn apply_iframe_config(
+    mut ui_state: Signal<UiState>,
+    mut agent_endpoint_state: Signal<lib::AgentEndpointState>,
+    config: &IframeBootstrapConfig,
+) {
+    if let Some(theme) = iframe_theme(&config.theme) {
+        ui_state.write().theme = theme;
+    }
+
+    if let Some(dicebear_style) = iframe_dicebear_style(&config.dicebear_style) {
+        let should_persist = agent_endpoint_state.read().dicebear_style != dicebear_style;
+        agent_endpoint_state.write().dicebear_style = dicebear_style.clone();
+        if should_persist {
+            spawn(async move {
+                let _ = lib::sw_api::set_agent_rail_style(&dicebear_style).await;
+            });
+        }
+    }
+
+    if let Some(endpoints) = iframe_agent_endpoints_override(config) {
+        let mut state = agent_endpoint_state.write();
+        let previous_active_agent_id = state.active_agent_id.clone();
+        state.endpoints = lib::merge_agent_endpoints(endpoints);
+        state.active_agent_id = previous_active_agent_id
+            .filter(|id| state.endpoints.iter().any(|endpoint| endpoint.id == *id));
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn take_iframe_bootstrap() -> Option<IframeBootstrapConfig> {
+    IFRAME_BOOTSTRAP.with(|bootstrap| bootstrap.borrow_mut().take())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn take_iframe_bootstrap() -> Option<IframeBootstrapConfig> {
+    None
+}
+
+#[cfg(target_arch = "wasm32")]
+fn install_iframe_runtime_listener(
+    ui_state: Signal<UiState>,
+    agent_endpoint_state: Signal<lib::AgentEndpointState>,
+) {
+    IFRAME_RUNTIME_LISTENER.with(|listener_slot| {
+        if listener_slot.borrow().is_some() {
+            return;
+        }
+
+        let Some(window) = web_sys::window() else {
+            return;
+        };
+
+        let listener = EventListener::new(&window, "message", move |event| {
+            let Some(envelope) = event
+                .dyn_ref::<web_sys::MessageEvent>()
+                .and_then(|message: &web_sys::MessageEvent| message.data().as_string())
+                .and_then(|raw| serde_json::from_str::<IframeBootstrapEnvelope>(&raw).ok())
+            else {
+                return;
+            };
+
+            if envelope.kind != IFRAME_BOOTSTRAP_EVENT {
+                return;
+            }
+
+            apply_iframe_config(ui_state, agent_endpoint_state, &envelope.payload);
+        });
+
+        listener_slot.replace(Some(listener));
+    });
+}
+
+// The embedded iframe bootstraps app config through window messages before Dioxus mounts; this is the one approved web_sys/gloo-events exception.
+#[cfg(target_arch = "wasm32")]
+fn wait_for_iframe_bootstrap() -> bool {
+    let Some(window) = web_sys::window() else {
+        return false;
+    };
+    let is_embedded = window
+        .parent()
+        .ok()
+        .flatten()
+        .is_some_and(|parent| !js_sys::Object::is(parent.as_ref(), window.as_ref()));
+    if !is_embedded {
+        return false;
+    }
+
+    IFRAME_BOOTSTRAP_LISTENER.with(|listener_slot| {
+        let listener = EventListener::new(&window, "message", move |event| {
+            let Some(envelope) = event
+                .dyn_ref::<web_sys::MessageEvent>()
+                .and_then(|message: &web_sys::MessageEvent| message.data().as_string())
+                .and_then(|raw| serde_json::from_str::<IframeBootstrapEnvelope>(&raw).ok())
+            else {
+                return;
+            };
+
+            if envelope.kind != IFRAME_BOOTSTRAP_EVENT {
+                return;
+            }
+
+            let already_started = IFRAME_APP_STARTED.with(|started| {
+                if started.get() {
+                    true
+                } else {
+                    started.set(true);
+                    false
+                }
+            });
+            if already_started {
+                return;
+            }
+
+            IFRAME_BOOTSTRAP.with(|bootstrap| {
+                bootstrap.replace(Some(envelope.payload));
+            });
+            dioxus::launch(App);
+        });
+        listener_slot.replace(Some(listener));
+    });
+
+    if let Ok(Some(parent)) = window.parent() {
+        let ready = serde_json::json!({ "type": IFRAME_READY_EVENT }).to_string();
+        let _ = parent.post_message(&wasm_bindgen::JsValue::from_str(&ready), "*");
+    }
+
+    true
+}
 
 #[cfg(target_arch = "wasm32")]
 fn provider_prefix(provider: &lib::ProviderId) -> &'static str {
@@ -33,13 +256,38 @@ fn provider_prefix(provider: &lib::ProviderId) -> &'static str {
 }
 
 fn main() {
+    #[cfg(target_arch = "wasm32")]
+    if wait_for_iframe_bootstrap() {
+        return;
+    }
+
     dioxus::launch(App);
 }
 
 #[component]
 fn App() -> Element {
-    let (threads, chat, tasks, workspace, model, ui, subagents) = default_states();
+    let (threads, chat, tasks, workspace, model, mut ui, background_tasks, mut agent_endpoints) =
+        default_states();
+    let iframe_config = take_iframe_bootstrap();
+    let iframe_agent_endpoints_override = iframe_config
+        .as_ref()
+        .and_then(iframe_agent_endpoints_override);
+    let iframe_dicebear_style_override = iframe_config
+        .as_ref()
+        .and_then(|config| iframe_dicebear_style(&config.dicebear_style));
+    if let Some(iframe_config) = iframe_config {
+        if let Some(theme) = iframe_theme(&iframe_config.theme) {
+            ui.theme = theme;
+        }
+        if let Some(dicebear_style) = iframe_dicebear_style_override.clone() {
+            agent_endpoints.dicebear_style = dicebear_style;
+        }
+        if let Some(endpoints) = iframe_agent_endpoints_override.clone() {
+            agent_endpoints.endpoints = lib::merge_agent_endpoints(endpoints);
+        }
+    }
     let dock_url = lib::utils::app_url("omni-dock.js");
+    let dicebear_url = lib::utils::app_url("omni-dicebear.js");
     let popper_url = lib::utils::app_url("omni-popper.js");
     let monaco_url = lib::utils::app_url("omni-monaco.js");
     let marked_url = lib::utils::app_url("omni-marked.js");
@@ -78,22 +326,45 @@ fn App() -> Element {
     #[cfg(not(target_arch = "wasm32"))]
     use_context_provider(|| Signal::new(model));
 
+    #[cfg(target_arch = "wasm32")]
+    let ui_signal = use_context_provider(|| Signal::new(ui));
+    #[cfg(not(target_arch = "wasm32"))]
     use_context_provider(|| Signal::new(ui));
     #[cfg(target_arch = "wasm32")]
-    let subagent_signal = use_context_provider(|| Signal::new(subagents));
+    let background_task_signal = use_context_provider(|| Signal::new(background_tasks));
     #[cfg(not(target_arch = "wasm32"))]
-    use_context_provider(|| Signal::new(subagents));
+    use_context_provider(|| Signal::new(background_tasks));
+
+    #[cfg(target_arch = "wasm32")]
+    let agent_endpoint_signal = use_context_provider(|| Signal::new(agent_endpoints));
+    #[cfg(not(target_arch = "wasm32"))]
+    use_context_provider(|| Signal::new(agent_endpoints));
+
+    #[cfg(target_arch = "wasm32")]
+    install_iframe_runtime_listener(ui_signal, agent_endpoint_signal);
 
     #[cfg(target_arch = "wasm32")]
     use_future(move || {
-        lib::async_init(
-            thread_signal,
-            chat_signal,
-            tasks_signal,
-            workspace_signal,
-            model_signal,
-            subagent_signal,
-        )
+        let iframe_agent_endpoints_override = iframe_agent_endpoints_override.clone();
+        let iframe_dicebear_style_override = iframe_dicebear_style_override.clone();
+        async move {
+            lib::async_init(
+                thread_signal,
+                chat_signal,
+                tasks_signal,
+                workspace_signal,
+                model_signal,
+                background_task_signal,
+                agent_endpoint_signal,
+                iframe_agent_endpoints_override,
+                iframe_dicebear_style_override.clone(),
+            )
+            .await;
+
+            if let Some(dicebear_style) = iframe_dicebear_style_override {
+                let _ = lib::sw_api::set_agent_rail_style(&dicebear_style).await;
+            }
+        }
     });
 
     rsx! {
@@ -107,6 +378,7 @@ fn App() -> Element {
             @font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:700;font-display:swap;src:url('{FONT_BOLD}') format('woff2')}}"
         }
         document::Script { src: dock_url, r#type: "module", defer: true }
+        document::Script { src: dicebear_url, r#type: "module", defer: true }
         document::Script { src: popper_url, r#type: "module", defer: true }
         document::Script { src: monaco_url, r#type: "module", defer: true }
         document::Script { src: marked_url, r#type: "module", defer: true }
@@ -144,7 +416,7 @@ pub fn AppLayout() -> Element {
         json!({"id":"chat","slot":"chat","title":"Chat","position":{"referencePanel":"sidebar","direction":"right"}}),
         json!({"id":"tasks","slot":"tasks","title":"Tasks","position":{"referencePanel":"chat","direction":"right"}}),
         json!({"id":"files","slot":"files","title":"Files","position":{"referencePanel":"tasks","direction":"below"}}),
-        json!({"id":"agents","slot":"agents","title":"Agents","position":{"referencePanel":"files","direction":"below"}}),
+        json!({"id":"bg-tasks","slot":"bg-tasks","title":"Background Tasks","position":{"referencePanel":"files","direction":"below"}}),
     ];
     for path in &open_tabs {
         if path.as_str() != "chat" {
@@ -167,10 +439,11 @@ pub fn AppLayout() -> Element {
 
     rsx! {
         div {
-            class: "h-screen w-screen overflow-hidden bg-background text-foreground",
+            class: "h-screen w-screen overflow-hidden bg-background text-foreground flex",
             "data-theme": theme,
+            AgentRail {}
             omni-dock {
-                class: "h-screen w-screen",
+                class: "min-w-0 flex-1 h-screen",
                 "data-panels": panel_config,
                 "data-active-panel": active_panel.clone(),
                 "data-proportions": "20,60,20",
@@ -195,7 +468,7 @@ pub fn AppLayout() -> Element {
                 }
                 div { slot: "tasks", class: "h-full w-full overflow-auto", TasksSection {} }
                 div { slot: "files", class: "h-full w-full overflow-auto", FilesSection {} }
-                div { slot: "agents", class: "h-full w-full overflow-auto", AgentsSection {} }
+                div { slot: "bg-tasks", class: "h-full w-full overflow-auto", BackgroundTasksSection {} }
                 for path in open_tabs.iter().filter(|p| p.as_str() != "chat") {
                     {
                         let gen = workspace_state.read().tab_generation.get(path).copied().unwrap_or(0);

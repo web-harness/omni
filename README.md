@@ -6,6 +6,7 @@ Omni is a harness that stays out of your way, compatible with LangGraph Agent Pr
 
 - [structure](#structure)
 - [development](#development)
+- [harness](#harness)
 - [runtime](#runtime)
 - [status](#status)
 
@@ -36,6 +37,12 @@ npm run format
 # build for production
 npm run build
 ```
+
+## harness
+
+Harness design in Omni is such that you can work with individual LangGraph agents in isolation, or use the full harness (Main Agent) with a central Deep Agent, which can manage multiple agents, perform routing, handle tools, and resources. The harness provides a flexible environment for the Main Agent to operate in, with features like file system access, sandboxed shell access, and a variety of viewers for different content types.
+
+Individual LangGraph agents will be limited to their own context and resources, while the Main Agent can have broader access and control. This allows for a modular approach to building agent-based applications, where you can have specialized agents for specific tasks, and a central agent that orchestrates everything.
 
 ## runtime
 

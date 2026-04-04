@@ -6,6 +6,10 @@ export type AgentConfig = {
   apiKey: string;
 };
 
+const ALLOWED_DICEBEAR_STYLES = new Set(["bottts-neutral", "thumbs"]);
+const IFRAME_BOOTSTRAP_EVENT = "omni-iframe-config";
+const IFRAME_READY_EVENT = "omni-iframe-ready";
+
 @customElement("omni-harness")
 export class OmniHarness extends LitElement {
   static styles = css`
@@ -25,27 +29,76 @@ export class OmniHarness extends LitElement {
   @property({ type: Array }) agents: AgentConfig[] = [];
   @property({ type: String }) src = "http://127.0.0.1:8080";
   @property({ type: String }) theme: "light" | "dark" = "dark";
+  @property({ type: String }) dicebearStyle = "bottts-neutral";
+
+  private sendBootstrap(): void {
+    const iframe = this.renderRoot.querySelector("iframe");
+    iframe?.contentWindow?.postMessage(this.bootstrapPayload, this.iframeOrigin);
+  }
+
+  private readonly handleFrameLoad = () => {
+    this.sendBootstrap();
+  };
+
+  private readonly handleWindowMessage = (event: MessageEvent) => {
+    if (event.origin !== this.iframeOrigin || typeof event.data !== "string") {
+      return;
+    }
+
+    let envelope: { type?: string } | null = null;
+    try {
+      envelope = JSON.parse(event.data) as { type?: string };
+    } catch {
+      return;
+    }
+
+    if (envelope?.type !== IFRAME_READY_EVENT) {
+      return;
+    }
+
+    this.sendBootstrap();
+  };
 
   private get iframeSrc(): string {
-    const url = new URL(this.src, window.location.href);
-    url.searchParams.set("theme", this.theme);
-    return url.toString();
+    return new URL(this.src, window.location.href).toString();
   }
 
-  private onLoad(e: Event) {
-    const iframe = e.target as HTMLIFrameElement;
-    iframe.contentWindow?.postMessage({ type: "omni-config", agents: this.agents, theme: this.theme }, "*");
+  private get bootstrapPayload(): string {
+    return JSON.stringify({
+      type: IFRAME_BOOTSTRAP_EVENT,
+      payload: {
+        theme: this.theme,
+        dicebearStyle: ALLOWED_DICEBEAR_STYLES.has(this.dicebearStyle) ? this.dicebearStyle : "bottts-neutral",
+        agents: this.agents,
+      },
+    });
   }
 
-  updated(changedProps: Map<string, unknown>) {
-    if (changedProps.has("theme") || changedProps.has("agents")) {
-      const iframe = this.shadowRoot?.querySelector("iframe");
-      iframe?.contentWindow?.postMessage({ type: "omni-config", agents: this.agents, theme: this.theme }, "*");
+  private get iframeOrigin(): string {
+    return new URL(this.src, window.location.href).origin;
+  }
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    window.addEventListener("message", this.handleWindowMessage);
+  }
+
+  disconnectedCallback(): void {
+    window.removeEventListener("message", this.handleWindowMessage);
+    super.disconnectedCallback();
+  }
+
+  protected updated(changedProperties: Map<PropertyKey, unknown>): void {
+    if (
+      !changedProperties.has("src") &&
+      (changedProperties.has("theme") || changedProperties.has("dicebearStyle") || changedProperties.has("agents"))
+    ) {
+      this.sendBootstrap();
     }
   }
 
   render() {
-    return html`<iframe src=${this.iframeSrc} @load=${this.onLoad}></iframe>`;
+    return html`<iframe src=${this.iframeSrc} @load=${this.handleFrameLoad}></iframe>`;
   }
 }
 

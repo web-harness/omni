@@ -3,14 +3,16 @@ use dioxus_free_icons::icons::ld_icons::{LdCircleDot, LdGitBranch};
 use dioxus_free_icons::Icon;
 
 use crate::lib::utils::relative_time;
-use crate::lib::{SubagentState, SubagentStatus, ThreadState, ThreadStatus, UiThread};
+use crate::lib::{
+    BackgroundTask, BackgroundTaskState, BackgroundTaskStatus, ThreadState, ThreadStatus, UiThread,
+};
 use crate::routes::Route;
 
 #[component]
 pub fn KanbanView() -> Element {
     let thread_state = use_context::<Signal<ThreadState>>();
-    let subagent_state = use_context::<Signal<SubagentState>>();
-    let show_subagents = use_signal(|| true);
+    let background_task_state = use_context::<Signal<BackgroundTaskState>>();
+    let show_background_tasks = use_signal(|| true);
 
     let mut pending = vec![];
     let mut progress = vec![];
@@ -31,23 +33,23 @@ pub fn KanbanView() -> Element {
         .active_thread_id
         .clone()
         .unwrap_or_default();
-    let agents = subagent_state.read().subagents_for(&tid);
+    let tasks = background_task_state.read().tasks_for(&tid);
 
     rsx! {
         div { class: "flex h-full min-h-0 flex-col",
-            KanbanHeader { show_subagents }
+            KanbanHeader { show_background_tasks }
             div { class: "grid min-h-0 flex-1 grid-cols-4 gap-3 overflow-auto p-3",
                 KanbanColumn { title: "PENDING".to_string(), tone: "border-border".to_string(), threads: pending }
                 KanbanColumn { title: "IN PROGRESS".to_string(), tone: "border-status-info".to_string(), threads: progress }
                 KanbanColumn { title: "BLOCKED".to_string(), tone: "border-status-warning".to_string(), threads: blocked }
                 KanbanColumn { title: "DONE".to_string(), tone: "border-status-nominal".to_string(), threads: done }
             }
-            if show_subagents() {
+            if show_background_tasks() {
                 div { class: "border-t border-border px-3 py-2",
-                    div { class: "mb-2 text-[10px] font-semibold text-muted-foreground", "SUBAGENTS" }
+                    div { class: "mb-2 text-[10px] font-semibold text-muted-foreground", "BACKGROUND TASKS" }
                     div { class: "grid grid-cols-2 gap-2",
-                        for agent in agents {
-                            SubagentKanbanCard { key: "{agent.id}", agent }
+                        for task in tasks {
+                            BackgroundTaskKanbanCard { key: "{task.id}", task }
                         }
                     }
                 }
@@ -57,7 +59,7 @@ pub fn KanbanView() -> Element {
 }
 
 #[component]
-pub fn KanbanHeader(show_subagents: Signal<bool>) -> Element {
+pub fn KanbanHeader(show_background_tasks: Signal<bool>) -> Element {
     let thread_state = use_context::<Signal<ThreadState>>();
     let active = thread_state
         .read()
@@ -65,10 +67,10 @@ pub fn KanbanHeader(show_subagents: Signal<bool>) -> Element {
         .iter()
         .filter(|t| matches!(t.status, ThreadStatus::Busy))
         .count();
-    let toggle_label = if show_subagents() {
-        "Hide Subagents"
+    let toggle_label = if show_background_tasks() {
+        "Hide Background Tasks"
     } else {
-        "Show Subagents"
+        "Show Background Tasks"
     };
 
     rsx! {
@@ -79,7 +81,7 @@ pub fn KanbanHeader(show_subagents: Signal<bool>) -> Element {
             }
             button {
                 class: "rounded-sm border border-border px-2 py-1 text-[11px]",
-                onclick: move |_| show_subagents.set(!show_subagents()),
+                onclick: move |_| show_background_tasks.set(!show_background_tasks()),
                 "{toggle_label}"
             }
         }
@@ -126,22 +128,22 @@ pub fn KanbanCard(thread: UiThread) -> Element {
 }
 
 #[component]
-pub fn SubagentKanbanCard(agent: crate::lib::Subagent) -> Element {
-    let tone = match agent.status {
-        SubagentStatus::Running => "text-status-info",
-        SubagentStatus::Completed => "text-status-nominal",
-        SubagentStatus::Failed => "text-status-critical",
-        SubagentStatus::Pending => "text-status-warning",
+pub fn BackgroundTaskKanbanCard(task: BackgroundTask) -> Element {
+    let tone = match task.status {
+        BackgroundTaskStatus::Running => "text-status-info",
+        BackgroundTaskStatus::Completed => "text-status-nominal",
+        BackgroundTaskStatus::Failed => "text-status-critical",
+        BackgroundTaskStatus::Pending => "text-status-warning",
     };
 
     rsx! {
         div { class: "rounded-sm border border-dashed border-border px-2 py-2",
             div { class: "inline-flex items-center gap-2 text-[11px] {tone}",
                 Icon { width: 12, height: 12, icon: LdGitBranch }
-                omni-text { "data-text": "{agent.name}", "data-strategy": "truncate", "data-max-lines": "1", class: "text-[11px]" }
+                omni-text { "data-text": "{task.name}", "data-strategy": "truncate", "data-max-lines": "1", class: "text-[11px]" }
             }
             omni-text {
-                "data-text": "{agent.description}",
+                "data-text": "{task.description}",
                 "data-strategy": "truncate",
                 "data-max-lines": "2",
                 class: "text-[10px] text-muted-foreground",

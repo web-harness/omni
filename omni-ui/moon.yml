@@ -7,6 +7,7 @@ dependsOn:
   - omni-deepagents
   - omni-util
   - omni-docxjs
+  - omni-dicebear
   - omni-dock
   - omni-marked
   - omni-monaco
@@ -32,6 +33,7 @@ tasks:
     deps:
       - omni-util:build
       - omni-docxjs:build
+      - omni-dicebear:build
       - omni-dock:build
       - omni-popper:build
       - omni-marked:build
@@ -82,6 +84,7 @@ tasks:
       - omni-zenfs:build-wasm
       - omni-util:watch
       - omni-docxjs:watch
+      - omni-dicebear:watch
       - omni-dock:watch
       - omni-popper:watch
       - omni-monaco:watch

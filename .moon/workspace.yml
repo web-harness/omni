@@ -10,6 +10,7 @@ projects:
   omni-deepagents: omni-rt/crates/omni-deepagents
   omni-util: omni-rt/packages/omni-util
   omni-docxjs: omni-rt/packages/omni-docxjs
+  omni-dicebear: omni-rt/packages/omni-dicebear
   omni-dock: omni-rt/packages/omni-dock
   omni-marked: omni-rt/packages/omni-marked
   omni-monaco: omni-rt/packages/omni-monaco

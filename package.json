@@ -7,6 +7,7 @@
     "omni-wc",
     "omni-rt/packages/omni-util",
     "omni-rt/packages/omni-docxjs",
+    "omni-rt/packages/omni-dicebear",
     "omni-rt/packages/omni-dock",
     "omni-rt/packages/omni-marked",
     "omni-rt/packages/omni-monaco",

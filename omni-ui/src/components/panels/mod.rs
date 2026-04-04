@@ -7,7 +7,8 @@ use dioxus_free_icons::Icon;
 use crate::components::ui::{Badge, BadgeVariant};
 use crate::lib::utils::fmt_size;
 use crate::lib::{
-    FileInfo, SubagentState, SubagentStatus, TasksState, ThreadState, TodoStatus, WorkspaceState,
+    BackgroundTaskState, BackgroundTaskStatus, FileInfo, TasksState, ThreadState, TodoStatus,
+    WorkspaceState,
 };
 
 #[component]
@@ -204,29 +205,29 @@ fn FileRow(file: FileInfo, on_open: EventHandler<String>, workspace_root: String
 }
 
 #[component]
-pub fn AgentsSection() -> Element {
+pub fn BackgroundTasksSection() -> Element {
     let thread_state = use_context::<Signal<ThreadState>>();
-    let subagent_state = use_context::<Signal<SubagentState>>();
+    let background_task_state = use_context::<Signal<BackgroundTaskState>>();
     let tid = thread_state
         .read()
         .active_thread_id
         .clone()
         .unwrap_or_default();
-    let subagents = subagent_state.read().subagents_for(&tid);
+    let tasks = background_task_state.read().tasks_for(&tid);
 
     rsx! {
         div { class: "overflow-auto py-1",
-            for agent in subagents {
+            for agent in tasks {
                 div { key: "{agent.id}", class: "px-3 py-2 border-b border-border/50",
                     div { class: "flex items-center gap-2 mb-1",
                         Icon { width: 12, height: 12, icon: LdBot, class: "text-status-info shrink-0" }
                         omni-text { "data-text": "{agent.name}", "data-strategy": "truncate", "data-max-lines": "1", class: "flex-1 text-[11px] font-semibold" }
                         {
                             let (variant, label) = match agent.status {
-                                SubagentStatus::Running => (BadgeVariant::Info, "RUNNING"),
-                                SubagentStatus::Completed => (BadgeVariant::Nominal, "DONE"),
-                                SubagentStatus::Failed => (BadgeVariant::Critical, "FAILED"),
-                                SubagentStatus::Pending => (BadgeVariant::Warning, "PENDING"),
+                                BackgroundTaskStatus::Running => (BadgeVariant::Info, "RUNNING"),
+                                BackgroundTaskStatus::Completed => (BadgeVariant::Nominal, "DONE"),
+                                BackgroundTaskStatus::Failed => (BadgeVariant::Critical, "FAILED"),
+                                BackgroundTaskStatus::Pending => (BadgeVariant::Warning, "PENDING"),
                             };
                             rsx! { Badge { variant, "{label}" } }
                         }

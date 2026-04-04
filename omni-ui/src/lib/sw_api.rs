@@ -1,5 +1,6 @@
 #[cfg(target_arch = "wasm32")]
 use super::utils::app_url;
+use super::AgentEndpoint;
 #[cfg(target_arch = "wasm32")]
 use gloo_net::http::Request;
 #[cfg(target_arch = "wasm32")]
@@ -7,7 +8,8 @@ use serde::Deserialize;
 
 #[cfg(target_arch = "wasm32")]
 use super::{
-    FileInfo, ModelConfig, Provider, Subagent, Todo, ToolCall, ToolResult, UiMessage, UiThread,
+    BackgroundTask, FileInfo, ModelConfig, Provider, Todo, ToolCall, ToolResult, UiMessage,
+    UiThread,
 };
 
 #[cfg(target_arch = "wasm32")]
@@ -22,18 +24,35 @@ pub struct BootstrapPayload {
     pub files: HashMap<String, Vec<FileInfo>>,
     pub tool_calls: HashMap<String, Vec<ToolCall>>,
     pub tool_results: HashMap<String, Vec<ToolResult>>,
-    pub subagents: HashMap<String, Vec<Subagent>>,
+    #[serde(default)]
+    pub background_tasks: HashMap<String, Vec<BackgroundTask>>,
     pub workspace_path: HashMap<String, String>,
     pub workspace_files: HashMap<String, Vec<FileInfo>>,
     pub providers: Vec<Provider>,
     pub models: Vec<ModelConfig>,
     pub default_model: String,
+    #[serde(default = "default_dicebear_style")]
+    pub dicebear_style: String,
+    #[serde(default)]
+    pub agent_endpoints: Vec<AgentEndpoint>,
+}
+
+#[cfg(target_arch = "wasm32")]
+fn default_dicebear_style() -> String {
+    "bottts-neutral".into()
 }
 
 #[cfg(target_arch = "wasm32")]
 #[derive(Deserialize)]
 struct ItemResponse {
     value: serde_json::Value,
+}
+
+#[cfg(target_arch = "wasm32")]
+#[derive(Deserialize)]
+#[allow(dead_code)]
+struct SearchItemsResponse {
+    items: Vec<ItemResponse>,
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -228,6 +247,108 @@ pub async fn delete_api_key(provider: &str) -> Result<(), std::io::Error> {
 }
 
 #[cfg(target_arch = "wasm32")]
+#[allow(dead_code)]
+pub async fn list_agent_endpoints() -> Result<Vec<AgentEndpoint>, std::io::Error> {
+    let response = Request::post(&app_url("store/items/search"))
+        .json(&serde_json::json!({
+            "namespace_prefix": ["config", "agent-endpoints"],
+            "limit": 200,
+            "offset": 0,
+        }))
+        .map_err(err_msg)?
+        .send()
+        .await
+        .map_err(err_msg)?;
+
+    if !response.ok() {
+        return Err(std::io::Error::other(format!(
+            "list agent endpoints failed: {}",
+            response.status()
+        )));
+    }
+
+    let payload = response
+        .json::<SearchItemsResponse>()
+        .await
+        .map_err(err_msg)?;
+    payload
+        .items
+        .into_iter()
+        .map(|item| serde_json::from_value::<AgentEndpoint>(item.value).map_err(err_msg))
+        .collect()
+}
+
+#[cfg(target_arch = "wasm32")]
+pub async fn set_agent_endpoint(endpoint: &AgentEndpoint) -> Result<(), std::io::Error> {
+    let response = Request::put(&app_url("store/items"))
+        .json(&serde_json::json!({
+            "namespace": ["config", "agent-endpoints"],
+            "key": endpoint.id,
+            "value": endpoint,
+        }))
+        .map_err(err_msg)?
+        .send()
+        .await
+        .map_err(err_msg)?;
+
+    if response.ok() {
+        Ok(())
+    } else {
+        Err(std::io::Error::other(format!(
+            "set agent endpoint failed: {}",
+            response.status()
+        )))
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+pub async fn delete_agent_endpoint(id: &str) -> Result<(), std::io::Error> {
+    let response = Request::delete(&app_url("store/items"))
+        .json(&serde_json::json!({
+            "namespace": ["config", "agent-endpoints"],
+            "key": id,
+        }))
+        .map_err(err_msg)?
+        .send()
+        .await
+        .map_err(err_msg)?;
+
+    if response.ok() {
+        Ok(())
+    } else {
+        Err(std::io::Error::other(format!(
+            "delete agent endpoint failed: {}",
+            response.status()
+        )))
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+pub async fn set_agent_rail_style(style: &str) -> Result<(), std::io::Error> {
+    let response = Request::put(&app_url("store/items"))
+        .json(&serde_json::json!({
+            "namespace": ["config", "agent-rail"],
+            "key": "dicebear-style",
+            "value": {
+                "style": style,
+            },
+        }))
+        .map_err(err_msg)?
+        .send()
+        .await
+        .map_err(err_msg)?;
+
+    if response.ok() {
+        Ok(())
+    } else {
+        Err(std::io::Error::other(format!(
+            "set agent rail style failed: {}",
+            response.status()
+        )))
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
 pub async fn list_providers_with_keys() -> Result<Vec<Provider>, std::io::Error> {
     let response = Request::get(&app_url("x/providers"))
         .send()
@@ -306,5 +427,29 @@ pub async fn list_workspace_files(workspace: &str) -> Result<Vec<super::FileInfo
 pub async fn list_workspace_files(
     _workspace: &str,
 ) -> Result<Vec<super::FileInfo>, std::io::Error> {
+    Err(unavailable())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
+pub async fn list_agent_endpoints() -> Result<Vec<AgentEndpoint>, std::io::Error> {
+    Err(unavailable())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
+pub async fn set_agent_endpoint(_endpoint: &AgentEndpoint) -> Result<(), std::io::Error> {
+    Err(unavailable())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
+pub async fn delete_agent_endpoint(_id: &str) -> Result<(), std::io::Error> {
+    Err(unavailable())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
+pub async fn set_agent_rail_style(_style: &str) -> Result<(), std::io::Error> {
     Err(unavailable())
 }

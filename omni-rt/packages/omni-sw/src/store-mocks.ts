@@ -12,6 +12,47 @@ export type SeedThread = {
     status: "pending" | "running" | "completed" | "failed";
   }>;
 };
+
+export type AgentEndpoint = {
+  id: string;
+  url: string;
+  bearer_token: string;
+  name: string;
+  removable: boolean;
+};
+
+const FNV_OFFSET_BASIS = 0xcbf29ce484222325n;
+const FNV_PRIME = 0x100000001b3n;
+const FNV_MASK = 0xffffffffffffffffn;
+
+export function hashAgentConfig(url: string, bearerToken: string): string {
+  const bytes = new TextEncoder().encode(`${url}\0${bearerToken}`);
+  let hash = FNV_OFFSET_BASIS;
+  for (const byte of bytes) {
+    hash ^= BigInt(byte);
+    hash = (hash * FNV_PRIME) & FNV_MASK;
+  }
+  return hash.toString(16).padStart(16, "0");
+}
+
+export function seedAgentEndpoints(): AgentEndpoint[] {
+  return [
+    {
+      id: hashAgentConfig("https://agent.example.com/api", "sk-mock-1"),
+      url: "https://agent.example.com/api",
+      bearer_token: "sk-mock-1",
+      name: "Research Agent",
+      removable: true,
+    },
+    {
+      id: hashAgentConfig("https://agent2.example.com/api", "sk-mock-2"),
+      url: "https://agent2.example.com/api",
+      bearer_token: "sk-mock-2",
+      name: "Code Review Agent",
+      removable: true,
+    },
+  ];
+}
 export const MOCK_THREAD_IDS = {
   gtd: "11111111-1111-4111-8111-111111111111",
   auth: "22222222-2222-4222-8222-222222222222",
@@ -91,7 +132,7 @@ export function seedThreads(): SeedThread[] {
     {
       id: "sa-1",
       name: "Spec Auditor",
-      description: "Cross-checks implementation against phase plan",
+      description: "Cross-checks implementation against the phase plan",
       status: "running",
     },
     {
@@ -118,9 +159,17 @@ export function seedThreads(): SeedThread[] {
         },
       ],
       todos: [
-        { id: "t1", content: "Research GTD (Getting Things Done) methodology using subagent", status: "in_progress" },
-        { id: "t2", content: "Research Kanban methodology using subagent", status: "in_progress" },
-        { id: "t3", content: "Research Chaos Mode (random prioritization) approach using subagent", status: "pending" },
+        {
+          id: "t1",
+          content: "Research GTD (Getting Things Done) methodology using a background task",
+          status: "in_progress",
+        },
+        { id: "t2", content: "Research Kanban methodology using a background task", status: "in_progress" },
+        {
+          id: "t3",
+          content: "Research Chaos Mode (random prioritization) approach using a background task",
+          status: "pending",
+        },
         {
           id: "t4",
           content: "Design data structure and API endpoints for three todo management systems",

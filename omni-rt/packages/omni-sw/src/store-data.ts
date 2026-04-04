@@ -31,11 +31,15 @@ import {
   getMockToolCalls,
   getMockToolResults,
   getMockWorkspaceFiles,
+  seedAgentEndpoints,
   seedThreads,
 } from "./store-mocks.js";
 
 const TODOS_DIR = "/home/db/todos";
 const SUBAGENTS_DIR = "/home/db/subagents";
+const AGENT_ENDPOINTS_DIR = "/home/store/config/agent-endpoints";
+const AGENT_RAIL_DIR = "/home/store/config/agent-rail";
+const ALLOWED_DICEBEAR_STYLES = new Set(["bottts-neutral", "thumbs"]);
 export const DEFAULT_THREAD_TITLE = "New Thread";
 
 type ProviderId = "Anthropic" | "OpenAI" | "Google" | "Ollama";
@@ -47,12 +51,20 @@ export type BootstrapPayload = {
   files: Record<string, Array<{ path: string; is_dir: boolean; size: number | null }>>;
   tool_calls: Record<string, Array<{ id: string; name: string; args: unknown }>>;
   tool_results: Record<string, Array<{ tool_call_id: string; content: string; is_error: boolean }>>;
-  subagents: Record<string, Array<{ id: string; name: string; description: string; status: string }>>;
+  background_tasks: Record<string, Array<{ id: string; name: string; description: string; status: string }>>;
   workspace_path: Record<string, string>;
   workspace_files: Record<string, Array<{ path: string; is_dir: boolean; size: number | null }>>;
   providers: Array<{ id: ProviderId; name: string; has_api_key: boolean }>;
   models: Array<{ id: string; name: string; provider: ProviderId }>;
   default_model: string;
+  dicebear_style: string;
+  agent_endpoints: Array<{
+    id: string;
+    url: string;
+    bearer_token: string;
+    name: string;
+    removable: boolean;
+  }>;
 };
 
 type DirEntry = { name: string; is_dir: boolean; is_file: boolean };
@@ -260,6 +272,31 @@ async function seedIfEmpty(): Promise<void> {
   }
 
   await ensureWorkspaceScaffold();
+  await seedMockAgentEndpoints();
+}
+
+async function seedMockAgentEndpoints(): Promise<void> {
+  await zenMkdir(AGENT_ENDPOINTS_DIR, { recursive: true });
+  const entries = (await zenReadDir(AGENT_ENDPOINTS_DIR).catch(() => [])) as DirEntry[];
+  if (entries.some((entry) => String(entry.name ?? "").endsWith(".json"))) {
+    return;
+  }
+
+  const now = new Date().toISOString();
+  for (const endpoint of seedAgentEndpoints()) {
+    await zenWriteFile(
+      `${AGENT_ENDPOINTS_DIR}/${endpoint.id}.json`,
+      encoder.encode(
+        JSON.stringify({
+          namespace: ["config", "agent-endpoints"],
+          key: endpoint.id,
+          value: endpoint,
+          created_at: now,
+          updated_at: now,
+        }),
+      ),
+    );
+  }
 }
 
 async function ensureWorkspaceScaffold(): Promise<void> {
@@ -342,7 +379,7 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
     })
     .filter((t) => t.id.length > 0)
     .sort((a, b) => {
-      const order = [
+      const order: string[] = [
         MOCK_THREAD_IDS.gtd,
         MOCK_THREAD_IDS.auth,
         MOCK_THREAD_IDS.db,
@@ -362,9 +399,27 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
   const files: BootstrapPayload["files"] = {};
   const tool_calls: BootstrapPayload["tool_calls"] = {};
   const tool_results: BootstrapPayload["tool_results"] = {};
-  const subagents: BootstrapPayload["subagents"] = {};
+  const background_tasks: BootstrapPayload["background_tasks"] = {};
   const workspace_path: BootstrapPayload["workspace_path"] = {};
   const workspace_files = getMockWorkspaceFiles();
+  const railStyleItem = (await readJson(`${AGENT_RAIL_DIR}/dicebear-style.json`)) as Record<string, unknown> | null;
+  const storedDicebearStyle = String(
+    (railStyleItem?.value as Record<string, unknown> | undefined)?.style ?? railStyleItem?.style ?? "bottts-neutral",
+  );
+  const dicebearStyle = ALLOWED_DICEBEAR_STYLES.has(storedDicebearStyle) ? storedDicebearStyle : "bottts-neutral";
+  const agentEndpoints = (await readJsonFiles(AGENT_ENDPOINTS_DIR))
+    .map((row) => {
+      const rec = row as Record<string, unknown>;
+      const value = (rec.value as Record<string, unknown> | undefined) ?? rec;
+      return {
+        id: String(value.id ?? ""),
+        url: String(value.url ?? ""),
+        bearer_token: String(value.bearer_token ?? ""),
+        name: String(value.name ?? ""),
+        removable: value.removable !== false,
+      };
+    })
+    .filter((endpoint) => endpoint.id.length > 0 && endpoint.removable);
 
   const seedById = new Map(seedThreads().map((t) => [t.id, t]));
 
@@ -422,7 +477,7 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
         status: toSubagentStatus(s.status),
       }));
     }
-    subagents[thread.id] = parsedSubagents;
+    background_tasks[thread.id] = parsedSubagents;
 
     files[thread.id] = getMockThreadFiles(thread.id);
     tool_calls[thread.id] = getMockToolCalls(thread.id);
@@ -440,12 +495,14 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
     files,
     tool_calls,
     tool_results,
-    subagents,
+    background_tasks,
     workspace_path,
     workspace_files,
     providers,
     models,
     default_model: defaultModel,
+    dicebear_style: dicebearStyle,
+    agent_endpoints: agentEndpoints,
   };
 }
 

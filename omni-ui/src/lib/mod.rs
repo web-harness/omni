@@ -34,7 +34,7 @@ pub enum TodoStatus {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum SubagentStatus {
+pub enum BackgroundTaskStatus {
     Pending,
     Running,
     Completed,
@@ -79,11 +79,20 @@ pub struct FileInfo {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Subagent {
+pub struct BackgroundTask {
     pub id: String,
     pub name: String,
     pub description: String,
-    pub status: SubagentStatus,
+    pub status: BackgroundTaskStatus,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AgentEndpoint {
+    pub id: String,
+    pub url: String,
+    pub bearer_token: String,
+    pub name: String,
+    pub removable: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -249,14 +258,132 @@ pub struct UiState {
 }
 
 #[derive(Clone, PartialEq)]
-pub struct SubagentState {
-    pub subagents: HashMap<String, Vec<Subagent>>,
+pub struct BackgroundTaskState {
+    pub background_tasks: HashMap<String, Vec<BackgroundTask>>,
     pub pending_hitl: Option<HITLRequest>,
 }
 
-impl SubagentState {
-    pub fn subagents_for(&self, thread_id: &str) -> Vec<Subagent> {
-        self.subagents.get(thread_id).cloned().unwrap_or_default()
+impl BackgroundTaskState {
+    pub fn tasks_for(&self, thread_id: &str) -> Vec<BackgroundTask> {
+        self.background_tasks
+            .get(thread_id)
+            .cloned()
+            .unwrap_or_default()
+    }
+}
+
+#[derive(Clone, PartialEq)]
+pub struct AgentEndpointState {
+    pub endpoints: Vec<AgentEndpoint>,
+    pub active_agent_id: Option<String>,
+    pub dicebear_style: String,
+}
+
+impl AgentEndpointState {
+    pub fn ordered(&self) -> Vec<&AgentEndpoint> {
+        let mut endpoints: Vec<_> = self
+            .endpoints
+            .iter()
+            .filter(|endpoint| !endpoint.removable)
+            .collect();
+        endpoints.extend(self.endpoints.iter().filter(|endpoint| endpoint.removable));
+        endpoints
+    }
+
+    pub fn active_endpoint(&self) -> Option<&AgentEndpoint> {
+        match &self.active_agent_id {
+            Some(id) => self.endpoints.iter().find(|endpoint| endpoint.id == *id),
+            None => self.endpoints.iter().find(|endpoint| !endpoint.removable),
+        }
+    }
+
+    pub fn upsert(&mut self, endpoint: AgentEndpoint) {
+        if let Some(existing) = self
+            .endpoints
+            .iter_mut()
+            .find(|item| item.id == endpoint.id)
+        {
+            *existing = endpoint;
+            return;
+        }
+        self.endpoints.push(endpoint);
+    }
+
+    pub fn remove(&mut self, id: &str) {
+        self.endpoints
+            .retain(|endpoint| endpoint.id != id || !endpoint.removable);
+        if self.active_agent_id.as_deref() == Some(id) {
+            self.active_agent_id = None;
+        }
+    }
+}
+
+const FNV_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
+const FNV_PRIME: u64 = 0x100000001b3;
+
+fn stable_hash_bytes(bytes: &[u8]) -> u64 {
+    let mut hash = FNV_OFFSET_BASIS;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+    hash
+}
+
+pub fn agent_config_hash(url: &str, bearer_token: &str) -> String {
+    let mut bytes = Vec::with_capacity(url.len() + bearer_token.len() + 1);
+    bytes.extend_from_slice(url.as_bytes());
+    bytes.push(0);
+    bytes.extend_from_slice(bearer_token.as_bytes());
+    format!("{:016x}", stable_hash_bytes(&bytes))
+}
+
+pub fn derive_agent_name(url: &str) -> String {
+    let trimmed = url.trim();
+    if trimmed.is_empty() {
+        return "Agent".into();
+    }
+
+    let without_scheme = trimmed
+        .split_once("://")
+        .map(|(_, rest)| rest)
+        .unwrap_or(trimmed);
+    let host = without_scheme.split('/').next().unwrap_or(trimmed).trim();
+    if host.is_empty() {
+        "Agent".into()
+    } else {
+        host.into()
+    }
+}
+
+pub fn builtin_main_agent() -> AgentEndpoint {
+    AgentEndpoint {
+        id: "main".into(),
+        url: String::new(),
+        bearer_token: String::new(),
+        name: "Main Agent".into(),
+        removable: false,
+    }
+}
+
+pub fn merge_agent_endpoints(endpoints: Vec<AgentEndpoint>) -> Vec<AgentEndpoint> {
+    let mut merged = vec![builtin_main_agent()];
+    for endpoint in endpoints {
+        if endpoint.id == "main" || !endpoint.removable {
+            continue;
+        }
+        if merged.iter().any(|item| item.id == endpoint.id) {
+            continue;
+        }
+        merged.push(endpoint);
+    }
+    merged
+}
+
+pub fn normalize_dicebear_style(style: &str) -> String {
+    match style.trim() {
+        "thumbs" => "thumbs".into(),
+        _ => "bottts-neutral".into(),
     }
 }
 
@@ -349,20 +476,9 @@ pub fn default_states() -> (
     WorkspaceState,
     ModelState,
     UiState,
-    SubagentState,
+    BackgroundTaskState,
+    AgentEndpointState,
 ) {
-    #[cfg(target_arch = "wasm32")]
-    let initial_theme = {
-        let search = web_sys::window()
-            .and_then(|w| w.location().search().ok())
-            .unwrap_or_default();
-        if search.contains("theme=light") {
-            Theme::Light
-        } else {
-            Theme::Dark
-        }
-    };
-    #[cfg(not(target_arch = "wasm32"))]
     let initial_theme = Theme::Dark;
 
     (
@@ -403,9 +519,14 @@ pub fn default_states() -> (
             api_key_provider: ProviderId::Anthropic,
             api_key_draft: String::new(),
         },
-        SubagentState {
-            subagents: HashMap::new(),
+        BackgroundTaskState {
+            background_tasks: HashMap::new(),
             pending_hitl: None,
+        },
+        AgentEndpointState {
+            endpoints: vec![builtin_main_agent()],
+            active_agent_id: None,
+            dicebear_style: normalize_dicebear_style("bottts-neutral"),
         },
     )
 }
@@ -417,7 +538,10 @@ pub async fn async_init(
     mut tasks_state: dioxus::prelude::Signal<TasksState>,
     mut workspace_state: dioxus::prelude::Signal<WorkspaceState>,
     mut model_state: dioxus::prelude::Signal<ModelState>,
-    mut subagent_state: dioxus::prelude::Signal<SubagentState>,
+    mut background_task_state: dioxus::prelude::Signal<BackgroundTaskState>,
+    mut agent_endpoint_state: dioxus::prelude::Signal<AgentEndpointState>,
+    iframe_agent_endpoints: Option<Vec<AgentEndpoint>>,
+    iframe_dicebear_style: Option<String>,
 ) {
     use dioxus::signals::{ReadableExt, WritableExt};
     use gloo_timers::future::TimeoutFuture;
@@ -488,8 +612,16 @@ pub async fn async_init(
         tsk.tool_results = payload.tool_results;
     }
     {
-        let mut ss = subagent_state.write();
-        ss.subagents = payload.subagents;
+        let mut task_state = background_task_state.write();
+        task_state.background_tasks = payload.background_tasks;
+    }
+    {
+        let mut endpoints = agent_endpoint_state.write();
+        endpoints.endpoints = iframe_agent_endpoints
+            .map(merge_agent_endpoints)
+            .unwrap_or_else(|| merge_agent_endpoints(payload.agent_endpoints));
+        endpoints.dicebear_style = iframe_dicebear_style
+            .unwrap_or_else(|| normalize_dicebear_style(&payload.dicebear_style));
     }
     model_state.write().selected_model = selected_model;
 

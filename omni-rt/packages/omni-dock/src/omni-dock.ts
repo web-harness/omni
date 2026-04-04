@@ -18,7 +18,7 @@ import type {
 
 const loadDockviewModule = createCachedLoader(() => import("dockview-core"));
 
-const PERMANENT_PANELS = new Set(["sidebar", "chat", "tasks", "files", "agents"]);
+const PERMANENT_PANELS = new Set(["sidebar", "chat", "tasks", "files", "bg-tasks"]);
 
 type PanelSpec = {
   id: string;

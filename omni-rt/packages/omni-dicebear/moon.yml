@@ -1,0 +1,49 @@
+language: typescript
+layer: library
+stack: frontend
+
+tasks:
+  clean-public:
+    command: shx
+    args:
+      - rm
+      - -f
+      - ../../../omni-ui/public/omni-dicebear.js
+      - ../../../omni-ui/public/omni-dicebear-*.js
+    inputs:
+      - '@group(configs)'
+    options:
+      internal: true
+  build:
+    command: esbuild
+    args:
+      - src/omni-dicebear.ts
+      - --bundle
+      - --format=esm
+      - --splitting
+      - --outdir=../../../omni-ui/public
+      - --entry-names=omni-dicebear
+      - --chunk-names=omni-dicebear-[name]-[hash]
+    deps:
+      - omni-util:build
+      - clean-public
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+  watch:
+    command: esbuild
+    args:
+      - src/omni-dicebear.ts
+      - --bundle
+      - --format=esm
+      - --splitting
+      - --outdir=../../../omni-ui/public
+      - --entry-names=omni-dicebear
+      - --chunk-names=omni-dicebear-[name]-[hash]
+      - --watch
+    deps:
+      - omni-util:build
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+    preset: server
