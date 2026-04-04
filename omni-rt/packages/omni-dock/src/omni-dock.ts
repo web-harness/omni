@@ -16,8 +16,6 @@ import type {
   TabPartInitParameters,
 } from "dockview-core";
 
-type DockviewModule = typeof import("dockview-core");
-
 const loadDockviewModule = createCachedLoader(() => import("dockview-core"));
 
 const PERMANENT_PANELS = new Set(["sidebar", "chat", "tasks", "files", "agents"]);

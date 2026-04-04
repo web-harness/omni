@@ -59,7 +59,7 @@ jobs:
         run: npm ci
 
       - name: Build Pages artifacts with moon
-        run: npx moon run omni-ui:build-pages omni-wc:build-pages
+        run: npm run build:pages -- --force
 
       - name: Assemble deploy directory
         run: |

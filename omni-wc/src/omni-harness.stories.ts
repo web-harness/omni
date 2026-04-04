@@ -10,6 +10,9 @@ const meta: Meta<OmniHarness> = {
   title: "Components/OmniHarness",
   component: "omni-harness",
   tags: ["autodocs"],
+  parameters: {
+    layout: "fullscreen",
+  },
   argTypes: {
     src: { control: "text" },
     theme: { control: { type: "select" }, options: ["dark", "light"] },
@@ -28,7 +31,7 @@ export const Default: Story = {
   },
   render: (args) => html`
     <omni-harness
-      style="display:block;width:100%;height:600px;"
+      style="display:block;width:100%;height:100vh;"
       .agents=${args.agents}
       src=${args.src}
       theme=${args.theme}
@@ -47,7 +50,7 @@ export const Light: Story = {
   },
   render: (args) => html`
     <omni-harness
-      style="display:block;width:100%;height:600px;"
+      style="display:block;width:100%;height:100vh;"
       .agents=${args.agents}
       src=${args.src}
       theme=${args.theme}
