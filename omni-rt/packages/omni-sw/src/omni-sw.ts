@@ -21,6 +21,8 @@ type RuntimeModule = {
 
 let runtimeModulePromise: Promise<RuntimeModule> | null = null;
 
+const ROUTE_ROOTS = new Set(["agents", "threads", "store", "x", "runs"]);
+
 function loadRuntimeModule(): Promise<RuntimeModule> {
   if (!runtimeModulePromise) {
     runtimeModulePromise = import("./agent/runtime.js") as Promise<RuntimeModule>;
@@ -28,8 +30,14 @@ function loadRuntimeModule(): Promise<RuntimeModule> {
   return runtimeModulePromise;
 }
 
-export function matchRunRoute(request: Request): RunRoute {
+function routeParts(request: Request): string[] {
   const parts = new URL(request.url).pathname.split("/").filter(Boolean);
+  const rootIndex = parts.findIndex((part) => ROUTE_ROOTS.has(part));
+  return rootIndex >= 0 ? parts.slice(rootIndex) : parts;
+}
+
+export function matchRunRoute(request: Request): RunRoute {
+  const parts = routeParts(request);
   if (parts[0] !== "runs") {
     return null;
   }

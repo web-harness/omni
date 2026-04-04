@@ -52,6 +52,7 @@ const RUN_STATUSES = new Set<PersistedRunStatus>(["pending", "error", "success",
 const STREAM_MODES = new Set<PersistedStreamMode>(["values", "messages", "updates", "custom"]);
 const SUPPORTED_STREAM_MODES = new Set<PersistedStreamMode>(["values", "messages"]);
 const DEFAULT_AGENT_ID = "deepagent";
+const ROUTE_ROOTS = new Set(["agents", "threads", "store", "x", "runs"]);
 
 interface RunRequest {
   thread_id?: string;
@@ -144,6 +145,12 @@ function validateUuid(value: string, field: string): string {
     throw new HttpError(422, `${field} must be a valid UUID`, "validation_error", { field });
   }
   return normalized;
+}
+
+function routeParts(request: Request): string[] {
+  const parts = new URL(request.url).pathname.split("/").filter(Boolean);
+  const rootIndex = parts.findIndex((part) => ROUTE_ROOTS.has(part));
+  return rootIndex >= 0 ? parts.slice(rootIndex) : parts;
 }
 
 function validatePlainObject(raw: unknown, field: string): Record<string, unknown> | undefined {
@@ -882,7 +889,7 @@ async function startRun(body: RunRequest): Promise<ActiveRun> {
 }
 
 function getRunIdFromRequest(request: Request): string {
-  const runId = new URL(request.url).pathname.split("/").filter(Boolean)[1] ?? "";
+  const runId = routeParts(request)[1] ?? "";
   return validateUuid(runId, "run_id");
 }
 

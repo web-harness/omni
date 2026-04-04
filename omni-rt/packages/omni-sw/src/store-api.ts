@@ -38,6 +38,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3
 const THREAD_STATUSES = new Set(["idle", "busy", "interrupted", "error"]);
 const DEFAULT_LIMIT = 10;
 const DEFAULT_NAMESPACE_LIMIT = 100;
+const ROUTE_ROOTS = new Set(["agents", "threads", "store", "x", "runs"]);
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -196,7 +197,9 @@ function errorResponse(status: number, message: string, code?: string, metadata?
 }
 
 function parsePath(request: Request): string[] {
-  return new URL(request.url).pathname.split("/").filter(Boolean);
+  const parts = new URL(request.url).pathname.split("/").filter(Boolean);
+  const rootIndex = parts.findIndex((part) => ROUTE_ROOTS.has(part));
+  return rootIndex >= 0 ? parts.slice(rootIndex) : parts;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
