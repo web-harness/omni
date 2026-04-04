@@ -3,7 +3,7 @@ layer: application
 stack: frontend
 
 dependsOn:
-  - omni-rt
+  - omni-glue
   - omni-deepagents
   - omni-util
   - omni-docxjs
@@ -57,6 +57,8 @@ tasks:
       - system
   build-pages:
     extends: build
+    env:
+      OMNI_BASE_PATH: /omni/app
     args:
       - bundle
       - --platform

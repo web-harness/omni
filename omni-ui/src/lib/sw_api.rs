@@ -1,4 +1,6 @@
 #[cfg(target_arch = "wasm32")]
+use super::utils::app_url;
+#[cfg(target_arch = "wasm32")]
 use gloo_net::http::Request;
 #[cfg(target_arch = "wasm32")]
 use serde::Deserialize;
@@ -73,7 +75,7 @@ fn parse_thread_status(raw: &str) -> super::ThreadStatus {
 
 #[cfg(target_arch = "wasm32")]
 fn store_item_url(namespace: &[&str], key: &str) -> String {
-    let mut url = "/store/items?".to_string();
+    let mut url = app_url("store/items?");
     for segment in namespace {
         let encoded = js_sys::encode_uri_component(segment)
             .as_string()
@@ -92,7 +94,10 @@ fn store_item_url(namespace: &[&str], key: &str) -> String {
 
 #[cfg(target_arch = "wasm32")]
 pub async fn fetch_bootstrap() -> Result<BootstrapPayload, std::io::Error> {
-    let response = Request::get("/x/bootstrap").send().await.map_err(err_msg)?;
+    let response = Request::get(&app_url("x/bootstrap"))
+        .send()
+        .await
+        .map_err(err_msg)?;
 
     if !response.ok() {
         return Err(std::io::Error::other(format!(
@@ -106,7 +111,7 @@ pub async fn fetch_bootstrap() -> Result<BootstrapPayload, std::io::Error> {
 
 #[cfg(target_arch = "wasm32")]
 pub async fn create_thread() -> Result<UiThread, std::io::Error> {
-    let response = Request::post("/threads")
+    let response = Request::post(&app_url("threads"))
         .json(&serde_json::json!({
             "metadata": {
                 "title": "New Thread"
@@ -144,7 +149,7 @@ pub async fn create_thread() -> Result<UiThread, std::io::Error> {
 
 #[cfg(target_arch = "wasm32")]
 pub async fn delete_thread(thread_id: &str) -> Result<(), std::io::Error> {
-    let response = Request::delete(&format!("/threads/{thread_id}"))
+    let response = Request::delete(&app_url(&format!("threads/{thread_id}")))
         .send()
         .await
         .map_err(err_msg)?;
@@ -179,7 +184,7 @@ pub async fn get_api_key(provider: &str) -> Result<String, std::io::Error> {
 
 #[cfg(target_arch = "wasm32")]
 pub async fn set_api_key(provider: &str, value: &str) -> Result<(), std::io::Error> {
-    let response = Request::put("/store/items")
+    let response = Request::put(&app_url("store/items"))
         .json(&serde_json::json!({
             "namespace": ["config", "api-keys"],
             "key": provider,
@@ -202,7 +207,7 @@ pub async fn set_api_key(provider: &str, value: &str) -> Result<(), std::io::Err
 
 #[cfg(target_arch = "wasm32")]
 pub async fn delete_api_key(provider: &str) -> Result<(), std::io::Error> {
-    let response = Request::delete("/store/items")
+    let response = Request::delete(&app_url("store/items"))
         .json(&serde_json::json!({
             "namespace": ["config", "api-keys"],
             "key": provider,
@@ -224,7 +229,10 @@ pub async fn delete_api_key(provider: &str) -> Result<(), std::io::Error> {
 
 #[cfg(target_arch = "wasm32")]
 pub async fn list_providers_with_keys() -> Result<Vec<Provider>, std::io::Error> {
-    let response = Request::get("/x/providers").send().await.map_err(err_msg)?;
+    let response = Request::get(&app_url("x/providers"))
+        .send()
+        .await
+        .map_err(err_msg)?;
 
     if !response.ok() {
         return Err(std::io::Error::other(format!(
@@ -250,7 +258,7 @@ pub async fn list_providers_with_keys() -> Result<Vec<Provider>, std::io::Error>
 
 #[cfg(target_arch = "wasm32")]
 pub async fn set_default_model(model_id: &str) -> Result<(), std::io::Error> {
-    let response = Request::put("/store/items")
+    let response = Request::put(&app_url("store/items"))
         .json(&serde_json::json!({
             "namespace": ["config"],
             "key": "default_model",
@@ -276,7 +284,7 @@ pub async fn list_workspace_files(workspace: &str) -> Result<Vec<super::FileInfo
     let encoded = js_sys::encode_uri_component(workspace)
         .as_string()
         .unwrap_or_else(|| "/home/workspace".to_string());
-    let response = Request::get(&format!("/x/files?workspace={encoded}"))
+    let response = Request::get(&app_url(&format!("x/files?workspace={encoded}")))
         .send()
         .await
         .map_err(err_msg)?;

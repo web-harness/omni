@@ -39,6 +39,19 @@ fn main() {
 #[component]
 fn App() -> Element {
     let (threads, chat, tasks, workspace, model, ui, subagents) = default_states();
+    let dock_url = lib::utils::app_url("omni-dock.js");
+    let popper_url = lib::utils::app_url("omni-popper.js");
+    let monaco_url = lib::utils::app_url("omni-monaco.js");
+    let marked_url = lib::utils::app_url("omni-marked.js");
+    let sheetjs_url = lib::utils::app_url("omni-sheetjs.js");
+    let docxjs_url = lib::utils::app_url("omni-docxjs.js");
+    let pdfjs_worker_url = lib::utils::app_url("omni-pdfjs.worker.js");
+    let pdfjs_url = lib::utils::app_url("omni-pdfjs.js");
+    let pptx_renderer_url = lib::utils::app_url("omni-pptx-renderer.js");
+    let plyr_url = lib::utils::app_url("omni-plyr.js");
+    let pretext_url = lib::utils::app_url("omni-pretext.js");
+    let sw_url = lib::utils::app_url("omni-sw.js");
+    let sw_register_url = lib::utils::app_url("omni-sw-register.js");
 
     #[cfg(target_arch = "wasm32")]
     let thread_signal = use_context_provider(|| Signal::new(threads));
@@ -93,19 +106,19 @@ fn App() -> Element {
             @font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:600;font-display:swap;src:url('{FONT_SEMIBOLD}') format('woff2')}}
             @font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:700;font-display:swap;src:url('{FONT_BOLD}') format('woff2')}}"
         }
-        document::Script { src: "/omni-dock.js", r#type: "module", defer: true }
-        document::Script { src: "/omni-popper.js", r#type: "module", defer: true }
-        document::Script { src: "/omni-monaco.js", r#type: "module", defer: true }
-        document::Script { src: "/omni-marked.js", r#type: "module", defer: true }
-        document::Script { src: "/omni-sheetjs.js", r#type: "module", defer: true }
-        document::Script { src: "/omni-docxjs.js", r#type: "module", defer: true }
-        document::Meta { name: "omni-pdfjs-worker", content: "/omni-pdfjs.worker.js" }
-        document::Script { src: "/omni-pdfjs.js", r#type: "module", defer: true }
-        document::Script { src: "/omni-pptx-renderer.js", r#type: "module", defer: true }
-        document::Script { src: "/omni-plyr.js", r#type: "module", defer: true }
-        document::Script { src: "/omni-pretext.js", r#type: "module", defer: true }
-        document::Meta { name: "omni-sw-url", content: "/omni-sw.js" }
-        document::Script { src: "/omni-sw-register.js", r#type: "module", defer: true }
+        document::Script { src: dock_url, r#type: "module", defer: true }
+        document::Script { src: popper_url, r#type: "module", defer: true }
+        document::Script { src: monaco_url, r#type: "module", defer: true }
+        document::Script { src: marked_url, r#type: "module", defer: true }
+        document::Script { src: sheetjs_url, r#type: "module", defer: true }
+        document::Script { src: docxjs_url, r#type: "module", defer: true }
+        document::Meta { name: "omni-pdfjs-worker", content: pdfjs_worker_url }
+        document::Script { src: pdfjs_url, r#type: "module", defer: true }
+        document::Script { src: pptx_renderer_url, r#type: "module", defer: true }
+        document::Script { src: plyr_url, r#type: "module", defer: true }
+        document::Script { src: pretext_url, r#type: "module", defer: true }
+        document::Meta { name: "omni-sw-url", content: sw_url }
+        document::Script { src: sw_register_url, r#type: "module", defer: true }
 
         Router::<Route> {}
     }

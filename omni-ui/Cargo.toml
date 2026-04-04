@@ -7,7 +7,7 @@ edition.workspace = true
 [dependencies]
 dioxus = { version = "0.7.4", features = ["router"] }
 dioxus-free-icons = { version = "0.10.0", features = ["lucide"] }
-omni-rt = { path = "../omni-rt/crates/omni-rt" }
+omni-rt = { path = "../omni-rt/crates/omni-glue" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 uuid = { version = "1.11", features = ["v4", "serde", "js"] }

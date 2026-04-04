@@ -31,3 +31,16 @@ pub fn fmt_size(bytes: u64) -> String {
 pub fn file_name(path: &str) -> String {
     path.rsplit('/').next().unwrap_or(path).to_string()
 }
+
+pub fn app_url(path: &str) -> String {
+    let base_path = option_env!("OMNI_BASE_PATH")
+        .unwrap_or("")
+        .trim_end_matches('/');
+    let path = path.trim_start_matches('/');
+
+    if base_path.is_empty() {
+        format!("/{path}")
+    } else {
+        format!("{base_path}/{path}")
+    }
+}

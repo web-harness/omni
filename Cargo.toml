@@ -1,7 +1,7 @@
 [workspace]
 members = [
   "omni-ui",
-  "omni-rt/crates/omni-rt",
+  "omni-rt/crates/omni-glue",
   "omni-rt/crates/omni-protocol",
   "omni-rt/crates/omni-bashkit",
   "omni-rt/crates/omni-zenfs",

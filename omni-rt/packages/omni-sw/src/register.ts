@@ -12,6 +12,18 @@ type RegisterEnv = {
   setReadyFlag: () => void;
 };
 
+function serviceWorkerScope(swUrl: string): string {
+  const baseUrl = globalThis.location?.href ?? "https://example.test/";
+  const resolvedUrl = new URL(swUrl, baseUrl);
+  const lastSlash = resolvedUrl.pathname.lastIndexOf("/");
+
+  if (lastSlash < 0) {
+    return "/";
+  }
+
+  return resolvedUrl.pathname.slice(0, lastSlash + 1) || "/";
+}
+
 function markReady(channel: BroadcastChannel, setReadyFlag: () => void): void {
   setReadyFlag();
   channel.postMessage({ type: "ready" });
@@ -24,7 +36,7 @@ export async function registerServiceWorker(env: RegisterEnv): Promise<void> {
   try {
     const registration = await navigator.serviceWorker.register(swUrl, {
       type: "module",
-      scope: "/",
+      scope: serviceWorkerScope(swUrl),
     });
 
     const sw = registration.installing ?? registration.waiting ?? registration.active;

@@ -27,7 +27,7 @@
     "build": "moon run omni-ui:build omni-wc:build",
     "build:nocache": "npm run build -- --force",
     "build:pages": "moon run omni-ui:build-pages omni-wc:build-pages",
-    "test": "moon run omni-sw:test omni-ui:test omni-rt:test omni-protocol:test omni-zenfs:test omni-bashkit:test omni-deepagents:test",
+    "test": "moon run omni-sw:test omni-ui:test omni-glue:test omni-protocol:test omni-zenfs:test omni-bashkit:test omni-deepagents:test",
     "format:biome": "moon run omni-ui:format-biome",
     "format:cargo": "moon run omni-ui:format-cargo",
     "format": "moon run omni-ui:format-biome omni-ui:format-cargo",
