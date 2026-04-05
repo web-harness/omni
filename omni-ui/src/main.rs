@@ -36,6 +36,8 @@ const IFRAME_READY_EVENT: &str = "omni-iframe-ready";
 
 #[derive(Clone, Deserialize)]
 struct IframeAgentConfig {
+    #[serde(default)]
+    name: String,
     url: String,
     #[serde(rename = "apiKey")]
     api_key: String,
@@ -72,6 +74,7 @@ fn iframe_agent_endpoints(configs: Vec<IframeAgentConfig>) -> Vec<lib::AgentEndp
     configs
         .into_iter()
         .filter_map(|agent| {
+            let name = agent.name.trim().to_string();
             let url = agent.url.trim().to_string();
             if url.is_empty() {
                 return None;
@@ -79,7 +82,11 @@ fn iframe_agent_endpoints(configs: Vec<IframeAgentConfig>) -> Vec<lib::AgentEndp
             let bearer_token = agent.api_key.trim().to_string();
             Some(lib::AgentEndpoint {
                 id: lib::agent_config_hash(&url, &bearer_token),
-                name: lib::derive_agent_name(&url),
+                name: if name.is_empty() {
+                    lib::derive_agent_name(&url)
+                } else {
+                    name
+                },
                 url,
                 bearer_token,
                 removable: true,
@@ -252,6 +259,7 @@ fn provider_prefix(provider: &lib::ProviderId) -> &'static str {
         lib::ProviderId::OpenAI => "openai",
         lib::ProviderId::Google => "google",
         lib::ProviderId::Ollama => "ollama",
+        lib::ProviderId::Browser => "browser",
     }
 }
 
@@ -298,6 +306,8 @@ fn App() -> Element {
     let pptx_renderer_url = lib::utils::app_url("omni-pptx-renderer.js");
     let plyr_url = lib::utils::app_url("omni-plyr.js");
     let pretext_url = lib::utils::app_url("omni-pretext.js");
+    let inference_url = lib::utils::app_url("omni-inference.js");
+    let inference_register_url = lib::utils::app_url("omni-inference-register.js");
     let sw_url = lib::utils::app_url("omni-sw.js");
     let sw_register_url = lib::utils::app_url("omni-sw-register.js");
 
@@ -389,6 +399,8 @@ fn App() -> Element {
         document::Script { src: pptx_renderer_url, r#type: "module", defer: true }
         document::Script { src: plyr_url, r#type: "module", defer: true }
         document::Script { src: pretext_url, r#type: "module", defer: true }
+        document::Meta { name: "omni-inference-url", content: inference_url }
+        document::Script { src: inference_register_url, r#type: "module", defer: true }
         document::Meta { name: "omni-sw-url", content: sw_url }
         document::Script { src: sw_register_url, r#type: "module", defer: true }
 

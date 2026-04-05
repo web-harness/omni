@@ -65,7 +65,7 @@ fn TabChip(tab: String, active: bool) -> Element {
             onclick: move |_| { workspace_state.write().active_tab.insert(tid.clone(), tab_for_select.clone()); },
             if tab == "chat" {
                 Icon { width: 13, height: 13, icon: LdBot }
-                span { "Agent" }
+                omni-text { "data-text": "Agent", "data-strategy": "none", "data-max-lines": "1" }
             } else {
                 FileIcon { path: tab.clone() }
                 omni-text { "data-text": "{tab}", "data-strategy": "truncate", "data-max-lines": "1", class: "max-w-[180px] text-[11px]" }
@@ -189,7 +189,7 @@ pub fn FileViewer(path: String, thread_id: String) -> Element {
                             .or_default()
                             .retain(|x| x != &path_for_close);
                     },
-                    "×"
+                    Icon { width: 11, height: 11, icon: LdX }
                 }
             }
             div { class: "flex-1 overflow-hidden relative", {viewer} }

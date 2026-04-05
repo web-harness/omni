@@ -161,6 +161,7 @@ pub fn AgentRail() -> Element {
     let mut hovered_agent_id = use_signal(|| None::<String>);
     let mut scroll_container = use_signal(|| None::<Rc<MountedData>>);
     let mut scroll_requested = use_signal(|| false);
+    let mut name_draft = use_signal(String::new);
     let mut url_draft = use_signal(String::new);
     let mut token_draft = use_signal(String::new);
 
@@ -212,6 +213,7 @@ pub fn AgentRail() -> Element {
     let mut add_endpoint = {
         let mut agent_state = agent_state;
         move || {
+            let name = name_draft.read().trim().to_string();
             let url = url_draft.read().trim().to_string();
             let bearer_token = token_draft.read().trim().to_string();
             if url.is_empty() || bearer_token.is_empty() {
@@ -220,7 +222,11 @@ pub fn AgentRail() -> Element {
 
             let endpoint = AgentEndpoint {
                 id: agent_config_hash(&url, &bearer_token),
-                name: derive_agent_name(&url),
+                name: if name.is_empty() {
+                    derive_agent_name(&url)
+                } else {
+                    name
+                },
                 url,
                 bearer_token,
                 removable: true,
@@ -228,6 +234,7 @@ pub fn AgentRail() -> Element {
 
             agent_state.write().upsert(endpoint.clone());
             scroll_requested.set(true);
+            name_draft.set(String::new());
             url_draft.set(String::new());
             token_draft.set(String::new());
             add_open.set(false);
@@ -356,10 +363,15 @@ pub fn AgentRail() -> Element {
                     div { class: "space-y-3",
                         div {
                             class: "space-y-1",
-                            h3 { class: "text-xs font-semibold", "Add Agent" }
-                            p { class: "text-[10px] text-muted-foreground", "Connect a LangGraph endpoint for direct chat routing." }
+                            omni-text { "data-text": "Add Agent", "data-strategy": "none", "data-max-lines": "1", class: "text-xs font-semibold" }
+                            omni-text { "data-text": "Connect a LangGraph endpoint for direct chat routing.", "data-strategy": "none", "data-max-lines": "2", class: "text-[10px] text-muted-foreground" }
                         }
                         div { class: "space-y-2",
+                            Input {
+                                value: name_draft(),
+                                placeholder: "Agent name".to_string(),
+                                oninput: move |evt: Event<FormData>| name_draft.set(evt.value()),
+                            }
                             Input {
                                 value: url_draft(),
                                 placeholder: "https://agent.example.com/api".to_string(),
@@ -374,7 +386,7 @@ pub fn AgentRail() -> Element {
                         div { class: "flex justify-end",
                             Button {
                                 onclick: move |_| add_endpoint(),
-                                "Add"
+                                omni-text { "data-text": "Add", "data-strategy": "none", "data-max-lines": "1" }
                             }
                         }
                     }

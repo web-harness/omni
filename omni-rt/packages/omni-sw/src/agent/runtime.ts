@@ -128,6 +128,8 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+import { getScopedRequestPathParts } from "@omni/omni-util/service-worker";
+
 function errorResponse(status: number, message: string, code?: string, metadata?: Record<string, unknown>): Response {
   return Response.json(
     {
@@ -145,12 +147,6 @@ function validateUuid(value: string, field: string): string {
     throw new HttpError(422, `${field} must be a valid UUID`, "validation_error", { field });
   }
   return normalized;
-}
-
-function routeParts(request: Request): string[] {
-  const parts = new URL(request.url).pathname.split("/").filter(Boolean);
-  const rootIndex = parts.findIndex((part) => ROUTE_ROOTS.has(part));
-  return rootIndex >= 0 ? parts.slice(rootIndex) : parts;
 }
 
 function validatePlainObject(raw: unknown, field: string): Record<string, unknown> | undefined {
@@ -889,7 +885,7 @@ async function startRun(body: RunRequest): Promise<ActiveRun> {
 }
 
 function getRunIdFromRequest(request: Request): string {
-  const runId = routeParts(request)[1] ?? "";
+  const runId = getScopedRequestPathParts(request, ROUTE_ROOTS)[1] ?? "";
   return validateUuid(runId, "run_id");
 }
 

@@ -1,3 +1,5 @@
+import { BROWSER_MODELS } from "@omni/omni-util/browser-models";
+
 import {
   exists as zenExists,
   init as zenInit,
@@ -39,10 +41,11 @@ const TODOS_DIR = "/home/db/todos";
 const SUBAGENTS_DIR = "/home/db/subagents";
 const AGENT_ENDPOINTS_DIR = "/home/store/config/agent-endpoints";
 const AGENT_RAIL_DIR = "/home/store/config/agent-rail";
+const DEFAULT_MODEL_ITEM_PATH = "/home/store/config/default_model.json";
 const ALLOWED_DICEBEAR_STYLES = new Set(["bottts-neutral", "thumbs"]);
 export const DEFAULT_THREAD_TITLE = "New Thread";
 
-type ProviderId = "Anthropic" | "OpenAI" | "Google" | "Ollama";
+type ProviderId = "Anthropic" | "OpenAI" | "Google" | "Ollama" | "Browser";
 
 export type BootstrapPayload = {
   threads: Array<{ id: string; title: string; status: string; updated_at: string }>;
@@ -195,6 +198,24 @@ async function readJson(path: string): Promise<unknown | null> {
   }
 }
 
+async function readStoredDefaultModelItem(): Promise<string | null> {
+  const item = (await readJson(DEFAULT_MODEL_ITEM_PATH)) as Record<string, unknown> | null;
+  const value = item?.value;
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const candidate =
+    typeof (value as Record<string, unknown>).model_id === "string"
+      ? (value as Record<string, unknown>).model_id
+      : typeof (value as Record<string, unknown>).value === "string"
+        ? (value as Record<string, unknown>).value
+        : null;
+
+  const modelId = candidate?.trim() ?? "";
+  return modelId || null;
+}
+
 async function readJsonFiles(dir: string): Promise<unknown[]> {
   if (!(await exists(dir))) return [];
   const entries = await zenReadDir(dir);
@@ -222,6 +243,7 @@ function providerDefs(): Array<{ id: ProviderId; name: string; prefix: string }>
     { id: "OpenAI", name: "OpenAI", prefix: "openai" },
     { id: "Google", name: "Google", prefix: "google" },
     { id: "Ollama", name: "Ollama", prefix: "ollama" },
+    { id: "Browser", name: "Browser", prefix: "browser" },
   ];
 }
 
@@ -235,6 +257,7 @@ function modelDefs(): Array<{ id: string; name: string; provider: ProviderId }> 
     { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash", provider: "Google" },
     { id: "llama-3.3-70b", name: "Llama 3.3 70B", provider: "Ollama" },
     { id: "deepseek-r1", name: "DeepSeek R1", provider: "Ollama" },
+    ...BROWSER_MODELS.map((model) => ({ id: model.id, name: model.name, provider: "Browser" as const })),
   ];
 }
 
@@ -349,11 +372,11 @@ export async function listWorkspaceFiles(
 }
 
 export async function getDefaultModel(): Promise<string> {
-  return await getDeepagentsDefaultModel();
+  return (await readStoredDefaultModelItem()) ?? (await getDeepagentsDefaultModel());
 }
 
 export async function getStoredDefaultModel(): Promise<string | null> {
-  return await getDeepagentsStoredDefaultModel();
+  return (await readStoredDefaultModelItem()) ?? (await getDeepagentsStoredDefaultModel());
 }
 
 export async function buildBootstrap(): Promise<BootstrapPayload> {
@@ -533,7 +556,7 @@ export async function readProvidersWithKeys(): Promise<Array<{ id: ProviderId; n
   );
   return providers.map((provider) => ({
     ...provider,
-    has_api_key: provider.has_api_key || provider.id === "Ollama",
+    has_api_key: provider.has_api_key || provider.id === "Ollama" || provider.id === "Browser",
   }));
 }
 

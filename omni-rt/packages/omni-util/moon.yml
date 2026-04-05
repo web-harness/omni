@@ -8,7 +8,9 @@ tasks:
     args:
       - src/index.ts
       - src/async-loader.ts
+      - src/browser-models.ts
       - src/object-url.ts
+      - src/service-worker.ts
       - --bundle
       - --format=esm
       - --outdir=dist
@@ -19,7 +21,9 @@ tasks:
     outputs:
       - dist/index.js
       - dist/async-loader.js
+      - dist/browser-models.js
       - dist/object-url.js
+      - dist/service-worker.js
     options:
       shell: false
   watch:
@@ -27,7 +31,9 @@ tasks:
     args:
       - src/index.ts
       - src/async-loader.ts
+      - src/browser-models.ts
       - src/object-url.ts
+      - src/service-worker.ts
       - --bundle
       - --format=esm
       - --outdir=dist

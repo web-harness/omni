@@ -39,6 +39,7 @@ tasks:
       - --format=esm
       - --outfile=../../../omni-ui/public/omni-sw-register.js
     deps:
+      - omni-util:build
       - ensure-public-dir
       - clean-public
     inputs:
@@ -122,6 +123,7 @@ tasks:
       - --alias:node:string_decoder=./shims/empty.ts
       - --alias:string_decoder=./shims/empty.ts
     deps:
+      - omni-util:build
       - ensure-public-dir
       - clean-public
     inputs:
@@ -142,6 +144,7 @@ tasks:
       - --outfile=../../../omni-ui/public/omni-sw-register.js
       - --watch
     deps:
+      - omni-util:watch
       - ensure-public-dir
       - clean-public
     inputs:
@@ -210,6 +213,7 @@ tasks:
       - --alias:string_decoder=./shims/empty.ts
       - --watch
     deps:
+      - omni-util:watch
       - ensure-public-dir
       - clean-public
     inputs:

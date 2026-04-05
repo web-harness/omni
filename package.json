@@ -17,6 +17,7 @@
     "omni-rt/packages/omni-popper",
     "omni-rt/packages/omni-pretext",
     "omni-rt/packages/omni-sheetjs",
+    "omni-rt/packages/omni-inference",
     "omni-rt/packages/omni-sw",
     "omni-rt/crates/omni-zenfs"
   ],

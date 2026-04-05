@@ -32,6 +32,39 @@ omni-text {
   min-width: 0;
 }
 
+@keyframes browser-download-sweep {
+  0% {
+    transform: translateX(-140%);
+    opacity: 0;
+  }
+
+  12% {
+    opacity: 0.18;
+  }
+
+  52% {
+    opacity: 0.34;
+  }
+
+  100% {
+    transform: translateX(320%);
+    opacity: 0;
+  }
+}
+
+.browser-download-sweep {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--status-info) 10%, transparent) 28%,
+    color-mix(in srgb, var(--foreground) 24%, transparent) 50%,
+    color-mix(in srgb, var(--status-info) 12%, transparent) 72%,
+    transparent 100%
+  );
+  animation: browser-download-sweep 1.25s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
 button,
 [role="button"],
 a,

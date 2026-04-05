@@ -67,6 +67,7 @@ The Omni runtime is meant to be a reference implementation of the environment ne
 - [x] Deep Agent integration as harness' main agent loop.
 - [x] Full compatibility with the Agent Protocol through Service Workers.
 - [x] [Moon](https://moonrepo.dev/) for fast builds and convenient developer experience.
+- [x] Builtin local-first browser based inference for testing and light tasks.
 - [ ] Desktop variant with extended agent access to sandboxed filesystem, computer use, and browser use.
 - [ ] Comprehensive test suite with unit, integration, and E2E tests.
 - [ ] Releases on GitHub with pre-built binaries and npm packages.

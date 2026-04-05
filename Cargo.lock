@@ -3528,6 +3528,7 @@ dependencies = [
  "js-sys",
  "omni-rt",
  "serde",
+ "serde-wasm-bindgen 0.6.5",
  "serde_json",
  "uuid",
  "wasm-bindgen",

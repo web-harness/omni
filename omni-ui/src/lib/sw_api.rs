@@ -1,10 +1,12 @@
 #[cfg(target_arch = "wasm32")]
 use super::utils::app_url;
-use super::AgentEndpoint;
+use super::{AgentEndpoint, BrowserInferenceStatus};
 #[cfg(target_arch = "wasm32")]
 use gloo_net::http::Request;
 #[cfg(target_arch = "wasm32")]
 use serde::Deserialize;
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
 
 #[cfg(target_arch = "wasm32")]
 use super::{
@@ -14,6 +16,22 @@ use super::{
 
 #[cfg(target_arch = "wasm32")]
 use std::collections::HashMap;
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(module = "/public/omni-inference-client.js")]
+extern "C" {
+    #[wasm_bindgen(catch, js_name = getBrowserInferenceStatus)]
+    async fn js_get_browser_inference_status() -> Result<JsValue, JsValue>;
+
+    #[wasm_bindgen(catch, js_name = startBrowserModelDownload)]
+    async fn js_start_browser_model_download(model_id: &str) -> Result<JsValue, JsValue>;
+
+    #[wasm_bindgen(catch, js_name = stopBrowserModelDownload)]
+    async fn js_stop_browser_model_download(model_id: &str) -> Result<JsValue, JsValue>;
+
+    #[wasm_bindgen(catch, js_name = deleteBrowserModel)]
+    async fn js_delete_browser_model(model_id: &str) -> Result<JsValue, JsValue>;
+}
 
 #[cfg(target_arch = "wasm32")]
 #[derive(Deserialize)]
@@ -75,6 +93,18 @@ struct ProvidersResponseItem {
 #[cfg(target_arch = "wasm32")]
 fn err_msg(err: impl ToString) -> std::io::Error {
     std::io::Error::other(err.to_string())
+}
+
+#[cfg(target_arch = "wasm32")]
+fn js_value_to_string(value: &JsValue) -> String {
+    js_sys::JSON::stringify(value)
+        .ok()
+        .and_then(|text| text.as_string())
+        .unwrap_or_else(|| {
+            value
+                .as_string()
+                .unwrap_or_else(|| "unknown javascript error".to_string())
+        })
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -383,7 +413,9 @@ pub async fn set_default_model(model_id: &str) -> Result<(), std::io::Error> {
         .json(&serde_json::json!({
             "namespace": ["config"],
             "key": "default_model",
-            "value": model_id,
+            "value": {
+                "model_id": model_id,
+            },
         }))
         .map_err(err_msg)?
         .send()
@@ -398,6 +430,38 @@ pub async fn set_default_model(model_id: &str) -> Result<(), std::io::Error> {
             response.status()
         )))
     }
+}
+
+#[cfg(target_arch = "wasm32")]
+pub async fn get_browser_inference_status() -> Result<BrowserInferenceStatus, std::io::Error> {
+    let value = js_get_browser_inference_status()
+        .await
+        .map_err(|error| std::io::Error::other(js_value_to_string(&error)))?;
+    serde_wasm_bindgen::from_value(value).map_err(err_msg)
+}
+
+#[cfg(target_arch = "wasm32")]
+pub async fn start_browser_model_download(model_id: &str) -> Result<(), std::io::Error> {
+    js_start_browser_model_download(model_id)
+        .await
+        .map(|_| ())
+        .map_err(|error| std::io::Error::other(js_value_to_string(&error)))
+}
+
+#[cfg(target_arch = "wasm32")]
+pub async fn stop_browser_model_download(model_id: &str) -> Result<(), std::io::Error> {
+    js_stop_browser_model_download(model_id)
+        .await
+        .map(|_| ())
+        .map_err(|error| std::io::Error::other(js_value_to_string(&error)))
+}
+
+#[cfg(target_arch = "wasm32")]
+pub async fn delete_browser_model(model_id: &str) -> Result<(), std::io::Error> {
+    js_delete_browser_model(model_id)
+        .await
+        .map(|_| ())
+        .map_err(|error| std::io::Error::other(js_value_to_string(&error)))
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -431,6 +495,11 @@ pub async fn list_workspace_files(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+pub async fn set_default_model(_model_id: &str) -> Result<(), std::io::Error> {
+    Err(unavailable())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 #[allow(dead_code)]
 pub async fn list_agent_endpoints() -> Result<Vec<AgentEndpoint>, std::io::Error> {
     Err(unavailable())
@@ -451,5 +520,25 @@ pub async fn delete_agent_endpoint(_id: &str) -> Result<(), std::io::Error> {
 #[cfg(not(target_arch = "wasm32"))]
 #[allow(dead_code)]
 pub async fn set_agent_rail_style(_style: &str) -> Result<(), std::io::Error> {
+    Err(unavailable())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub async fn get_browser_inference_status() -> Result<BrowserInferenceStatus, std::io::Error> {
+    Err(unavailable())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub async fn start_browser_model_download(_model_id: &str) -> Result<(), std::io::Error> {
+    Err(unavailable())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub async fn stop_browser_model_download(_model_id: &str) -> Result<(), std::io::Error> {
+    Err(unavailable())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub async fn delete_browser_model(_model_id: &str) -> Result<(), std::io::Error> {
     Err(unavailable())
 }

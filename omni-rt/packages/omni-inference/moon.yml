@@ -1,0 +1,211 @@
+language: typescript
+layer: library
+stack: frontend
+
+tasks:
+  ensure-public-dir:
+    command: shx
+    args:
+      - mkdir
+      - -p
+      - omni-ui/public
+      - omni-ui/public/wllama
+    inputs:
+      - '@group(configs)'
+    options:
+      internal: true
+      runFromWorkspaceRoot: true
+  clean-public:
+    command: shx
+    args:
+      - rm
+      - -f
+      - ../../../omni-ui/public/omni-inference.js
+      - ../../../omni-ui/public/omni-inference-client.js
+      - ../../../omni-ui/public/omni-inference-register.js
+      - ../../../omni-ui/public/omni-inference-*.js
+      - ../../../omni-ui/public/wllama/single-thread/wllama.wasm
+      - ../../../omni-ui/public/wllama/multi-thread/wllama.wasm
+    inputs:
+      - '@group(configs)'
+    options:
+      internal: true
+  ensure-wasm-dirs:
+    command: shx
+    args:
+      - mkdir
+      - -p
+      - omni-ui/public/wllama/single-thread
+      - omni-ui/public/wllama/multi-thread
+    deps:
+      - ensure-public-dir
+    inputs:
+      - '@group(configs)'
+    options:
+      internal: true
+      runFromWorkspaceRoot: true
+  copy-single-thread-wasm:
+    command: shx
+    args:
+      - cp
+      - node_modules/@wllama/wllama/esm/single-thread/wllama.wasm
+      - omni-ui/public/wllama/single-thread/wllama.wasm
+    deps:
+      - clean-public
+      - ensure-wasm-dirs
+    inputs:
+      - package.json
+      - '@group(configs)'
+    options:
+      cache: false
+      internal: true
+      runFromWorkspaceRoot: true
+  copy-multi-thread-wasm:
+    command: shx
+    args:
+      - cp
+      - node_modules/@wllama/wllama/esm/multi-thread/wllama.wasm
+      - omni-ui/public/wllama/multi-thread/wllama.wasm
+    deps:
+      - clean-public
+      - ensure-wasm-dirs
+    inputs:
+      - package.json
+      - '@group(configs)'
+    options:
+      cache: false
+      internal: true
+      runFromWorkspaceRoot: true
+  copy-wasm:
+    deps:
+      - copy-single-thread-wasm
+      - copy-multi-thread-wasm
+    options:
+      internal: true
+  build-register:
+    command: esbuild
+    args:
+      - src/register.ts
+      - --bundle
+      - --platform=browser
+      - --target=es2021
+      - --format=esm
+      - --outfile=../../../omni-ui/public/omni-inference-register.js
+    deps:
+      - omni-util:build
+      - ensure-public-dir
+      - clean-public
+    inputs:
+      - src/register.ts
+      - '@group(configs)'
+    options:
+      cache: false
+      internal: true
+  build-client:
+    command: esbuild
+    args:
+      - src/client.ts
+      - --bundle
+      - --platform=browser
+      - --target=es2021
+      - --format=esm
+      - --outfile=../../../omni-ui/public/omni-inference-client.js
+    deps:
+      - omni-util:build
+      - ensure-public-dir
+      - clean-public
+    inputs:
+      - src/client.ts
+      - '@group(configs)'
+    options:
+      cache: false
+      internal: true
+  build-main:
+    command: esbuild
+    args:
+      - src/omni-inference.ts
+      - --bundle
+      - --splitting
+      - --platform=browser
+      - --target=es2021
+      - --format=esm
+      - --outdir=../../../omni-ui/public
+      - --entry-names=omni-inference
+      - --chunk-names=omni-inference-[name]-[hash]
+      - --define:global=globalThis
+      - '--define:process.env.NODE_ENV="production"'
+    deps:
+      - omni-util:build
+      - ensure-public-dir
+      - clean-public
+      - copy-wasm
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+    options:
+      cache: false
+      shell: false
+      internal: true
+  watch-register:
+    command: esbuild
+    args:
+      - src/register.ts
+      - --bundle
+      - --platform=browser
+      - --target=es2021
+      - --format=esm
+      - --outfile=../../../omni-ui/public/omni-inference-register.js
+      - --watch
+    deps:
+      - omni-util:watch
+      - ensure-public-dir
+      - clean-public
+    inputs:
+      - src/register.ts
+      - '@group(configs)'
+    preset: server
+  watch-client:
+    command: esbuild
+    args:
+      - src/client.ts
+      - --bundle
+      - --platform=browser
+      - --target=es2021
+      - --format=esm
+      - --outfile=../../../omni-ui/public/omni-inference-client.js
+      - --watch
+    deps:
+      - omni-util:watch
+      - ensure-public-dir
+      - clean-public
+    inputs:
+      - src/client.ts
+      - '@group(configs)'
+    preset: server
+  watch-main:
+    command: esbuild
+    args:
+      - src/omni-inference.ts
+      - --bundle
+      - --splitting
+      - --platform=browser
+      - --target=es2021
+      - --format=esm
+      - --outdir=../../../omni-ui/public
+      - --entry-names=omni-inference
+      - --chunk-names=omni-inference-[name]-[hash]
+      - --define:global=globalThis
+      - '--define:process.env.NODE_ENV="production"'
+      - --watch
+    deps:
+      - omni-util:watch
+      - ensure-public-dir
+      - clean-public
+      - copy-wasm
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+    preset: server
+    options:
+      shell: false
+      internal: true

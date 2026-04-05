@@ -1,3 +1,5 @@
+import { BROWSER_MODELS } from "@omni/omni-util/browser-models";
+
 import {
   buildBootstrap,
   deleteApiKey,
@@ -42,6 +44,7 @@ const ROUTE_ROOTS = new Set(["agents", "threads", "store", "x", "runs"]);
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+const BROWSER_MODEL_IDS = new Set(BROWSER_MODELS.map((model) => model.id));
 
 const DEEP_AGENT = {
   agent_id: "deepagent",
@@ -809,7 +812,10 @@ async function putStoreItem(body: Record<string, unknown>): Promise<Response> {
   if (isApiKeyNamespace(namespace)) {
     await setApiKey(key, parseApiKeyValue(value));
   } else if (isDefaultModelItem(namespace, key)) {
-    await setDefaultModel(parseDefaultModelValue(value));
+    const modelId = parseDefaultModelValue(value);
+    if (!BROWSER_MODEL_IDS.has(modelId)) {
+      await setDefaultModel(modelId);
+    }
   }
 
   return new Response(null, { status: 204 });

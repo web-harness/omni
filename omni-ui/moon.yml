@@ -17,6 +17,7 @@ dependsOn:
   - omni-popper
   - omni-pretext
   - omni-sheetjs
+  - omni-inference
   - omni-sw
   - omni-zenfs
   - omni-bashkit
@@ -47,6 +48,10 @@ tasks:
       - omni-zenfs:build-wasm
       - omni-deepagents:build
       - omni-bashkit:build
+      - omni-inference:build-main
+      - omni-inference:build-client
+      - omni-inference:build-register
+      - omni-inference:copy-wasm
       - omni-sw:build-main
       - omni-sw:build-register
       - omni-sw:copy-sql-wasm
@@ -97,6 +102,10 @@ tasks:
       - omni-zenfs:watch
       - omni-zenfs:watch-wasm
       - omni-deepagents:build
+      - omni-inference:copy-wasm
+      - omni-inference:watch-client
+      - omni-inference:watch-main
+      - omni-inference:watch-register
       - omni-sw:copy-sql-wasm
       - omni-sw:watch-main
       - omni-sw:watch-register

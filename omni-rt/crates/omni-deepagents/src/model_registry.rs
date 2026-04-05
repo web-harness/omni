@@ -6,6 +6,7 @@ pub enum ProviderId {
     OpenAI,
     Google,
     Ollama,
+    Browser,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,6 +65,16 @@ pub fn list_models() -> Vec<ModelConfig> {
             name: "DeepSeek R1".into(),
             provider: ProviderId::Ollama,
         },
+        ModelConfig {
+            id: "lfm2-1.2b".into(),
+            name: "LFM2 1.2B".into(),
+            provider: ProviderId::Browser,
+        },
+        ModelConfig {
+            id: "deepseek-r1-1.5b".into(),
+            name: "DeepSeek R1 1.5B".into(),
+            provider: ProviderId::Browser,
+        },
     ]
 }
 
@@ -89,6 +100,11 @@ pub fn list_providers() -> Vec<Provider> {
             name: "Ollama".into(),
             prefix: "ollama".into(),
         },
+        Provider {
+            id: ProviderId::Browser,
+            name: "Browser".into(),
+            prefix: "browser".into(),
+        },
     ]
 }
 
@@ -109,19 +125,21 @@ mod tests {
     #[test]
     fn list_models_returns_expected_catalog() {
         let models = list_models();
-        assert!(models.len() >= 8);
+        assert!(models.len() >= 10);
         assert!(models.iter().any(|m| m.id == "claude-3-7-sonnet"));
         assert!(models.iter().any(|m| m.id == "gpt-5"));
         assert!(models.iter().any(|m| m.id == "gemini-2.5-pro"));
+        assert!(models.iter().any(|m| m.id == "lfm2-1.2b"));
     }
 
     #[test]
     fn list_providers_returns_core_providers() {
         let providers = list_providers();
-        assert_eq!(providers.len(), 4);
+        assert_eq!(providers.len(), 5);
         assert!(providers.iter().any(|p| p.id == ProviderId::Anthropic));
         assert!(providers.iter().any(|p| p.id == ProviderId::OpenAI));
         assert!(providers.iter().any(|p| p.id == ProviderId::Google));
         assert!(providers.iter().any(|p| p.id == ProviderId::Ollama));
+        assert!(providers.iter().any(|p| p.id == ProviderId::Browser));
     }
 }

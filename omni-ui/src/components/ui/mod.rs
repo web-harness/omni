@@ -179,7 +179,7 @@ pub fn Popover(
     rsx! {
         if open {
             div {
-                class: "fixed inset-0 z-[100]",
+                class: "fixed inset-0 z-[100] bg-black/65",
                 onclick: move |_| on_close.call(()),
                 onkeydown: move |e: Event<KeyboardData>| {
                     if e.key() == Key::Escape { on_close.call(()); }

@@ -46,7 +46,7 @@ pub fn KanbanView() -> Element {
             }
             if show_background_tasks() {
                 div { class: "border-t border-border px-3 py-2",
-                    div { class: "mb-2 text-[10px] font-semibold text-muted-foreground", "BACKGROUND TASKS" }
+                    omni-text { "data-text": "BACKGROUND TASKS", "data-strategy": "none", "data-max-lines": "1", class: "mb-2 text-[10px] font-semibold text-muted-foreground" }
                     div { class: "grid grid-cols-2 gap-2",
                         for task in tasks {
                             BackgroundTaskKanbanCard { key: "{task.id}", task }
@@ -77,12 +77,12 @@ pub fn KanbanHeader(show_background_tasks: Signal<bool>) -> Element {
         div { class: "flex items-center justify-between border-b border-border px-3 py-2",
             div { class: "inline-flex items-center gap-2 text-[11px] text-muted-foreground",
                 Icon { width: 14, height: 14, icon: LdCircleDot }
-                span { "KANBAN OVERVIEW • {active} ACTIVE" }
+                omni-text { "data-text": "KANBAN OVERVIEW • {active} ACTIVE", "data-strategy": "none", "data-max-lines": "1" }
             }
             button {
                 class: "rounded-sm border border-border px-2 py-1 text-[11px]",
                 onclick: move |_| show_background_tasks.set(!show_background_tasks()),
-                "{toggle_label}"
+                omni-text { "data-text": "{toggle_label}", "data-strategy": "none", "data-max-lines": "1" }
             }
         }
     }
@@ -90,11 +90,13 @@ pub fn KanbanHeader(show_background_tasks: Signal<bool>) -> Element {
 
 #[component]
 pub fn KanbanColumn(title: String, tone: String, threads: Vec<UiThread>) -> Element {
+    let thread_count = threads.len();
+
     rsx! {
         div { class: "min-w-0 rounded-sm border {tone} bg-muted/30",
             div { class: "flex items-center justify-between border-b border-border px-2 py-2 text-[10px] font-semibold",
-                span { "{title}" }
-                span { class: "text-muted-foreground", "{threads.len()}" }
+                omni-text { "data-text": "{title}", "data-strategy": "none", "data-max-lines": "1" }
+                omni-text { "data-text": "{thread_count}", "data-strategy": "none", "data-max-lines": "1", class: "text-muted-foreground" }
             }
             div { class: "space-y-2 p-2",
                 for thread in threads {
@@ -122,7 +124,7 @@ pub fn KanbanCard(thread: UiThread) -> Element {
                 "data-min-size": "9",
                 class: "text-[11px] font-semibold",
             }
-            div { class: "mt-1 text-[10px] text-muted-foreground", "{relative_time(&thread.updated_at)}" }
+            omni-text { "data-text": "{relative_time(&thread.updated_at)}", "data-strategy": "none", "data-max-lines": "1", class: "mt-1 text-[10px] text-muted-foreground" }
         }
     }
 }

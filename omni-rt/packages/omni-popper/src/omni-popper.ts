@@ -3,8 +3,6 @@ import { createCachedLoader } from "@omni/omni-util/async-loader";
 import { customElement, property } from "lit/decorators.js";
 import type { Instance, Placement } from "@popperjs/core";
 
-type PopperModule = typeof import("@popperjs/core");
-
 const loadPopperModule = createCachedLoader(() => import("@popperjs/core"));
 
 @customElement("omni-popper")

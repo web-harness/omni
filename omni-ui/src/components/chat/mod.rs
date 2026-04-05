@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 use dioxus_free_icons::icons::ld_icons::{
-    LdBot, LdChevronDown, LdChevronRight, LdFolder, LdListTodo, LdSend, LdUser,
+    LdBot, LdChevronDown, LdChevronRight, LdFolder, LdListTodo, LdSend, LdSquare, LdTrash2, LdUser,
 };
 use dioxus_free_icons::Icon;
 use futures_util::StreamExt;
@@ -9,8 +9,8 @@ use crate::components::ui::{Badge, BadgeVariant, Popover};
 #[cfg(target_arch = "wasm32")]
 use crate::lib::thread_context::apply_stream_event;
 use crate::lib::{
-    AgentEndpoint, AgentEndpointState, ChatState, ModelState, Role, TasksState, ThreadState,
-    ToolCall, ToolResult, UiState, WorkspaceState,
+    browser_model_spec, AgentEndpoint, AgentEndpointState, ChatState, ModelState, Role, TasksState,
+    ThreadState, ToolCall, ToolResult, UiState, WorkspaceState,
 };
 
 #[cfg(target_arch = "wasm32")]
@@ -51,6 +51,54 @@ fn send_stream_request(
     _endpoint: Option<AgentEndpoint>,
 ) {
     stream.send(StreamRequest);
+}
+
+fn browser_download_bytes(
+    model_id: &str,
+    status: &crate::lib::BrowserInferenceStatus,
+) -> Option<(u64, u64)> {
+    if status.download.phase != crate::lib::BrowserDownloadPhase::Downloading {
+        return None;
+    }
+
+    if status.download.model_id.as_deref() != Some(model_id) {
+        return None;
+    }
+
+    let spec = browser_model_spec(model_id)?;
+    let loaded_bytes = status.download.loaded_bytes.unwrap_or(0).min(spec.size);
+    Some((loaded_bytes, spec.size))
+}
+
+fn browser_download_segment_label(
+    model_id: &str,
+    status: &crate::lib::BrowserInferenceStatus,
+) -> Option<String> {
+    let (loaded_bytes, total_bytes) = browser_download_bytes(model_id, status)?;
+    let spec = browser_model_spec(model_id)?;
+    let completed_segments = if loaded_bytes >= total_bytes {
+        spec.mirror_parts
+    } else {
+        ((loaded_bytes as u128 * spec.mirror_parts as u128) / total_bytes as u128) as u16
+    };
+
+    Some(format!(
+        "{}/{}",
+        completed_segments.min(spec.mirror_parts),
+        spec.mirror_parts
+    ))
+}
+
+fn browser_download_progress_percent(
+    model_id: &str,
+    status: &crate::lib::BrowserInferenceStatus,
+) -> Option<u8> {
+    let (loaded_bytes, total_bytes) = browser_download_bytes(model_id, status)?;
+    if total_bytes == 0 {
+        return Some(0);
+    }
+
+    Some(((loaded_bytes as u128 * 100) / total_bytes as u128).min(100) as u8)
 }
 
 #[component]
@@ -165,8 +213,8 @@ pub fn ChatContainer(thread_id: String) -> Element {
                 div { class: "mx-auto flex w-full max-w-3xl flex-col gap-3",
                     if messages.is_empty() && tool_calls.is_empty() {
                         div { class: "rounded-sm border border-border bg-background-elevated p-4 text-center",
-                            div { class: "text-xs font-semibold text-muted-foreground", "NEW THREAD" }
-                            p { class: "mt-2 text-sm", "Pick workspace, choose model, and issue your first task." }
+                            omni-text { "data-text": "NEW THREAD", "data-strategy": "none", "data-max-lines": "1", class: "text-xs font-semibold text-muted-foreground" }
+                            omni-text { "data-text": "Pick workspace, choose model, and issue your first task.", "data-strategy": "none", "data-max-lines": "2", class: "mt-2 text-sm" }
                         }
                     }
                     for msg in &messages {
@@ -180,12 +228,14 @@ pub fn ChatContainer(thread_id: String) -> Element {
                     }
                     if chat_state.read().is_streaming {
                         div { class: "rounded-sm border border-border bg-background p-3 text-[11px]",
-                            div { class: "mb-1 text-muted-foreground", "Agent is working..." }
+                            omni-text { "data-text": "Agent is working...", "data-strategy": "none", "data-max-lines": "1", class: "mb-1 text-muted-foreground" }
                             pre { class: "whitespace-pre-wrap", "{chat_state.read().stream_buffer}" }
                         }
                     }
                     if let Some(err) = chat_state.read().error.clone() {
-                        div { class: "rounded-sm border border-status-critical bg-status-critical/10 p-2 text-[11px] text-status-critical", "{err}" }
+                        div { class: "rounded-sm border border-status-critical bg-status-critical/10 p-2 text-[11px] text-status-critical",
+                            omni-text { "data-text": "{err}", "data-strategy": "none", "data-max-lines": "4" }
+                        }
                     }
                 }
             }
@@ -214,7 +264,7 @@ pub fn MessageBubble(message: crate::lib::UiMessage) -> Element {
                 div { class: "w-7" }
             }
             div { class: "min-w-0 flex-1",
-                div { class: "mb-1 text-[10px] font-semibold text-muted-foreground", "{label}" }
+                omni-text { "data-text": "{label}", "data-strategy": "none", "data-max-lines": "1", class: "mb-1 text-[10px] font-semibold text-muted-foreground" }
                 div { class: "{bubble_class}",
                     pre { class: "whitespace-pre-wrap font-sans text-[12px]", "{message.content}" }
                 }
@@ -279,7 +329,7 @@ fn UpdateTodosRenderer(call: ToolCall, result: Option<ToolResult>) -> Element {
                     Icon { width: 10, height: 10, icon: LdChevronRight, class: "text-muted-foreground shrink-0" }
                 }
                 Icon { width: 12, height: 12, icon: LdListTodo, class: "text-muted-foreground shrink-0" }
-                span { class: "font-semibold", "Update Tasks" }
+                omni-text { "data-text": "Update Tasks", "data-strategy": "none", "data-max-lines": "1", class: "font-semibold" }
                 div { class: "ml-auto flex items-center gap-1",
                     if is_done {
                         Badge { variant: BadgeVariant::Nominal, "OK" }
@@ -339,7 +389,7 @@ fn BackgroundTaskRenderer(call: ToolCall) -> Element {
                     Icon { width: 10, height: 10, icon: LdChevronRight, class: "text-muted-foreground shrink-0" }
                 }
                 Icon { width: 12, height: 12, icon: LdBot, class: "text-status-info shrink-0" }
-                span { class: "font-semibold", "Background Task" }
+                omni-text { "data-text": "Background Task", "data-strategy": "none", "data-max-lines": "1", class: "font-semibold" }
             }
             div { class: "px-3 pb-3 pt-1 text-muted-foreground",
                 if open() {
@@ -378,7 +428,7 @@ fn GenericToolCallRenderer(call: ToolCall, result: Option<ToolResult>) -> Elemen
                 } else {
                     Icon { width: 10, height: 10, icon: LdChevronRight, class: "text-muted-foreground shrink-0" }
                 }
-                span { class: "font-semibold font-mono", "{call.name}" }
+                omni-text { "data-text": "{call.name}", "data-strategy": "truncate", "data-max-lines": "1", class: "font-semibold font-mono" }
                 div { class: "ml-auto flex items-center gap-1",
                     if is_done { Badge { variant: BadgeVariant::Nominal, "OK" } }
                     if is_err { Badge { variant: BadgeVariant::Critical, "ERROR" } }
@@ -499,14 +549,10 @@ fn ChatInput(thread_id: String, stream: Coroutine<StreamRequest>) -> Element {
                             .map(|endpoint| endpoint.name.clone())
                             .unwrap_or_else(|| "Main Agent".to_string());
                         rsx! {
-                            div { class: "text-[10px] text-muted-foreground whitespace-nowrap",
-                                "Target: {active_target}"
-                            }
+                            omni-text { "data-text": "Using: {active_target}", "data-strategy": "truncate", "data-max-lines": "1", class: "text-[10px] text-muted-foreground whitespace-nowrap" }
                         }
                     }
-                    div { class: "ml-auto text-[10px] text-muted-foreground whitespace-nowrap",
-                        "~2.4k input · ~580 output · $0.012"
-                    }
+                    omni-text { "data-text": "~2.4k input · ~580 output · $0.012", "data-strategy": "none", "data-max-lines": "1", class: "ml-auto text-[10px] text-muted-foreground whitespace-nowrap" }
                 }
             }
         }
@@ -517,9 +563,9 @@ fn ChatInput(thread_id: String, stream: Coroutine<StreamRequest>) -> Element {
 pub fn ModelSwitcher() -> Element {
     let mut model_state = use_context::<Signal<ModelState>>();
     let mut ui_state = use_context::<Signal<UiState>>();
+    let agent_state = use_context::<Signal<crate::lib::AgentEndpointState>>();
     let thread_state = use_context::<Signal<ThreadState>>();
     let mut open = use_signal(|| false);
-    let mut selected_provider = use_signal(|| crate::lib::ProviderId::Anthropic);
 
     let tid = thread_state
         .read()
@@ -529,12 +575,94 @@ pub fn ModelSwitcher() -> Element {
     let providers = model_state.read().providers.clone();
     let models = model_state.read().models.clone();
     let selected_model = model_state.read().selected_model_for(&tid);
+    let browser_status = model_state.read().browser_inference.clone();
+    let selected_model_config = models
+        .iter()
+        .find(|model| model.id == selected_model)
+        .cloned();
+    let locked_agent = agent_state
+        .read()
+        .active_endpoint()
+        .filter(|endpoint| endpoint.removable)
+        .cloned();
+    let locked_agent_for_close_effect = locked_agent.clone();
+    let locked_agent_for_render = locked_agent.clone();
+    let initial_provider = selected_model_config
+        .as_ref()
+        .map(|model| model.provider.clone())
+        .unwrap_or(crate::lib::ProviderId::Anthropic);
+    let selected_label = selected_model_config
+        .as_ref()
+        .map(|model| model.name.clone())
+        .unwrap_or_else(|| selected_model.clone());
+    let mut selected_provider = use_signal(|| initial_provider.clone());
+    let mut pending_download = use_signal(|| None::<crate::lib::ModelConfig>);
+    let mut pending_delete = use_signal(|| None::<crate::lib::ModelConfig>);
 
     let filtered_models: Vec<_> = models
         .iter()
         .filter(|m| m.provider == selected_provider())
         .cloned()
         .collect();
+
+    let selected_model_for_effect = selected_model_config.clone();
+    let selected_model_for_trigger = selected_model_config.clone();
+
+    use_effect(move || {
+        if locked_agent_for_close_effect.is_none() {
+            return;
+        }
+
+        pending_download.set(None);
+        pending_delete.set(None);
+        if open() {
+            open.set(false);
+        }
+    });
+
+    use_effect(move || {
+        if let Some(model) = selected_model_for_effect.clone() {
+            if selected_provider() != model.provider {
+                selected_provider.set(model.provider);
+            }
+        }
+    });
+
+    use_effect(move || {
+        if selected_provider() != crate::lib::ProviderId::Browser {
+            return;
+        }
+
+        let mut model_state_for_status = model_state;
+        let open_for_status = open;
+        let selected_provider_for_status = selected_provider;
+        spawn(async move {
+            loop {
+                if selected_provider_for_status() != crate::lib::ProviderId::Browser {
+                    break;
+                }
+
+                let status = match crate::lib::sw_api::get_browser_inference_status().await {
+                    Ok(status) => status,
+                    Err(_) => break,
+                };
+
+                let is_downloading =
+                    status.download.phase == crate::lib::BrowserDownloadPhase::Downloading;
+                model_state_for_status.write().browser_inference = status;
+
+                if !open_for_status() && !is_downloading {
+                    break;
+                }
+
+                #[cfg(target_arch = "wasm32")]
+                gloo_timers::future::TimeoutFuture::new(250).await;
+
+                #[cfg(not(target_arch = "wasm32"))]
+                break;
+            }
+        });
+    });
 
     #[cfg(target_arch = "wasm32")]
     fn provider_prefix(provider: &crate::lib::ProviderId) -> &'static str {
@@ -543,93 +671,446 @@ pub fn ModelSwitcher() -> Element {
             crate::lib::ProviderId::OpenAI => "openai",
             crate::lib::ProviderId::Google => "google",
             crate::lib::ProviderId::Ollama => "ollama",
+            crate::lib::ProviderId::Browser => "browser",
         }
     }
 
     rsx! {
-        Popover {
-            open: open(),
-            on_close: move |_| open.set(false),
-            trigger: rsx! {
-                button {
-                    class: "flex items-center gap-1 rounded-sm border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-background-interactive",
-                    onclick: move |_| open.set(!open()),
-                    omni-text { "data-text": "{selected_model}", "data-strategy": "truncate", "data-max-lines": "1", class: "max-w-[180px]" }
-                    Icon { width: 10, height: 10, icon: LdChevronDown }
-                }
-            },
-            div { class: "flex gap-0",
-                div { class: "w-[140px] shrink-0 space-y-0.5 border-r border-border pr-2 mr-2",
-                    for p in providers {
-                        {
-                            let dot_class = if p.has_api_key { "bg-status-nominal" } else { "bg-status-warning" };
-                            let btn_class = if p.id == selected_provider() {
-                                "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[11px] bg-background-interactive"
-                            } else {
-                                "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[11px] hover:bg-background-interactive text-muted-foreground"
-                            };
-                            let pid = p.id.clone();
-                            rsx! {
+        if let Some(agent) = locked_agent_for_render {
+            button {
+                disabled: true,
+                class: "flex w-[clamp(120px,18vw,180px)] max-w-full cursor-default items-center gap-1 rounded-sm border border-border px-2 py-1 text-[11px] text-muted-foreground opacity-70",
+                omni-text { "data-text": "{agent.name}", "data-strategy": "shrink-truncate", "data-max-lines": "1", "data-min-size": "9", class: "min-w-0 flex-1 overflow-hidden whitespace-nowrap" }
+                span { class: "h-[10px] w-[10px] shrink-0" }
+            }
+        } else {
+            Popover {
+                open: open(),
+                on_close: move |_| {
+                    pending_download.set(None);
+                    pending_delete.set(None);
+                    open.set(false);
+                },
+                trigger: rsx! {
+                    button {
+                        class: "flex w-[clamp(120px,18vw,180px)] max-w-full cursor-pointer items-center gap-1 rounded-sm border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-background-interactive",
+                        onclick: move |_| {
+                            if let Some(model) = selected_model_for_trigger.clone() {
+                                selected_provider.set(model.provider);
+                            }
+                            open.set(!open());
+                        },
+                        omni-text { "data-text": "{selected_label}", "data-strategy": "shrink-truncate", "data-max-lines": "1", "data-min-size": "9", class: "min-w-0 flex-1 overflow-hidden whitespace-nowrap" }
+                        Icon { width: 10, height: 10, icon: LdChevronDown }
+                    }
+                },
+                if let Some(model) = pending_download() {
+                {
+                    let download_url = browser_model_spec(&model.id)
+                        .map(|details| details.download_url())
+                        .unwrap_or_default();
+                    let size_label = browser_model_spec(&model.id)
+                        .map(|details| crate::lib::utils::fmt_size(details.size))
+                        .unwrap_or_default();
+                    let source_label = browser_model_spec(&model.id)
+                        .map(|details| details.source_label())
+                        .unwrap_or_default();
+                    let model_for_download = model.clone();
+                    let tid_for_download = tid.clone();
+                    rsx! {
+                        div { class: "space-y-3",
+                            div {
+                                omni-text { "data-text": "Download {model.name}", "data-strategy": "none", "data-max-lines": "1", class: "text-[11px] font-semibold text-foreground" }
+                                omni-text { "data-text": "Browser inference caches the model locally before use.", "data-strategy": "none", "data-max-lines": "2", class: "mt-1 text-[10px] text-muted-foreground" }
+                            }
+                            div { class: "space-y-1 rounded-sm border border-border bg-background px-3 py-2 text-[10px]",
+                                div { class: "flex items-center justify-between gap-2",
+                                    omni-text { "data-text": "Size", "data-strategy": "none", "data-max-lines": "1", class: "text-muted-foreground" }
+                                    omni-text { "data-text": "{size_label}", "data-strategy": "none", "data-max-lines": "1" }
+                                }
+                                div { class: "space-y-1",
+                                    omni-text { "data-text": "Source", "data-strategy": "none", "data-max-lines": "1", class: "text-muted-foreground" }
+                                    omni-text { "data-text": "{source_label}", "data-strategy": "none", "data-max-lines": "2", class: "text-muted-foreground/80" }
+                                    omni-text {
+                                        "data-text": "{download_url}",
+                                        "data-strategy": "none",
+                                        "data-max-lines": "4",
+                                        class: "break-all text-foreground",
+                                    }
+                                }
+                            }
+                            if let Some(error) = browser_status.last_error.clone() {
+                                div { class: "rounded-sm border border-status-critical bg-status-critical/10 px-3 py-2 text-[10px] text-status-critical",
+                                    omni-text { "data-text": "{error}", "data-strategy": "none", "data-max-lines": "4" }
+                                }
+                            }
+                            div { class: "flex items-center justify-end gap-2",
                                 button {
-                                    key: "{p.name}",
-                                    class: "{btn_class}",
-                                    onclick: move |_| selected_provider.set(pid.clone()),
-                                    div { class: "h-1.5 w-1.5 rounded-full {dot_class} shrink-0" }
-                                    span { "{p.name}" }
+                                    class: "rounded-sm border border-border px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-background-interactive",
+                                    onclick: move |evt| {
+                                        evt.stop_propagation();
+                                        pending_download.set(None);
+                                    },
+                                    omni-text { "data-text": "Back", "data-strategy": "none", "data-max-lines": "1" }
+                                }
+                                button {
+                                    class: "rounded-sm bg-primary px-3 py-1.5 text-[11px] text-primary-foreground hover:opacity-90 disabled:opacity-50",
+                                    disabled: browser_status.download.phase == crate::lib::BrowserDownloadPhase::Downloading,
+                                    onclick: move |evt| {
+                                        evt.stop_propagation();
+                                        pending_download.set(None);
+                                        open.set(true);
+                                        if let Some(spec) = browser_model_spec(&model_for_download.id) {
+                                            let mut state = model_state.write();
+                                            state.browser_inference.last_error = None;
+                                            state.browser_inference.download.phase = crate::lib::BrowserDownloadPhase::Downloading;
+                                            state.browser_inference.download.model_id = Some(model_for_download.id.clone());
+                                            state.browser_inference.download.loaded_bytes = Some(0);
+                                            state.browser_inference.download.total_bytes = Some(spec.size);
+                                            state.browser_inference.download.progress_percent = Some(0);
+                                        }
+                                        let mut model_state_for_download = model_state;
+                                        let mut open_for_download = open;
+                                        let model_id = model_for_download.id.clone();
+                                        let tid_for_async = tid_for_download.clone();
+                                        spawn(async move {
+                                            match crate::lib::sw_api::start_browser_model_download(&model_id).await {
+                                                Ok(()) => loop {
+                                                    match crate::lib::sw_api::get_browser_inference_status().await {
+                                                        Ok(status) => {
+                                                            let phase = status.download.phase.clone();
+                                                            let last_error = status.last_error.clone();
+                                                            model_state_for_download.write().browser_inference = status;
+
+                                                            if phase == crate::lib::BrowserDownloadPhase::Completed {
+                                                                model_state_for_download.write().selected_model.insert(
+                                                                    tid_for_async.clone(),
+                                                                    model_id.clone(),
+                                                                );
+                                                                let _ = crate::lib::sw_api::set_default_model(&model_id).await;
+                                                                open_for_download.set(false);
+                                                                break;
+                                                            }
+
+                                                            if phase == crate::lib::BrowserDownloadPhase::Error {
+                                                                if let Some(error) = last_error {
+                                                                    let mut state = model_state_for_download.write();
+                                                                    state.browser_inference.last_error = Some(error);
+                                                                }
+                                                                break;
+                                                            }
+                                                        }
+                                                        Err(error) => {
+                                                            let mut state = model_state_for_download.write();
+                                                            state.browser_inference.last_error = Some(error.to_string());
+                                                            state.browser_inference.download.phase = crate::lib::BrowserDownloadPhase::Error;
+                                                            break;
+                                                        }
+                                                    }
+
+                                                    #[cfg(target_arch = "wasm32")]
+                                                    gloo_timers::future::TimeoutFuture::new(250).await;
+                                                },
+                                                Err(error) => {
+                                                    let mut state = model_state_for_download.write();
+                                                    state.browser_inference.last_error = Some(error.to_string());
+                                                    state.browser_inference.download.phase = crate::lib::BrowserDownloadPhase::Error;
+                                                }
+                                            }
+                                        });
+                                    },
+                                    omni-text { "data-text": "Download", "data-strategy": "none", "data-max-lines": "1" }
                                 }
                             }
                         }
                     }
-                    button {
-                        class: "mt-1 w-full rounded-sm border border-border px-2 py-1 text-left text-[10px] text-muted-foreground hover:bg-background-interactive",
-                        onclick: move |_| {
-                            let provider = selected_provider();
-                            ui_state.write().api_key_provider = provider.clone();
-
-                            #[cfg(target_arch = "wasm32")]
-                            {
-                                let mut ui_for_load = ui_state;
-                                let prefix = provider_prefix(&provider).to_string();
-                                spawn(async move {
-                                    let key = crate::lib::sw_api::get_api_key(&prefix)
-                                        .await
-                                        .unwrap_or_default();
-                                    ui_for_load.write().api_key_draft = key;
-                                });
+                }
+            } else if let Some(model) = pending_delete() {
+                {
+                    let model_for_delete = model.clone();
+                    let tid_for_delete = tid.clone();
+                    rsx! {
+                        div { class: "space-y-3",
+                            div {
+                                omni-text { "data-text": "Delete {model.name}?", "data-strategy": "none", "data-max-lines": "1", class: "text-[11px] font-semibold text-foreground" }
+                                omni-text { "data-text": "This removes the model from your browser's local storage.", "data-strategy": "none", "data-max-lines": "2", class: "mt-1 text-[10px] text-muted-foreground" }
                             }
-
-                            ui_state.write().api_key_dialog_open = true;
-                            open.set(false);
-                        },
-                        "API Keys"
+                            div { class: "rounded-sm border border-status-warning/40 bg-status-warning/10 px-3 py-2 text-[10px] text-muted-foreground",
+                                omni-text { "data-text": "You can download it again later if you need it.", "data-strategy": "none", "data-max-lines": "2" }
+                            }
+                            if let Some(error) = browser_status.last_error.clone() {
+                                div { class: "rounded-sm border border-status-critical bg-status-critical/10 px-3 py-2 text-[10px] text-status-critical",
+                                    omni-text { "data-text": "{error}", "data-strategy": "none", "data-max-lines": "4" }
+                                }
+                            }
+                            div { class: "flex items-center justify-end gap-2",
+                                button {
+                                    class: "rounded-sm border border-border px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-background-interactive",
+                                    onclick: move |evt| {
+                                        evt.stop_propagation();
+                                        pending_delete.set(None);
+                                    },
+                                    omni-text { "data-text": "Cancel", "data-strategy": "none", "data-max-lines": "1" }
+                                }
+                                button {
+                                    class: "rounded-sm bg-status-critical px-3 py-1.5 text-[11px] text-white hover:opacity-90",
+                                    onclick: move |evt| {
+                                        evt.stop_propagation();
+                                        pending_delete.set(None);
+                                        {
+                                            let mut state = model_state.write();
+                                            state.browser_inference.cached_model_ids.retain(|cached| cached != &model_for_delete.id);
+                                            if state.browser_inference.loaded_model_id.as_deref() == Some(model_for_delete.id.as_str()) {
+                                                state.browser_inference.loaded_model_id = None;
+                                            }
+                                            if state.browser_inference.download.model_id.as_deref() == Some(model_for_delete.id.as_str()) {
+                                                state.browser_inference.download.phase = crate::lib::BrowserDownloadPhase::Idle;
+                                                state.browser_inference.download.model_id = None;
+                                                state.browser_inference.download.loaded_bytes = None;
+                                                state.browser_inference.download.total_bytes = None;
+                                                state.browser_inference.download.progress_percent = None;
+                                            }
+                                        }
+                                        let mut model_state_for_delete = model_state;
+                                        let model_id = model_for_delete.id.clone();
+                                        let tid_for_async = tid_for_delete.clone();
+                                        spawn(async move {
+                                            match crate::lib::sw_api::delete_browser_model(&model_id).await {
+                                                Ok(()) => {
+                                                    match crate::lib::sw_api::get_browser_inference_status().await {
+                                                        Ok(status) => {
+                                                            let fallback_model = status
+                                                                .cached_model_ids
+                                                                .first()
+                                                                .cloned()
+                                                                .unwrap_or_else(|| "claude-3-7-sonnet".to_string());
+                                                            let mut state = model_state_for_delete.write();
+                                                            state.browser_inference = status;
+                                                            if state.selected_model_for(&tid_for_async) == model_id {
+                                                                state.selected_model.insert(tid_for_async.clone(), fallback_model);
+                                                            }
+                                                        }
+                                                        Err(error) => {
+                                                            let mut state = model_state_for_delete.write();
+                                                            state.browser_inference.last_error = Some(error.to_string());
+                                                        }
+                                                    }
+                                                }
+                                                Err(error) => {
+                                                    match crate::lib::sw_api::get_browser_inference_status().await {
+                                                        Ok(status) => {
+                                                            let mut state = model_state_for_delete.write();
+                                                            state.browser_inference = status;
+                                                            state.browser_inference.last_error = Some(error.to_string());
+                                                        }
+                                                        Err(_) => {
+                                                            let mut state = model_state_for_delete.write();
+                                                            state.browser_inference.last_error = Some(error.to_string());
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        });
+                                    },
+                                    omni-text { "data-text": "Delete", "data-strategy": "none", "data-max-lines": "1" }
+                                }
+                            }
+                        }
                     }
                 }
-                div { class: "flex-1 space-y-0.5",
-                    for model in filtered_models {
-                        {
-                            let btn_class = if model.id == selected_model {
-                                "w-full rounded-sm px-2 py-1.5 text-left text-[11px] bg-primary/10 text-primary"
-                            } else {
-                                "w-full rounded-sm px-2 py-1.5 text-left text-[11px] hover:bg-background-interactive text-muted-foreground"
-                            };
-                            let mid = model.id.clone();
-                            let tid_for_click = tid.clone();
-                            rsx! {
-                                button {
-                                    key: "{model.id}",
-                                    class: "{btn_class}",
-                                    onclick: move |_| {
-                                        model_state.write().selected_model.insert(tid_for_click.clone(), mid.clone());
-                                        #[cfg(target_arch = "wasm32")]
-                                        {
-                                            let model_id = mid.clone();
-                                            spawn(async move {
-                                                let _ = crate::lib::sw_api::set_default_model(&model_id).await;
-                                            });
+            } else {
+                div { class: "flex gap-0",
+                    div { class: "w-[140px] shrink-0 space-y-0.5 border-r border-border pr-2 mr-2",
+                        for p in providers {
+                            {
+                                let dot_class = if p.has_api_key { "bg-status-nominal" } else { "bg-status-warning" };
+                                let btn_class = if p.id == selected_provider() {
+                                    "flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[11px] bg-background-interactive"
+                                } else {
+                                    "flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[11px] hover:bg-background-interactive text-muted-foreground"
+                                };
+                                let pid = p.id.clone();
+                                rsx! {
+                                    button {
+                                        key: "{p.name}",
+                                        class: "{btn_class}",
+                                        onclick: move |_| selected_provider.set(pid.clone()),
+                                        div { class: "h-1.5 w-1.5 rounded-full {dot_class} shrink-0" }
+                                        omni-text { "data-text": "{p.name}", "data-strategy": "truncate", "data-max-lines": "1" }
+                                    }
+                                }
+                            }
+                        }
+                        if selected_provider() != crate::lib::ProviderId::Browser {
+                            button {
+                                class: "mt-1 w-full rounded-sm border border-border px-2 py-1 text-left text-[10px] text-muted-foreground hover:bg-background-interactive",
+                                onclick: move |_| {
+                                    let provider = selected_provider();
+                                    ui_state.write().api_key_provider = provider.clone();
+
+                                    #[cfg(target_arch = "wasm32")]
+                                    {
+                                        let mut ui_for_load = ui_state;
+                                        let prefix = provider_prefix(&provider).to_string();
+                                        spawn(async move {
+                                            let key = crate::lib::sw_api::get_api_key(&prefix)
+                                                .await
+                                                .unwrap_or_default();
+                                            ui_for_load.write().api_key_draft = key;
+                                        });
+                                    }
+
+                                    ui_state.write().api_key_dialog_open = true;
+                                    open.set(false);
+                                },
+                                omni-text { "data-text": "API Keys", "data-strategy": "none", "data-max-lines": "1" }
+                            }
+                        }
+                    }
+                    div { class: "flex-1 space-y-0.5",
+                        for model in filtered_models {
+                            {
+                                let is_browser = model.provider == crate::lib::ProviderId::Browser;
+                                let is_cached = browser_status.cached_model_ids.iter().any(|cached| cached == &model.id);
+                                let is_loaded = browser_status.loaded_model_id.as_deref() == Some(model.id.as_str());
+                                let is_downloading = browser_status.download.phase == crate::lib::BrowserDownloadPhase::Downloading
+                                    && browser_status.download.model_id.as_deref() == Some(model.id.as_str());
+                                let download_progress = browser_download_progress_percent(&model.id, &browser_status);
+                                let download_segments = browser_download_segment_label(&model.id, &browser_status);
+                                let browser_badge = if is_browser {
+                                    if is_downloading {
+                                        Some((
+                                            BadgeVariant::Info,
+                                            download_segments.unwrap_or_else(|| "0/0".to_string()),
+                                        ))
+                                    } else if is_loaded {
+                                        Some((BadgeVariant::Nominal, "LOADED".to_string()))
+                                    } else if is_cached {
+                                        Some((BadgeVariant::Nominal, "READY".to_string()))
+                                    } else {
+                                        Some((BadgeVariant::Warning, "DOWNLOAD".to_string()))
+                                    }
+                                } else {
+                                    None
+                                };
+                                let btn_class = if model.id == selected_model {
+                                    "relative w-full cursor-pointer overflow-hidden rounded-sm px-2 py-1.5 text-left text-[11px] bg-primary/10 text-primary"
+                                } else {
+                                    "relative w-full cursor-pointer overflow-hidden rounded-sm px-2 py-1.5 text-left text-[11px] hover:bg-background-interactive text-muted-foreground"
+                                };
+                                let mid = model.id.clone();
+                                let model_name = model.name.clone();
+                                let tid_for_click = tid.clone();
+                                let model_for_confirm = model.clone();
+                                let model_for_delete = model.clone();
+                                rsx! {
+                                    div {
+                                        key: "{model.id}",
+                                        class: "relative",
+                                        div {
+                                            class: "{btn_class}",
+                                            onclick: move |_| {
+                                                if is_browser && !is_cached {
+                                                    if !is_downloading {
+                                                        pending_download.set(Some(model_for_confirm.clone()));
+                                                    }
+                                                    return;
+                                                }
+                                                model_state.write().selected_model.insert(tid_for_click.clone(), mid.clone());
+                                                #[cfg(target_arch = "wasm32")]
+                                                {
+                                                    let model_id = mid.clone();
+                                                    spawn(async move {
+                                                        let _ = crate::lib::sw_api::set_default_model(&model_id).await;
+                                                    });
+                                                }
+                                                open.set(false);
+                                            },
+                                            if let Some(progress_percent) = download_progress {
+                                                div {
+                                                    class: "pointer-events-none absolute inset-y-0 left-0 rounded-sm bg-status-info/15",
+                                                    style: "width: {progress_percent}%;",
+                                                }
+                                            }
+                                            if is_downloading {
+                                                div { class: "pointer-events-none absolute inset-y-0 left-0 z-10 w-[42%] browser-download-sweep" }
+                                            }
+                                            div { class: "relative z-20 flex items-center gap-2",
+                                                div { class: "min-w-0 flex-1",
+                                                    omni-text {
+                                                        "data-text": "{model_name}",
+                                                        "data-strategy": "truncate",
+                                                        "data-max-lines": "1",
+                                                        class: "min-w-0",
+                                                    }
+                                                    if is_downloading {
+                                                        omni-text { "data-text": "{download_progress.unwrap_or(0)}% of total download", "data-strategy": "none", "data-max-lines": "1", class: "mt-0.5 text-[10px] text-muted-foreground" }
+                                                    }
+                                                }
+                                                if let Some((variant, badge_text)) = browser_badge.clone() {
+                                                    if is_browser && is_cached && !is_downloading {
+                                                        div { class: "group relative shrink-0",
+                                                            Badge { variant: variant, class: "shrink-0 transition-opacity group-hover:opacity-0", "{badge_text}" }
+                                                            button {
+                                                                class: "absolute inset-0 inline-flex items-center justify-center rounded-sm border border-status-critical/30 bg-status-critical/10 text-status-critical opacity-0 transition-opacity group-hover:opacity-100",
+                                                                onclick: move |evt| {
+                                                                    evt.stop_propagation();
+                                                                    pending_delete.set(Some(model_for_delete.clone()));
+                                                                },
+                                                                Icon { width: 11, height: 11, icon: LdTrash2 }
+                                                            }
+                                                        }
+                                                    } else if is_downloading {
+                                                        div { class: "group relative shrink-0",
+                                                            Badge { variant: variant, class: "shrink-0 transition-opacity group-hover:opacity-0", "{badge_text}" }
+                                                            button {
+                                                                class: "absolute inset-0 inline-flex items-center justify-center rounded-sm border border-status-critical/30 bg-status-critical/10 text-status-critical opacity-0 transition-opacity group-hover:opacity-100",
+                                                                onclick: move |evt| {
+                                                                    evt.stop_propagation();
+                                                                    {
+                                                                        let mut state = model_state.write();
+                                                                        state.browser_inference.last_error = None;
+                                                                        state.browser_inference.download.phase = crate::lib::BrowserDownloadPhase::Idle;
+                                                                        state.browser_inference.download.model_id = None;
+                                                                        state.browser_inference.download.loaded_bytes = None;
+                                                                        state.browser_inference.download.total_bytes = None;
+                                                                        state.browser_inference.download.progress_percent = None;
+                                                                        state.browser_inference.cached_model_ids.retain(|cached| cached != &model.id);
+                                                                        if state.browser_inference.loaded_model_id.as_deref() == Some(model.id.as_str()) {
+                                                                            state.browser_inference.loaded_model_id = None;
+                                                                        }
+                                                                    }
+                                                                    let mut model_state_for_stop = model_state;
+                                                                    let model_id = model.id.clone();
+                                                                    spawn(async move {
+                                                                        match crate::lib::sw_api::stop_browser_model_download(&model_id).await {
+                                                                            Ok(()) => {
+                                                                                if let Ok(status) = crate::lib::sw_api::get_browser_inference_status().await {
+                                                                                    model_state_for_stop.write().browser_inference = status;
+                                                                                }
+                                                                            }
+                                                                            Err(error) => {
+                                                                                let refreshed_status = crate::lib::sw_api::get_browser_inference_status().await.ok();
+                                                                                let mut state = model_state_for_stop.write();
+                                                                                if let Some(status) = refreshed_status {
+                                                                                    state.browser_inference = status;
+                                                                                }
+                                                                                state.browser_inference.last_error = Some(error.to_string());
+                                                                            }
+                                                                        }
+                                                                    });
+                                                                },
+                                                                Icon { width: 10, height: 10, icon: LdSquare }
+                                                            }
+                                                        }
+                                                    } else {
+                                                        Badge { variant: variant, class: "shrink-0", "{badge_text}" }
+                                                    }
+                                                }
+                                                }
+                                            }
                                         }
-                                        open.set(false);
-                                    },
-                                    "{model.name}"
+                                    }
                                 }
                             }
                         }
@@ -670,7 +1151,7 @@ pub fn WorkspacePicker() -> Element {
                 }
             },
             div { class: "space-y-1",
-                div { class: "px-2 pb-1 text-[9px] font-semibold uppercase tracking-widest text-muted-foreground", "Select Workspace" }
+                omni-text { "data-text": "Select Workspace", "data-strategy": "none", "data-max-lines": "1", class: "px-2 pb-1 text-[9px] font-semibold uppercase tracking-widest text-muted-foreground" }
                 for (name, path) in presets {
                     {
                         let active = workspace_state.read().workspace_for(&tid) == path;
@@ -700,8 +1181,8 @@ pub fn WorkspacePicker() -> Element {
                                 },
                                 Icon { width: 12, height: 12, icon: LdFolder, class: "shrink-0" }
                                 div {
-                                    div { class: "text-[11px] font-semibold", "{name}" }
-                                    div { class: "text-[10px] text-muted-foreground", "{path}" }
+                                    omni-text { "data-text": "{name}", "data-strategy": "truncate", "data-max-lines": "1", class: "text-[11px] font-semibold" }
+                                    omni-text { "data-text": "{path}", "data-strategy": "truncate", "data-max-lines": "1", class: "text-[10px] text-muted-foreground" }
                                 }
                             }
                         }
@@ -711,7 +1192,7 @@ pub fn WorkspacePicker() -> Element {
                 button {
                     class: "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[11px] text-muted-foreground hover:bg-background-interactive",
                     Icon { width: 12, height: 12, icon: LdFolder, class: "shrink-0" }
-                    span { "Browse..." }
+                    omni-text { "data-text": "Browse...", "data-strategy": "none", "data-max-lines": "1" }
                 }
             }
         }

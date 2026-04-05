@@ -30,8 +30,8 @@ pub fn TasksSection() -> Element {
     rsx! {
         div { class: "overflow-auto",
             div { class: "flex items-center justify-between px-3 py-1.5 text-[10px] text-muted-foreground border-b border-border",
-                span { class: "font-semibold tracking-wide", "PROGRESS" }
-                span { "{done}/{total}" }
+                omni-text { "data-text": "PROGRESS", "data-strategy": "none", "data-max-lines": "1", class: "font-semibold tracking-wide" }
+                omni-text { "data-text": "{done}/{total}", "data-strategy": "none", "data-max-lines": "1" }
             }
             div { class: "py-1",
                 for todo in todos {
@@ -121,7 +121,7 @@ pub fn FilesSection() -> Element {
                         });
                     },
                     Icon { width: 10, height: 10, icon: LdRefreshCw }
-                    span { "Sync" }
+                    omni-text { "data-text": "Sync", "data-strategy": "none", "data-max-lines": "1" }
                 }
             }
             div { class: "py-1",
@@ -198,7 +198,7 @@ fn FileRow(file: FileInfo, on_open: EventHandler<String>, workspace_root: String
             }
             omni-text { "data-text": "{name}", "data-strategy": "truncate", "data-max-lines": "1", class: "flex-1 text-[11px]" }
             if !size_str.is_empty() {
-                span { class: "shrink-0 text-[10px] text-muted-foreground", "{size_str}" }
+                omni-text { "data-text": "{size_str}", "data-strategy": "none", "data-max-lines": "1", class: "shrink-0 text-[10px] text-muted-foreground" }
             }
         }
     }

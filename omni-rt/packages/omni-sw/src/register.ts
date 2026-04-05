@@ -1,47 +1,68 @@
+import { resolveServiceWorkerScope } from "@omni/omni-util/service-worker";
+
 // URL is injected by Dioxus via <meta name="omni-sw-url"> so the hashed asset path is correct
 const SW_URL =
   typeof document !== "undefined"
     ? (document.querySelector<HTMLMetaElement>('meta[name="omni-sw-url"]')?.content ?? "/omni-sw.js")
     : "/omni-sw.js";
 const READY_CHANNEL = "omni-sw-ready";
+const FIRST_ACTIVATION_RELOAD_KEY = "__omni_sw_first_activation_reload";
 
 type RegisterEnv = {
   navigator: Navigator;
   channel: BroadcastChannel;
   swUrl: string;
   setReadyFlag: () => void;
+  reloadPage: () => void;
 };
-
-function serviceWorkerScope(swUrl: string): string {
-  const baseUrl = globalThis.location?.href ?? "https://example.test/";
-  const resolvedUrl = new URL(swUrl, baseUrl);
-  const lastSlash = resolvedUrl.pathname.lastIndexOf("/");
-
-  if (lastSlash < 0) {
-    return "/";
-  }
-
-  return resolvedUrl.pathname.slice(0, lastSlash + 1) || "/";
-}
 
 function markReady(channel: BroadcastChannel, setReadyFlag: () => void): void {
   setReadyFlag();
   channel.postMessage({ type: "ready" });
 }
 
+function shouldReloadOnFirstActivation(hadController: boolean): boolean {
+  if (hadController || typeof sessionStorage === "undefined") {
+    return false;
+  }
+
+  if (sessionStorage.getItem(FIRST_ACTIVATION_RELOAD_KEY) === "done") {
+    return false;
+  }
+
+  sessionStorage.setItem(FIRST_ACTIVATION_RELOAD_KEY, "done");
+  return true;
+}
+
+function clearReloadFlag(): void {
+  if (typeof sessionStorage === "undefined") {
+    return;
+  }
+  sessionStorage.removeItem(FIRST_ACTIVATION_RELOAD_KEY);
+}
+
 export async function registerServiceWorker(env: RegisterEnv): Promise<void> {
-  const { navigator, channel, swUrl, setReadyFlag } = env;
+  const { navigator, channel, swUrl, setReadyFlag, reloadPage } = env;
   if (!("serviceWorker" in navigator)) return;
+
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  if (hadController) {
+    clearReloadFlag();
+  }
 
   try {
     const registration = await navigator.serviceWorker.register(swUrl, {
       type: "module",
-      scope: serviceWorkerScope(swUrl),
+      scope: resolveServiceWorkerScope(swUrl),
     });
 
     const sw = registration.installing ?? registration.waiting ?? registration.active;
 
     if (sw && sw.state === "activated") {
+      if (shouldReloadOnFirstActivation(hadController)) {
+        reloadPage();
+        return;
+      }
       markReady(channel, setReadyFlag);
       return;
     }
@@ -50,6 +71,10 @@ export async function registerServiceWorker(env: RegisterEnv): Promise<void> {
     if (target) {
       target.addEventListener("statechange", () => {
         if (target.state === "activated") {
+          if (shouldReloadOnFirstActivation(hadController)) {
+            reloadPage();
+            return;
+          }
           markReady(channel, setReadyFlag);
         }
       });
@@ -60,6 +85,10 @@ export async function registerServiceWorker(env: RegisterEnv): Promise<void> {
       if (!newSw) return;
       newSw.addEventListener("statechange", () => {
         if (newSw.state === "activated") {
+          if (shouldReloadOnFirstActivation(hadController)) {
+            reloadPage();
+            return;
+          }
           setReadyFlag();
           channel.postMessage({ type: "update-available" });
         }
@@ -78,6 +107,7 @@ if (typeof navigator !== "undefined" && typeof BroadcastChannel !== "undefined")
     navigator,
     channel,
     swUrl: SW_URL,
+    reloadPage: () => location.reload(),
     setReadyFlag: () => {
       (globalThis as Record<string, unknown>).__omni_sw_ready = true;
     },

@@ -54,7 +54,7 @@ pub fn ThreadSidebar() -> Element {
                         }
                     },
                     Icon { width: 14, height: 14, icon: LdPlus }
-                    span { "New Thread" }
+                    omni-text { "data-text": "New Thread", "data-strategy": "none", "data-max-lines": "1" }
                 }
             }
 
@@ -89,7 +89,7 @@ pub fn ThreadSidebar() -> Element {
                         navigator.push(Route::Board {});
                     },
                     Icon { width: 14, height: 14, icon: LdLayoutGrid }
-                    span { "Overview" }
+                    omni-text { "data-text": "Overview", "data-strategy": "none", "data-max-lines": "1" }
                 }
             }
         }
@@ -131,7 +131,7 @@ fn ThreadRow(thread: crate::lib::UiThread) -> Element {
                         "data-max-lines": "1",
                         class: "text-xs font-semibold",
                     }
-                    div { class: "text-[10px] text-muted-foreground", "{relative_time(&thread.updated_at)}" }
+                    omni-text { "data-text": "{relative_time(&thread.updated_at)}", "data-strategy": "none", "data-max-lines": "1", class: "text-[10px] text-muted-foreground" }
                 }
                 button {
                     class: "rounded px-1 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-status-critical transition-opacity",

@@ -47,6 +47,7 @@ pub enum ProviderId {
     OpenAI,
     Google,
     Ollama,
+    Browser,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -128,6 +129,80 @@ pub struct ModelConfig {
     pub id: String,
     pub name: String,
     pub provider: ProviderId,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BrowserModelSpec {
+    pub id: &'static str,
+    pub name: &'static str,
+    pub file: &'static str,
+    pub size: u64,
+    pub mirror_parts: u16,
+}
+
+impl BrowserModelSpec {
+    pub fn download_url(self) -> String {
+        format!(
+            "https://raw.githubusercontent.com/web-harness/models/main/models/{}.zip.part-000",
+            self.file
+        )
+    }
+
+    pub fn source_label(self) -> String {
+        format!("web-harness/models/{}.zip.part-*", self.file)
+    }
+}
+
+pub const BROWSER_MODEL_SPECS: [BrowserModelSpec; 2] = [
+    BrowserModelSpec {
+        id: "lfm2-1.2b",
+        name: "LFM2 1.2B",
+        file: "LFM2-1.2B-Q4_K_M.gguf",
+        size: 730_910_720,
+        mirror_parts: 8,
+    },
+    BrowserModelSpec {
+        id: "deepseek-r1-1.5b",
+        name: "DeepSeek R1 1.5B",
+        file: "DeepSeek-R1-Distill-Qwen-1.5B-Q3_K_M.gguf",
+        size: 924_844_032,
+        mirror_parts: 10,
+    },
+];
+
+pub fn browser_model_spec(model_id: &str) -> Option<BrowserModelSpec> {
+    BROWSER_MODEL_SPECS
+        .iter()
+        .copied()
+        .find(|model| model.id == model_id)
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BrowserDownloadPhase {
+    #[default]
+    Idle,
+    Downloading,
+    Completed,
+    Error,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BrowserDownloadStatus {
+    pub phase: BrowserDownloadPhase,
+    pub model_id: Option<String>,
+    pub loaded_bytes: Option<u64>,
+    pub total_bytes: Option<u64>,
+    pub progress_percent: Option<u8>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BrowserInferenceStatus {
+    pub engaged: bool,
+    pub loaded_model_id: Option<String>,
+    pub cached_model_ids: Vec<String>,
+    pub download: BrowserDownloadStatus,
+    pub last_error: Option<String>,
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -236,6 +311,7 @@ pub struct ModelState {
     pub providers: Vec<Provider>,
     pub models: Vec<ModelConfig>,
     pub selected_model: HashMap<String, String>,
+    pub browser_inference: BrowserInferenceStatus,
 }
 
 impl ModelState {
@@ -394,48 +470,58 @@ pub fn static_models() -> Vec<ModelConfig> {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    vec![
-        ModelConfig {
-            id: "claude-3-7-sonnet".into(),
-            name: "Claude 3.7 Sonnet".into(),
-            provider: ProviderId::Anthropic,
-        },
-        ModelConfig {
-            id: "claude-3-5-haiku".into(),
-            name: "Claude 3.5 Haiku".into(),
-            provider: ProviderId::Anthropic,
-        },
-        ModelConfig {
-            id: "gpt-5".into(),
-            name: "GPT-5".into(),
-            provider: ProviderId::OpenAI,
-        },
-        ModelConfig {
-            id: "gpt-4o".into(),
-            name: "GPT-4o".into(),
-            provider: ProviderId::OpenAI,
-        },
-        ModelConfig {
-            id: "gemini-2.5-pro".into(),
-            name: "Gemini 2.5 Pro".into(),
-            provider: ProviderId::Google,
-        },
-        ModelConfig {
-            id: "gemini-2.0-flash".into(),
-            name: "Gemini 2.0 Flash".into(),
-            provider: ProviderId::Google,
-        },
-        ModelConfig {
-            id: "llama-3.3-70b".into(),
-            name: "Llama 3.3 70B".into(),
-            provider: ProviderId::Ollama,
-        },
-        ModelConfig {
-            id: "deepseek-r1".into(),
-            name: "DeepSeek R1".into(),
-            provider: ProviderId::Ollama,
-        },
-    ]
+    {
+        let mut models = vec![
+            ModelConfig {
+                id: "claude-3-7-sonnet".into(),
+                name: "Claude 3.7 Sonnet".into(),
+                provider: ProviderId::Anthropic,
+            },
+            ModelConfig {
+                id: "claude-3-5-haiku".into(),
+                name: "Claude 3.5 Haiku".into(),
+                provider: ProviderId::Anthropic,
+            },
+            ModelConfig {
+                id: "gpt-5".into(),
+                name: "GPT-5".into(),
+                provider: ProviderId::OpenAI,
+            },
+            ModelConfig {
+                id: "gpt-4o".into(),
+                name: "GPT-4o".into(),
+                provider: ProviderId::OpenAI,
+            },
+            ModelConfig {
+                id: "gemini-2.5-pro".into(),
+                name: "Gemini 2.5 Pro".into(),
+                provider: ProviderId::Google,
+            },
+            ModelConfig {
+                id: "gemini-2.0-flash".into(),
+                name: "Gemini 2.0 Flash".into(),
+                provider: ProviderId::Google,
+            },
+            ModelConfig {
+                id: "llama-3.3-70b".into(),
+                name: "Llama 3.3 70B".into(),
+                provider: ProviderId::Ollama,
+            },
+            ModelConfig {
+                id: "deepseek-r1".into(),
+                name: "DeepSeek R1".into(),
+                provider: ProviderId::Ollama,
+            },
+        ];
+
+        models.extend(BROWSER_MODEL_SPECS.into_iter().map(|model| ModelConfig {
+            id: model.id.into(),
+            name: model.name.into(),
+            provider: ProviderId::Browser,
+        }));
+
+        models
+    }
 }
 
 pub fn static_providers() -> Vec<Provider> {
@@ -465,6 +551,11 @@ pub fn static_providers() -> Vec<Provider> {
             id: ProviderId::Ollama,
             name: "Ollama".into(),
             has_api_key: false,
+        },
+        Provider {
+            id: ProviderId::Browser,
+            name: "Browser".into(),
+            has_api_key: true,
         },
     ]
 }
@@ -511,6 +602,7 @@ pub fn default_states() -> (
             providers: static_providers(),
             models: static_models(),
             selected_model: HashMap::new(),
+            browser_inference: BrowserInferenceStatus::default(),
         },
         UiState {
             theme: initial_theme,
@@ -565,6 +657,10 @@ pub async fn async_init(
         if !payload.providers.is_empty() {
             ms.providers = payload.providers.clone();
         }
+    }
+
+    if let Ok(status) = sw_api::get_browser_inference_status().await {
+        model_state.write().browser_inference = status;
     }
 
     let first_model = model_state.read().models.first().map(|m| m.id.clone());

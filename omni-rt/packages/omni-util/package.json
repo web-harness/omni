@@ -8,6 +8,8 @@
   "exports": {
     ".": "./dist/index.js",
     "./async-loader": "./dist/async-loader.js",
+    "./browser-models": "./dist/browser-models.js",
+    "./service-worker": "./dist/service-worker.js",
     "./object-url": "./dist/object-url.js"
   },
   "devDependencies": {

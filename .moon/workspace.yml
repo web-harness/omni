@@ -20,6 +20,7 @@ projects:
   omni-popper: omni-rt/packages/omni-popper
   omni-pretext: omni-rt/packages/omni-pretext
   omni-sheetjs: omni-rt/packages/omni-sheetjs
+  omni-inference: omni-rt/packages/omni-inference
   omni-sw: omni-rt/packages/omni-sw
   omni-wc: omni-wc
 
