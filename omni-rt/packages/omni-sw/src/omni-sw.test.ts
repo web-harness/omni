@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { matchInferenceRoute } from "@omni/omni-inference/runtime";
 import { matchRunRoute } from "./omni-sw";
 import { matchStoreRoute } from "./store-api";
 
@@ -44,6 +45,11 @@ describe("matchRunRoute", () => {
   it("passes through unrelated paths", () => {
     const req = new Request("https://example.test/threads", { method: "POST" });
     expect(matchRunRoute(req)).toBeNull();
+  });
+
+  it("matches completions inference endpoint through the shared runtime matcher", () => {
+    const req = new Request("https://example.test/omni/app/v1/completions", { method: "POST" });
+    expect(matchInferenceRoute(req)).toBe("completions");
   });
 
   it("matches GitHub Pages-prefixed store endpoints", () => {

@@ -6,7 +6,7 @@ import {
   deleteDefaultModel,
   deleteThread,
   getApiKey,
-  getStoredDefaultModel,
+  getMigratableStoredDefaultModel,
   listWorkspaceFiles,
   readProvidersWithKeys,
   setApiKey,
@@ -499,7 +499,7 @@ async function ensureConfigItemMirror(namespace: string[], key: string): Promise
   }
 
   if (isDefaultModelItem(namespace, key)) {
-    const modelId = (await getStoredDefaultModel())?.trim() ?? "";
+    const modelId = (await getMigratableStoredDefaultModel())?.trim() ?? "";
     if (!modelId) {
       return;
     }

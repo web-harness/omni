@@ -6,6 +6,12 @@ use gloo_net::http::Request;
 #[cfg(target_arch = "wasm32")]
 use serde::Deserialize;
 #[cfg(target_arch = "wasm32")]
+use std::cell::RefCell;
+#[cfg(target_arch = "wasm32")]
+use std::rc::Rc;
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::closure::Closure;
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
 #[cfg(target_arch = "wasm32")]
@@ -31,7 +37,34 @@ extern "C" {
 
     #[wasm_bindgen(catch, js_name = deleteBrowserModel)]
     async fn js_delete_browser_model(model_id: &str) -> Result<JsValue, JsValue>;
+
+    type BrowserInferenceStatusStreamHandle;
+
+    #[wasm_bindgen(catch, js_name = startBrowserInferenceStatusStream)]
+    fn js_start_browser_inference_status_stream(
+        callback: &Closure<dyn FnMut(JsValue)>,
+    ) -> Result<BrowserInferenceStatusStreamHandle, JsValue>;
+
+    #[wasm_bindgen(method, js_name = stop)]
+    fn stop_browser_inference_status_stream(this: &BrowserInferenceStatusStreamHandle);
 }
+
+#[cfg(target_arch = "wasm32")]
+pub struct BrowserInferenceStatusSubscription {
+    callback: Closure<dyn FnMut(JsValue)>,
+    handle: BrowserInferenceStatusStreamHandle,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl Drop for BrowserInferenceStatusSubscription {
+    fn drop(&mut self) {
+        let _ = &self.callback;
+        self.handle.stop_browser_inference_status_stream();
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub struct BrowserInferenceStatusSubscription;
 
 #[cfg(target_arch = "wasm32")]
 #[derive(Deserialize)]
@@ -465,6 +498,43 @@ pub async fn delete_browser_model(model_id: &str) -> Result<(), std::io::Error> 
 }
 
 #[cfg(target_arch = "wasm32")]
+pub fn subscribe_browser_inference_status<F>(
+    on_status: F,
+) -> Result<BrowserInferenceStatusSubscription, std::io::Error>
+where
+    F: FnMut(BrowserInferenceStatus) + 'static,
+{
+    let callback = Rc::new(RefCell::new(on_status));
+    let closure = {
+        let callback = callback.clone();
+        Closure::wrap(Box::new(move |value: JsValue| {
+            if let Ok(status) = serde_wasm_bindgen::from_value::<BrowserInferenceStatus>(value) {
+                callback.borrow_mut()(status);
+            }
+        }) as Box<dyn FnMut(JsValue)>)
+    };
+
+    let handle = js_start_browser_inference_status_stream(&closure)
+        .map_err(|error| std::io::Error::other(js_value_to_string(&error)))?;
+
+    Ok(BrowserInferenceStatusSubscription {
+        callback: closure,
+        handle,
+    })
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
+pub fn subscribe_browser_inference_status<F>(
+    _: F,
+) -> Result<BrowserInferenceStatusSubscription, std::io::Error>
+where
+    F: FnMut(BrowserInferenceStatus) + 'static,
+{
+    Err(unavailable())
+}
+
+#[cfg(target_arch = "wasm32")]
 pub async fn list_workspace_files(workspace: &str) -> Result<Vec<super::FileInfo>, std::io::Error> {
     let encoded = js_sys::encode_uri_component(workspace)
         .as_string()
@@ -495,6 +565,7 @@ pub async fn list_workspace_files(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
 pub async fn set_default_model(_model_id: &str) -> Result<(), std::io::Error> {
     Err(unavailable())
 }

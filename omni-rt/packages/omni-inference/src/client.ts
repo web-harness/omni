@@ -2,6 +2,14 @@ import { resolveServiceWorkerScope } from "@omni/omni-util/service-worker";
 import { parseInferenceWorkerResponse, type InferenceWorkerMessage, type InferenceWorkerResponse } from "./protocol.js";
 
 const WORKER_RESPONSE_TIMEOUT_MS = 10_000;
+const STATUS_CHANNEL = "omni-inference-status";
+
+type BrowserInferenceStatusMessage = {
+  type: "status";
+  payload: unknown;
+};
+
+export type BrowserInferenceStatusListener = (status: unknown) => void;
 
 function inferenceWorkerUrl(): string {
   return document.querySelector<HTMLMetaElement>('meta[name="omni-inference-url"]')?.content ?? "/omni-inference.js";
@@ -110,4 +118,25 @@ export async function deleteBrowserModel(modelId: string): Promise<void> {
   if (!("accepted" in response)) {
     throw new Error("Inference worker returned an invalid delete response payload");
   }
+}
+
+export function startBrowserInferenceStatusStream(listener: BrowserInferenceStatusListener): { stop(): void } {
+  const channel = new BroadcastChannel(STATUS_CHANNEL);
+  const onMessage = (event: MessageEvent<BrowserInferenceStatusMessage>) => {
+    const message = event.data;
+    if (!message || message.type !== "status") {
+      return;
+    }
+
+    listener(message.payload);
+  };
+
+  channel.addEventListener("message", onMessage);
+
+  return {
+    stop() {
+      channel.removeEventListener("message", onMessage);
+      channel.close();
+    },
+  };
 }

@@ -1,5 +1,51 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BrowserModelSpec {
+    pub id: &'static str,
+    pub name: &'static str,
+    pub file: &'static str,
+    pub size: u64,
+    pub mirror_parts: u16,
+}
+
+impl BrowserModelSpec {
+    pub fn download_url(self) -> String {
+        format!(
+            "https://raw.githubusercontent.com/web-harness/models/main/models/{}.zip.part-000",
+            self.file
+        )
+    }
+
+    pub fn source_label(self) -> String {
+        format!("web-harness/models/{}.zip.part-*", self.file)
+    }
+}
+
+pub const BROWSER_MODEL_SPECS: [BrowserModelSpec; 2] = [
+    BrowserModelSpec {
+        id: "lfm2-1.2b",
+        name: "LFM2 1.2B",
+        file: "LFM2-1.2B-Q4_K_M.gguf",
+        size: 730_910_720,
+        mirror_parts: 8,
+    },
+    BrowserModelSpec {
+        id: "deepseek-r1-1.5b",
+        name: "DeepSeek R1 1.5B",
+        file: "DeepSeek-R1-Distill-Qwen-1.5B-Q3_K_M.gguf",
+        size: 924_844_032,
+        mirror_parts: 10,
+    },
+];
+
+pub fn browser_model_spec(model_id: &str) -> Option<BrowserModelSpec> {
+    BROWSER_MODEL_SPECS
+        .iter()
+        .copied()
+        .find(|model| model.id == model_id)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ProviderId {
     Anthropic,
@@ -24,7 +70,7 @@ pub struct Provider {
 }
 
 pub fn list_models() -> Vec<ModelConfig> {
-    vec![
+    let mut models = vec![
         ModelConfig {
             id: "claude-3-7-sonnet".into(),
             name: "Claude 3.7 Sonnet".into(),
@@ -65,17 +111,15 @@ pub fn list_models() -> Vec<ModelConfig> {
             name: "DeepSeek R1".into(),
             provider: ProviderId::Ollama,
         },
-        ModelConfig {
-            id: "lfm2-1.2b".into(),
-            name: "LFM2 1.2B".into(),
-            provider: ProviderId::Browser,
-        },
-        ModelConfig {
-            id: "deepseek-r1-1.5b".into(),
-            name: "DeepSeek R1 1.5B".into(),
-            provider: ProviderId::Browser,
-        },
-    ]
+    ];
+
+    models.extend(BROWSER_MODEL_SPECS.iter().map(|model| ModelConfig {
+        id: model.id.into(),
+        name: model.name.into(),
+        provider: ProviderId::Browser,
+    }));
+
+    models
 }
 
 pub fn list_providers() -> Vec<Provider> {

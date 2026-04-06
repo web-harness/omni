@@ -1,4 +1,11 @@
 import { Serwist } from "serwist";
+import { formatError } from "@omni/omni-util";
+import {
+  matchInferenceRoute,
+  type InferenceBridgeMessage,
+  type InferenceBridgeRequestMessage,
+  type InferenceRoute,
+} from "@omni/omni-inference/runtime";
 import { getScopedRequestPathParts } from "@omni/omni-util/service-worker";
 import { handleStoreRoute, matchStoreRoute } from "./store-api.js";
 
@@ -20,55 +27,15 @@ type RuntimeModule = {
   handleRunRoute(request: Request, route: Exclude<RunRoute, null>): Promise<Response>;
 };
 
-type InferenceRoute = "chat-completions" | "models-list" | "download-model" | "inference-status";
-
-type BridgeRequestMessage = {
-  type: "request";
-  requestId: string;
-  route: InferenceRoute;
-  url: string;
-  method: string;
-  headers: [string, string][];
-  body: string | null;
-};
-
-type BridgeResponseStartMessage = {
-  type: "response-start";
-  requestId: string;
-  status: number;
-  statusText: string;
-  headers: [string, string][];
-};
-
-type BridgeResponseChunkMessage = {
-  type: "response-chunk";
-  requestId: string;
-  chunk: string;
-};
-
-type BridgeResponseEndMessage = {
-  type: "response-end";
-  requestId: string;
-};
-
-type BridgeResponseErrorMessage = {
-  type: "response-error";
-  requestId: string;
-  message: string;
-};
-
-type BridgeMessage =
-  | BridgeRequestMessage
-  | BridgeResponseStartMessage
-  | BridgeResponseChunkMessage
-  | BridgeResponseEndMessage
-  | BridgeResponseErrorMessage;
-
 let runtimeModulePromise: Promise<RuntimeModule> | null = null;
 
 const ROUTE_ROOTS = new Set(["agents", "threads", "store", "x", "runs"]);
-const INFERENCE_ROUTE_ROOTS = new Set(["v1", "inference"]);
 const INFERENCE_BRIDGE_CHANNEL = "omni-inference-bridge";
+const BRIDGE_IDLE_TIMEOUT_MS = 30_000;
+const STREAM_CONTENT_TYPE = "text/event-stream";
+const NAVIGATION_ERROR_HTML =
+  '<!doctype html><html><head><meta charset="utf-8"><title>Application Unavailable</title></head><body><h1>Application Unavailable</h1><p>The application shell could not be loaded.</p></body></html>';
+const textEncoder = new TextEncoder();
 
 let bridgeCounter = 0;
 
@@ -80,30 +47,13 @@ function loadRuntimeModule(): Promise<RuntimeModule> {
 }
 
 function inferenceErrorResponse(error: unknown): Response {
-  const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  const message = formatError(error);
   return Response.json({ error: { message } }, { status: 500 });
 }
 
 function nextBridgeRequestId(): string {
   bridgeCounter += 1;
   return `inference-${Date.now()}-${bridgeCounter}`;
-}
-
-function matchInferenceRoute(request: Request): InferenceRoute | null {
-  const parts = getScopedRequestPathParts(request, INFERENCE_ROUTE_ROOTS);
-  if (parts[0] === "v1" && parts[1] === "chat" && parts[2] === "completions" && request.method === "POST") {
-    return "chat-completions";
-  }
-  if (parts[0] === "v1" && parts[1] === "models" && request.method === "GET") {
-    return "models-list";
-  }
-  if (parts[0] === "inference" && parts[1] === "download" && request.method === "POST") {
-    return "download-model";
-  }
-  if (parts[0] === "inference" && parts[1] === "status" && request.method === "GET") {
-    return "inference-status";
-  }
-  return null;
 }
 
 async function handleInferenceViaBridge(request: Request, route: InferenceRoute): Promise<Response> {
@@ -117,24 +67,48 @@ async function handleInferenceViaBridge(request: Request, route: InferenceRoute)
 
   return new Promise<Response>((resolve, reject) => {
     let started = false;
+    let resolved = false;
     let responseInit: ResponseInit | null = null;
     let buffered = "";
     let streamController: ReadableStreamDefaultController<Uint8Array> | null = null;
+    let timeoutSignal: AbortSignal | null = null;
 
     const cleanup = () => {
+      timeoutSignal?.removeEventListener("abort", onTimeout);
       channel.close();
     };
 
     const fail = (error: unknown) => {
+      const normalized = error instanceof Error ? error : new Error(String(error));
       cleanup();
-      reject(error);
+      if (streamController) {
+        streamController.error(normalized);
+        return;
+      }
+      if (!resolved) {
+        reject(normalized);
+      }
     };
 
-    channel.addEventListener("message", (event: MessageEvent<BridgeMessage>) => {
+    const onTimeout = () => {
+      fail(new Error("Inference bridge timed out"));
+    };
+
+    const armTimeout = () => {
+      timeoutSignal?.removeEventListener("abort", onTimeout);
+      timeoutSignal = AbortSignal.timeout(BRIDGE_IDLE_TIMEOUT_MS);
+      timeoutSignal.addEventListener("abort", onTimeout, { once: true });
+    };
+
+    armTimeout();
+
+    channel.addEventListener("message", (event: MessageEvent<InferenceBridgeMessage>) => {
       const message = event.data;
       if (!message || message.requestId !== requestId || message.type === "request") {
         return;
       }
+
+      armTimeout();
 
       if (message.type === "response-error") {
         fail(new Error(message.message));
@@ -150,12 +124,13 @@ async function handleInferenceViaBridge(request: Request, route: InferenceRoute)
         };
 
         const contentType = new Headers(message.headers).get("content-type") ?? "";
-        if (contentType.includes("text/event-stream")) {
+        if (contentType.includes(STREAM_CONTENT_TYPE)) {
           const stream = new ReadableStream<Uint8Array>({
             start(controller) {
               streamController = controller;
             },
           });
+          resolved = true;
           resolve(new Response(stream, responseInit));
         }
         return;
@@ -163,7 +138,7 @@ async function handleInferenceViaBridge(request: Request, route: InferenceRoute)
 
       if (message.type === "response-chunk") {
         if (streamController) {
-          streamController.enqueue(new TextEncoder().encode(message.chunk));
+          streamController.enqueue(textEncoder.encode(message.chunk));
         } else {
           buffered += message.chunk;
         }
@@ -177,6 +152,7 @@ async function handleInferenceViaBridge(request: Request, route: InferenceRoute)
           return;
         }
         if (started && responseInit) {
+          resolved = true;
           resolve(new Response(buffered, responseInit));
           return;
         }
@@ -193,7 +169,7 @@ async function handleInferenceViaBridge(request: Request, route: InferenceRoute)
       method: request.method,
       headers: [...request.headers.entries()],
       body,
-    } satisfies BridgeRequestMessage);
+    } satisfies InferenceBridgeRequestMessage);
   });
 }
 
@@ -244,16 +220,28 @@ export function setupServiceWorker(scope: ServiceWorkerGlobalScope): void {
   serwist.addEventListeners();
 
   async function handleNavigationRequest(request: Request): Promise<Response> {
-    const response = await fetch(request);
-    const headers = new Headers(response.headers);
-    headers.set("Cross-Origin-Embedder-Policy", "require-corp");
-    headers.set("Cross-Origin-Opener-Policy", "same-origin");
+    try {
+      const response = await fetch(request);
+      const headers = new Headers(response.headers);
+      headers.set("Cross-Origin-Embedder-Policy", "require-corp");
+      headers.set("Cross-Origin-Opener-Policy", "same-origin");
 
-    return new Response(response.body, {
-      status: response.status,
-      statusText: response.statusText,
-      headers,
-    });
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
+    } catch {
+      return new Response(NAVIGATION_ERROR_HTML, {
+        status: 503,
+        statusText: "Service Unavailable",
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "Cross-Origin-Embedder-Policy": "require-corp",
+          "Cross-Origin-Opener-Policy": "same-origin",
+        },
+      });
+    }
   }
 
   scope.addEventListener("fetch", (event: FetchEvent) => {
@@ -270,18 +258,11 @@ export function setupServiceWorker(scope: ServiceWorkerGlobalScope): void {
       return;
     }
 
-    const inferenceParts = getScopedRequestPathParts(event.request, INFERENCE_ROUTE_ROOTS);
-    if (inferenceParts.length > 0) {
+    const inferenceRoute = matchInferenceRoute(event.request);
+    if (inferenceRoute) {
       event.respondWith(
         Promise.resolve()
-          .then(async () => {
-            const inferenceRoute = matchInferenceRoute(event.request);
-            if (inferenceRoute) {
-              return handleInferenceViaBridge(event.request, inferenceRoute);
-            }
-
-            return fetch(event.request);
-          })
+          .then(() => handleInferenceViaBridge(event.request, inferenceRoute))
           .catch((error) => inferenceErrorResponse(error)),
       );
       return;
@@ -291,8 +272,6 @@ export function setupServiceWorker(scope: ServiceWorkerGlobalScope): void {
       event.respondWith(handleNavigationRequest(event.request));
       return;
     }
-
-    event.respondWith(fetch(event.request));
   });
 }
 

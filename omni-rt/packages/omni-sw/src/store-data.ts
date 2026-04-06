@@ -376,6 +376,10 @@ export async function getDefaultModel(): Promise<string> {
 }
 
 export async function getStoredDefaultModel(): Promise<string | null> {
+  return readStoredDefaultModelItem();
+}
+
+export async function getMigratableStoredDefaultModel(): Promise<string | null> {
   return (await readStoredDefaultModelItem()) ?? (await getDeepagentsStoredDefaultModel());
 }
 

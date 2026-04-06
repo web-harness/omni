@@ -4,13 +4,14 @@ use dioxus_free_icons::icons::ld_icons::{
 };
 use dioxus_free_icons::Icon;
 use futures_util::StreamExt;
+use omni_rt::deepagents::model_registry::browser_model_spec;
 
 use crate::components::ui::{Badge, BadgeVariant, Popover};
 #[cfg(target_arch = "wasm32")]
 use crate::lib::thread_context::apply_stream_event;
 use crate::lib::{
-    browser_model_spec, AgentEndpoint, AgentEndpointState, ChatState, ModelState, Role, TasksState,
-    ThreadState, ToolCall, ToolResult, UiState, WorkspaceState,
+    AgentEndpoint, AgentEndpointState, ChatState, ModelState, Role, TasksState, ThreadState,
+    ToolCall, ToolResult, UiState, WorkspaceState,
 };
 
 #[cfg(target_arch = "wasm32")]
@@ -598,6 +599,10 @@ pub fn ModelSwitcher() -> Element {
     let mut selected_provider = use_signal(|| initial_provider.clone());
     let mut pending_download = use_signal(|| None::<crate::lib::ModelConfig>);
     let mut pending_delete = use_signal(|| None::<crate::lib::ModelConfig>);
+    let mut active_download_model_id = use_signal(|| None::<String>);
+    let browser_status_for_download_effect = browser_status.clone();
+    let mut _browser_status_subscription =
+        use_signal(|| None::<crate::lib::sw_api::BrowserInferenceStatusSubscription>);
 
     let filtered_models: Vec<_> = models
         .iter()
@@ -607,6 +612,7 @@ pub fn ModelSwitcher() -> Element {
 
     let selected_model_for_effect = selected_model_config.clone();
     let selected_model_for_trigger = selected_model_config.clone();
+    let tid_for_download_effect = tid.clone();
 
     use_effect(move || {
         if locked_agent_for_close_effect.is_none() {
@@ -629,39 +635,60 @@ pub fn ModelSwitcher() -> Element {
     });
 
     use_effect(move || {
-        if selected_provider() != crate::lib::ProviderId::Browser {
+        let mut model_state_for_status = model_state;
+        spawn(async move {
+            if let Ok(status) = crate::lib::sw_api::get_browser_inference_status().await {
+                model_state_for_status.write().browser_inference = status;
+            }
+        });
+
+        #[cfg(target_arch = "wasm32")]
+        let subscription = crate::lib::sw_api::subscribe_browser_inference_status({
+            let mut model_state_for_status = model_state;
+            move |status| {
+                model_state_for_status.write().browser_inference = status;
+            }
+        })
+        .ok();
+
+        #[cfg(target_arch = "wasm32")]
+        _browser_status_subscription.set(subscription);
+    });
+
+    use_effect(move || {
+        let Some(model_id) = active_download_model_id() else {
+            return;
+        };
+
+        let download_model_id = browser_status_for_download_effect.download.model_id.clone();
+        let download_phase = browser_status_for_download_effect.download.phase.clone();
+
+        if download_model_id.as_deref() != Some(model_id.as_str()) {
+            if download_phase != crate::lib::BrowserDownloadPhase::Downloading {
+                active_download_model_id.set(None);
+            }
             return;
         }
 
-        let mut model_state_for_status = model_state;
-        let open_for_status = open;
-        let selected_provider_for_status = selected_provider;
-        spawn(async move {
-            loop {
-                if selected_provider_for_status() != crate::lib::ProviderId::Browser {
-                    break;
-                }
-
-                let status = match crate::lib::sw_api::get_browser_inference_status().await {
-                    Ok(status) => status,
-                    Err(_) => break,
-                };
-
-                let is_downloading =
-                    status.download.phase == crate::lib::BrowserDownloadPhase::Downloading;
-                model_state_for_status.write().browser_inference = status;
-
-                if !open_for_status() && !is_downloading {
-                    break;
-                }
+        match download_phase {
+            crate::lib::BrowserDownloadPhase::Completed => {
+                model_state
+                    .write()
+                    .selected_model
+                    .insert(tid_for_download_effect.clone(), model_id.clone());
+                active_download_model_id.set(None);
+                open.set(false);
 
                 #[cfg(target_arch = "wasm32")]
-                gloo_timers::future::TimeoutFuture::new(250).await;
-
-                #[cfg(not(target_arch = "wasm32"))]
-                break;
+                spawn(async move {
+                    let _ = crate::lib::sw_api::set_default_model(&model_id).await;
+                });
             }
-        });
+            crate::lib::BrowserDownloadPhase::Error | crate::lib::BrowserDownloadPhase::Idle => {
+                active_download_model_id.set(None);
+            }
+            crate::lib::BrowserDownloadPhase::Downloading => {}
+        }
     });
 
     #[cfg(target_arch = "wasm32")]
@@ -716,7 +743,7 @@ pub fn ModelSwitcher() -> Element {
                         .map(|details| details.source_label())
                         .unwrap_or_default();
                     let model_for_download = model.clone();
-                    let tid_for_download = tid.clone();
+                    let download_phase = browser_status.download.phase.clone();
                     rsx! {
                         div { class: "space-y-3",
                             div {
@@ -755,7 +782,7 @@ pub fn ModelSwitcher() -> Element {
                                 }
                                 button {
                                     class: "rounded-sm bg-primary px-3 py-1.5 text-[11px] text-primary-foreground hover:opacity-90 disabled:opacity-50",
-                                    disabled: browser_status.download.phase == crate::lib::BrowserDownloadPhase::Downloading,
+                                    disabled: download_phase == crate::lib::BrowserDownloadPhase::Downloading,
                                     onclick: move |evt| {
                                         evt.stop_propagation();
                                         pending_download.set(None);
@@ -769,48 +796,12 @@ pub fn ModelSwitcher() -> Element {
                                             state.browser_inference.download.total_bytes = Some(spec.size);
                                             state.browser_inference.download.progress_percent = Some(0);
                                         }
+                                        active_download_model_id.set(Some(model_for_download.id.clone()));
                                         let mut model_state_for_download = model_state;
-                                        let mut open_for_download = open;
                                         let model_id = model_for_download.id.clone();
-                                        let tid_for_async = tid_for_download.clone();
                                         spawn(async move {
                                             match crate::lib::sw_api::start_browser_model_download(&model_id).await {
-                                                Ok(()) => loop {
-                                                    match crate::lib::sw_api::get_browser_inference_status().await {
-                                                        Ok(status) => {
-                                                            let phase = status.download.phase.clone();
-                                                            let last_error = status.last_error.clone();
-                                                            model_state_for_download.write().browser_inference = status;
-
-                                                            if phase == crate::lib::BrowserDownloadPhase::Completed {
-                                                                model_state_for_download.write().selected_model.insert(
-                                                                    tid_for_async.clone(),
-                                                                    model_id.clone(),
-                                                                );
-                                                                let _ = crate::lib::sw_api::set_default_model(&model_id).await;
-                                                                open_for_download.set(false);
-                                                                break;
-                                                            }
-
-                                                            if phase == crate::lib::BrowserDownloadPhase::Error {
-                                                                if let Some(error) = last_error {
-                                                                    let mut state = model_state_for_download.write();
-                                                                    state.browser_inference.last_error = Some(error);
-                                                                }
-                                                                break;
-                                                            }
-                                                        }
-                                                        Err(error) => {
-                                                            let mut state = model_state_for_download.write();
-                                                            state.browser_inference.last_error = Some(error.to_string());
-                                                            state.browser_inference.download.phase = crate::lib::BrowserDownloadPhase::Error;
-                                                            break;
-                                                        }
-                                                    }
-
-                                                    #[cfg(target_arch = "wasm32")]
-                                                    gloo_timers::future::TimeoutFuture::new(250).await;
-                                                },
+                                                Ok(()) => {}
                                                 Err(error) => {
                                                     let mut state = model_state_for_download.write();
                                                     state.browser_inference.last_error = Some(error.to_string());

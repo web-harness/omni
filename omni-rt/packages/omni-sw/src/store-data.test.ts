@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+const DEFAULT_MODEL_ITEM_PATH = "/home/store/config/default_model.json";
+
 vi.mock("./zenfs.js", () => ({
   exists: vi.fn(),
   init: vi.fn(),
@@ -59,5 +61,34 @@ describe("store-data thread titles", () => {
     const title = deriveThreadTitle([{ role: "user", content: "Rename me" }], "Existing Title");
 
     expect(title).toBe("Existing Title");
+  });
+
+  it("reads the current stored default model without falling back to legacy storage", async () => {
+    const zenfs = await import("./zenfs.js");
+    const deepagents = await import("./deepagents.js");
+    vi.mocked(zenfs.readFile).mockImplementation(async (path: string) => {
+      if (path === DEFAULT_MODEL_ITEM_PATH) {
+        return new TextEncoder().encode(JSON.stringify({ value: { model_id: "lfm2-1.2b" } }));
+      }
+      throw new Error("missing");
+    });
+    vi.mocked(deepagents.getStoredDefaultModel).mockResolvedValue("deepseek-r1");
+
+    const { getStoredDefaultModel } = await import("./store-data.js");
+
+    await expect(getStoredDefaultModel()).resolves.toBe("lfm2-1.2b");
+    expect(deepagents.getStoredDefaultModel).not.toHaveBeenCalled();
+  });
+
+  it("keeps the legacy fallback only for migration reads", async () => {
+    const zenfs = await import("./zenfs.js");
+    const deepagents = await import("./deepagents.js");
+    vi.mocked(zenfs.readFile).mockRejectedValue(new Error("missing"));
+    vi.mocked(deepagents.getStoredDefaultModel).mockResolvedValue("deepseek-r1");
+
+    const { getMigratableStoredDefaultModel, getStoredDefaultModel } = await import("./store-data.js");
+
+    await expect(getStoredDefaultModel()).resolves.toBeNull();
+    await expect(getMigratableStoredDefaultModel()).resolves.toBe("deepseek-r1");
   });
 });

@@ -1,4 +1,5 @@
 import { resolveServiceWorkerScope } from "@omni/omni-util/service-worker";
+import { formatError } from "@omni/omni-util";
 
 const SW_URL =
   typeof document !== "undefined"
@@ -12,6 +13,20 @@ type RegisterEnv = {
   swUrl: string;
 };
 
+function absoluteUrl(path: string): string {
+  return new URL(path, globalThis.location.href).href;
+}
+
+function registrationScriptUrl(registration: ServiceWorkerRegistration): string | null {
+  return registration.installing?.scriptURL ?? registration.waiting?.scriptURL ?? registration.active?.scriptURL ?? null;
+}
+
+function samePathDifferentUrl(left: string, right: string): boolean {
+  const leftUrl = new URL(left);
+  const rightUrl = new URL(right);
+  return leftUrl.pathname === rightUrl.pathname && leftUrl.href !== rightUrl.href;
+}
+
 function markReady(channel: BroadcastChannel): void {
   channel.postMessage({ type: "ready" });
 }
@@ -22,31 +37,48 @@ export async function registerServiceWorker(env: RegisterEnv): Promise<void> {
     return;
   }
 
-  try {
-    const registration = await navigator.serviceWorker.register(swUrl, {
-      type: "module",
-      scope: resolveServiceWorkerScope(swUrl, "inference/"),
-    });
+  const scope = resolveServiceWorkerScope(swUrl, "inference/");
+  const scopeUrl = absoluteUrl(scope);
+  const scriptUrl = absoluteUrl(swUrl);
 
-    void navigator.storage?.persist?.();
-
-    const sw = registration.installing ?? registration.waiting ?? registration.active;
-    if (sw?.state === "activated") {
-      markReady(channel);
-      return;
-    }
-
-    const target = registration.installing ?? registration.waiting;
-    if (target) {
-      target.addEventListener("statechange", () => {
-        if (target.state === "activated") {
-          markReady(channel);
+  const registrations = await navigator.serviceWorker.getRegistrations();
+  await Promise.all(
+    registrations
+      .filter((registration) => {
+        const registeredScriptUrl = registrationScriptUrl(registration);
+        if (!registeredScriptUrl) {
+          return registration.scope === scopeUrl;
         }
-      });
-    }
-  } catch (error) {
-    const details = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-    console.error(`[omni-inference] registration failed: ${details}`);
+
+        return registration.scope === scopeUrl || samePathDifferentUrl(registeredScriptUrl, scriptUrl);
+      })
+      .filter((registration) => registrationScriptUrl(registration) !== scriptUrl)
+      .map((registration) => registration.unregister()),
+  );
+
+  const registration = await navigator.serviceWorker.register(swUrl, {
+    type: "module",
+    scope,
+    updateViaCache: "none",
+  });
+
+  await registration.update();
+
+  void navigator.storage?.persist?.();
+
+  const sw = registration.installing ?? registration.waiting ?? registration.active;
+  if (sw?.state === "activated") {
+    markReady(channel);
+    return;
+  }
+
+  const target = registration.installing ?? registration.waiting;
+  if (target) {
+    target.addEventListener("statechange", () => {
+      if (target.state === "activated") {
+        markReady(channel);
+      }
+    });
   }
 }
 
@@ -55,5 +87,7 @@ if (typeof navigator !== "undefined" && typeof BroadcastChannel !== "undefined")
     navigator,
     channel: new BroadcastChannel(READY_CHANNEL),
     swUrl: SW_URL,
+  }).catch((error) => {
+    console.error(`[omni-inference] registration failed: ${formatError(error)}`);
   });
 }

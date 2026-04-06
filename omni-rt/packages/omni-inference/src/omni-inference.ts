@@ -1,42 +1,16 @@
 import { Serwist } from "serwist";
+import { formatError } from "@omni/omni-util";
 import { getInferenceEngine } from "./engine.js";
-import type { InferenceRoute, InferenceWorkerMessage, InferenceWorkerResponse } from "./protocol.js";
-import { handleInferenceRoute, matchInferenceRoute } from "./runtime.js";
+import { handleInferenceRoute } from "./openai-handler.js";
+import type {
+  InferenceBridgeRequestMessage,
+  InferenceBridgeResponseMessage,
+  InferenceWorkerMessage,
+  InferenceWorkerResponse,
+} from "./protocol.js";
+import { matchInferenceRoute } from "./runtime.js";
 
 declare const self: ServiceWorkerGlobalScope;
-
-type BridgeRequestMessage = {
-  type: "request";
-  requestId: string;
-  route: InferenceRoute;
-  url: string;
-  method: string;
-  headers: [string, string][];
-  body: string | null;
-};
-
-type BridgeResponseMessage =
-  | {
-      type: "response-start";
-      requestId: string;
-      status: number;
-      statusText: string;
-      headers: [string, string][];
-    }
-  | {
-      type: "response-chunk";
-      requestId: string;
-      chunk: string;
-    }
-  | {
-      type: "response-end";
-      requestId: string;
-    }
-  | {
-      type: "response-error";
-      requestId: string;
-      message: string;
-    };
 
 const INFERENCE_BRIDGE_CHANNEL = "omni-inference-bridge";
 
@@ -44,7 +18,7 @@ function respondToClient(port: MessagePort | undefined, payload: InferenceWorker
   port?.postMessage(payload);
 }
 
-function postBridgeMessage(channel: BroadcastChannel, payload: BridgeResponseMessage): void {
+function postBridgeMessage(channel: BroadcastChannel, payload: InferenceBridgeResponseMessage): void {
   channel.postMessage(payload);
 }
 
@@ -99,7 +73,7 @@ function setupBridgeChannel(scope: ServiceWorkerGlobalScope): void {
   }
 
   const channel = new BroadcastChannel(INFERENCE_BRIDGE_CHANNEL);
-  channel.addEventListener("message", (event: MessageEvent<BridgeRequestMessage>) => {
+  channel.addEventListener("message", (event: MessageEvent<InferenceBridgeRequestMessage>) => {
     const message = event.data;
     if (!message || message.type !== "request") {
       return;
@@ -115,11 +89,10 @@ function setupBridgeChannel(scope: ServiceWorkerGlobalScope): void {
       handleInferenceRoute(request, message.route)
         .then((response) => forwardBridgeResponse(channel, message.requestId, response))
         .catch((error) => {
-          const details = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
           postBridgeMessage(channel, {
             type: "response-error",
             requestId: message.requestId,
-            message: details,
+            message: formatError(error),
           });
         }),
     );
@@ -140,8 +113,7 @@ function setupClientMessages(scope: ServiceWorkerGlobalScope): void {
           .getStatus()
           .then((status) => respondToClient(port, { ok: true, status }))
           .catch((error) => {
-            const details = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-            respondToClient(port, { ok: false, message: details });
+            respondToClient(port, { ok: false, message: formatError(error) });
           }),
       );
       return;
@@ -163,8 +135,7 @@ function setupClientMessages(scope: ServiceWorkerGlobalScope): void {
           .stopDownload(message.modelId)
           .then(() => respondToClient(port, { ok: true, accepted: true }))
           .catch((error) => {
-            const details = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-            respondToClient(port, { ok: false, message: details });
+            respondToClient(port, { ok: false, message: formatError(error) });
           }),
       );
       return;
@@ -176,8 +147,7 @@ function setupClientMessages(scope: ServiceWorkerGlobalScope): void {
           .deleteModel(message.modelId)
           .then(() => respondToClient(port, { ok: true, accepted: true }))
           .catch((error) => {
-            const details = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-            respondToClient(port, { ok: false, message: details });
+            respondToClient(port, { ok: false, message: formatError(error) });
           }),
       );
     }

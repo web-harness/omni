@@ -1,6 +1,12 @@
 import { getScopedRequestPathParts } from "@omni/omni-util/service-worker";
-import { handleInferenceRoute as handleRuntimeInferenceRoute } from "./openai-handler.js";
 import type { InferenceRoute } from "./protocol.js";
+
+export type {
+  InferenceBridgeMessage,
+  InferenceBridgeRequestMessage,
+  InferenceBridgeResponseMessage,
+  InferenceRoute,
+} from "./protocol.js";
 
 export type MatchedInferenceRoute = InferenceRoute | null;
 
@@ -24,8 +30,4 @@ export function matchInferenceRoute(request: Request): MatchedInferenceRoute {
     return "inference-status";
   }
   return null;
-}
-
-export async function handleInferenceRoute(request: Request, route: InferenceRoute): Promise<Response> {
-  return handleRuntimeInferenceRoute(request, route);
 }

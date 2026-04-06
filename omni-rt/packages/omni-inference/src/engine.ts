@@ -116,7 +116,6 @@ async function sha256(data: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", data);
   return hex(new Uint8Array(digest));
 }
-
 async function readResponseBytes(
   response: Response,
   onChunk: (chunk: Uint8Array, expectedBytes: number | null) => void,
@@ -258,7 +257,9 @@ export class WllamaEngine {
     }
 
     this.downloadAbortController?.abort();
-    await this.downloadPromise.catch(() => {});
+    if (this.downloadPromise) {
+      await this.downloadPromise.catch(() => {});
+    }
     await deleteCachedModel(modelId).catch(() => {});
     await this.refreshStatus();
     this.resetDownloadState();
