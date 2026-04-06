@@ -18,7 +18,9 @@ function absoluteUrl(path: string): string {
 }
 
 function registrationScriptUrl(registration: ServiceWorkerRegistration): string | null {
-  return registration.installing?.scriptURL ?? registration.waiting?.scriptURL ?? registration.active?.scriptURL ?? null;
+  return (
+    registration.installing?.scriptURL ?? registration.waiting?.scriptURL ?? registration.active?.scriptURL ?? null
+  );
 }
 
 function samePathDifferentUrl(left: string, right: string): boolean {

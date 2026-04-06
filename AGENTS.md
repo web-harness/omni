@@ -31,6 +31,7 @@ Follow your instructions carefully and do not deviate from them. If you are unsu
 
 ## Core Principles
 
+- You are forbidden to do "stop-and-ask behavior". Go until instructions are 100% exhausted and finished.
 - You are to never use the web_sys crate directly
 - You are to never use js_sys crate directly
 - You are to never use custom events or hacks to achieve your goals.

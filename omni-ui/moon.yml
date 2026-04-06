@@ -77,6 +77,46 @@ tasks:
       - dist
     options:
       mergeArgs: replace
+  build-native:
+    command: dx
+    args:
+      - bundle
+      - --platform
+      - desktop
+      - --out-dir
+      - dist-native
+    deps:
+      - omni-util:build
+      - omni-docxjs:build
+      - omni-dicebear:build
+      - omni-dock:build
+      - omni-popper:build
+      - omni-marked:build
+      - omni-monaco:build
+      - omni-pdfjs:build
+      - omni-pptx-renderer:build
+      - omni-plyr:build
+      - omni-pretext:build
+      - omni-sheetjs:build
+      - omni-zenfs:build
+      - omni-zenfs:build-wasm
+      - omni-deepagents:build
+      - omni-bashkit:build
+      - omni-inference:build-main
+      - omni-inference:build-client
+      - omni-inference:build-register
+      - omni-inference:copy-wasm
+      - omni-sw:build-main
+      - omni-sw:build-agent-module
+      - omni-sw:build-register
+      - omni-sw:copy-sql-wasm
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+    outputs:
+      - dist-native/
+    toolchains:
+      - system
   dev:
     command: dx
     args:
@@ -108,6 +148,42 @@ tasks:
       - omni-inference:watch-register
       - omni-sw:copy-sql-wasm
       - omni-sw:watch-main
+      - omni-sw:watch-register
+    preset: server
+    toolchains:
+      - system
+  dev-native:
+    command: dx
+    args:
+      - serve
+      - --platform
+      - desktop
+    deps:
+      - omni-bashkit:build
+      - omni-zenfs:build
+      - omni-zenfs:build-wasm
+      - omni-util:watch
+      - omni-docxjs:watch
+      - omni-dicebear:watch
+      - omni-dock:watch
+      - omni-popper:watch
+      - omni-monaco:watch
+      - omni-marked:watch
+      - omni-pdfjs:watch
+      - omni-pptx-renderer:watch
+      - omni-plyr:watch
+      - omni-pretext:watch
+      - omni-sheetjs:watch
+      - omni-zenfs:watch
+      - omni-zenfs:watch-wasm
+      - omni-deepagents:build
+      - omni-inference:copy-wasm
+      - omni-inference:watch-client
+      - omni-inference:watch-main
+      - omni-inference:watch-register
+      - omni-sw:copy-sql-wasm
+      - omni-sw:watch-main
+      - omni-sw:watch-agent-module
       - omni-sw:watch-register
     preset: server
     toolchains:

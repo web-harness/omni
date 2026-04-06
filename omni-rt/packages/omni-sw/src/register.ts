@@ -1,5 +1,7 @@
 import { resolveServiceWorkerScope } from "@omni/omni-util/service-worker";
 
+import { buildBootstrap } from "./store-data.js";
+
 // URL is injected by Dioxus via <meta name="omni-sw-url"> so the hashed asset path is correct
 const SW_URL =
   typeof document !== "undefined"
@@ -7,6 +9,8 @@ const SW_URL =
     : "/omni-sw.js";
 const READY_CHANNEL = "omni-sw-ready";
 const FIRST_ACTIVATION_RELOAD_KEY = "__omni_sw_first_activation_reload";
+let ready = false;
+let readyWaiters: Array<() => void> = [];
 
 type RegisterEnv = {
   navigator: Navigator;
@@ -17,8 +21,27 @@ type RegisterEnv = {
 };
 
 function markReady(channel: BroadcastChannel, setReadyFlag: () => void): void {
+  ready = true;
+  for (const resolve of readyWaiters) {
+    resolve();
+  }
+  readyWaiters = [];
   setReadyFlag();
   channel.postMessage({ type: "ready" });
+}
+
+export function waitForServiceWorkerReady(): Promise<void> {
+  if (ready || (globalThis as Record<string, unknown>).__omni_sw_ready === true) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    readyWaiters.push(resolve);
+  });
+}
+
+export async function loadBootstrapPayloadJson(): Promise<string> {
+  return JSON.stringify(await buildBootstrap());
 }
 
 function shouldReloadOnFirstActivation(hadController: boolean): boolean {
@@ -43,7 +66,9 @@ function clearReloadFlag(): void {
 
 export async function registerServiceWorker(env: RegisterEnv): Promise<void> {
   const { navigator, channel, swUrl, setReadyFlag, reloadPage } = env;
-  if (!("serviceWorker" in navigator)) return;
+  if (!("serviceWorker" in navigator)) {
+    return;
+  }
 
   const hadController = Boolean(navigator.serviceWorker.controller);
   if (hadController) {

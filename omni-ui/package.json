@@ -1,0 +1,20 @@
+{
+  "type": "module",
+  "dependencies": {
+    "@omni/omni-dicebear": "file:../omni-rt/packages/omni-dicebear",
+    "@omni/omni-dock": "file:../omni-rt/packages/omni-dock",
+    "@omni/omni-docxjs": "file:../omni-rt/packages/omni-docxjs",
+    "@omni/omni-inference": "file:../omni-rt/packages/omni-inference",
+    "@omni/omni-marked": "file:../omni-rt/packages/omni-marked",
+    "@omni/omni-monaco": "file:../omni-rt/packages/omni-monaco",
+    "@omni/omni-pdfjs": "file:../omni-rt/packages/omni-pdfjs",
+    "@omni/omni-plyr": "file:../omni-rt/packages/omni-plyr",
+    "@omni/omni-popper": "file:../omni-rt/packages/omni-popper",
+    "@omni/omni-pptx-renderer": "file:../omni-rt/packages/omni-pptx-renderer",
+    "@omni/omni-pretext": "file:../omni-rt/packages/omni-pretext",
+    "@omni/omni-sheetjs": "file:../omni-rt/packages/omni-sheetjs",
+    "@omni/omni-sw": "file:../omni-rt/packages/omni-sw",
+    "@omni/omni-util": "file:../omni-rt/packages/omni-util",
+    "@omni/omni-zenfs": "file:../omni-rt/crates/omni-zenfs"
+  }
+}

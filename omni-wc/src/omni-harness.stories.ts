@@ -4,7 +4,8 @@ import "./omni-harness.js";
 import type { OmniHarness } from "./omni-harness.js";
 
 const DEV_APP_SRC = "http://127.0.0.1:8080";
-const appSrc = (import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV ? DEV_APP_SRC : "./app/";
+const isLocalStorybook = typeof window !== "undefined" && ["localhost", "127.0.0.1"].includes(window.location.hostname);
+const appSrc = isLocalStorybook ? DEV_APP_SRC : "./app/";
 
 const meta: Meta<OmniHarness> = {
   title: "Components/OmniHarness",

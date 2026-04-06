@@ -1,5 +1,3 @@
-#![cfg(target_arch = "wasm32")]
-
 use crate::lib::{ChatState, Role, StreamEvent, TasksState, UiMessage};
 
 pub fn apply_stream_event(

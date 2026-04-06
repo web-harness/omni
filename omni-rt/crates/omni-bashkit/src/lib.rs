@@ -1,15 +1,37 @@
+#[cfg(target_arch = "wasm32")]
 pub mod zenfs_backend;
 pub use bashkit::{Bash, BashTool, ExecutionLimits};
-pub use zenfs_backend::ZenFsBackend;
 
+#[cfg(target_arch = "wasm32")]
 use bashkit::PosixFs;
+#[cfg(target_arch = "wasm32")]
 use std::sync::Arc;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
+#[cfg(target_arch = "wasm32")]
+pub use zenfs_backend::ZenFsBackend;
 
+#[cfg(target_arch = "wasm32")]
 pub fn build_bash() -> Bash {
     let fs = Arc::new(PosixFs::new(ZenFsBackend));
     Bash::builder().fs(fs).build()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn build_bash() -> Bash {
+    let workspace_root = std::env::var_os("HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(".omni")
+        .join("data")
+        .join("home")
+        .join("workspace");
+
+    let _ = std::fs::create_dir_all(&workspace_root);
+
+    Bash::builder()
+        .mount_real_readwrite_at(workspace_root, "/home/workspace")
+        .build()
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -48,6 +70,33 @@ pub async fn execute(command: String, cwd: Option<String>) -> Result<JsValue, Js
     }
 
     Ok(obj.into())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub async fn execute_native(
+    command: String,
+    cwd: Option<String>,
+) -> Result<(String, i32, bool), std::io::Error> {
+    let mut bash = build_bash();
+    let cwd = cwd
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "/home/workspace".to_string());
+    let script = format!("cd \"{}\" && {}", cwd.replace('"', "\\\""), command);
+    let result = bash
+        .exec(&script)
+        .await
+        .map_err(|error| std::io::Error::other(error.to_string()))?;
+
+    let mut output = result.stdout;
+    if !result.stderr.is_empty() {
+        output.push_str(&result.stderr);
+    }
+
+    Ok((
+        output,
+        result.exit_code,
+        result.stdout_truncated || result.stderr_truncated,
+    ))
 }
 
 #[cfg(test)]

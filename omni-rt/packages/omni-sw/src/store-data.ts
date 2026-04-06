@@ -18,12 +18,8 @@ import {
   getApiKey as getDeepagentsApiKey,
   getDefaultModel as getDeepagentsDefaultModel,
   getStoredDefaultModel as getDeepagentsStoredDefaultModel,
-  listMessages as listDeepagentsMessages,
-  listThreads as listDeepagentsThreads,
-  saveMessage as saveDeepagentsMessage,
   setApiKey as setDeepagentsApiKey,
   setDefaultModel as setDeepagentsDefaultModel,
-  setThreadStatus as setDeepagentsThreadStatus,
 } from "./deepagents.js";
 import {
   DEFAULT_WORKSPACE_ORDER,
@@ -37,11 +33,12 @@ import {
   seedThreads,
 } from "./store-mocks.js";
 
+const THREADS_DIR = "/home/db/threads";
+const MESSAGES_DIR = "/home/db/messages";
 const TODOS_DIR = "/home/db/todos";
 const SUBAGENTS_DIR = "/home/db/subagents";
 const AGENT_ENDPOINTS_DIR = "/home/store/config/agent-endpoints";
 const AGENT_RAIL_DIR = "/home/store/config/agent-rail";
-const DEFAULT_MODEL_ITEM_PATH = "/home/store/config/default_model.json";
 const ALLOWED_DICEBEAR_STYLES = new Set(["bottts-neutral", "thumbs"]);
 export const DEFAULT_THREAD_TITLE = "New Thread";
 
@@ -198,24 +195,6 @@ async function readJson(path: string): Promise<unknown | null> {
   }
 }
 
-async function readStoredDefaultModelItem(): Promise<string | null> {
-  const item = (await readJson(DEFAULT_MODEL_ITEM_PATH)) as Record<string, unknown> | null;
-  const value = item?.value;
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-
-  const candidate =
-    typeof (value as Record<string, unknown>).model_id === "string"
-      ? (value as Record<string, unknown>).model_id
-      : typeof (value as Record<string, unknown>).value === "string"
-        ? (value as Record<string, unknown>).value
-        : null;
-
-  const modelId = candidate?.trim() ?? "";
-  return modelId || null;
-}
-
 async function readJsonFiles(dir: string): Promise<unknown[]> {
   if (!(await exists(dir))) return [];
   const entries = await zenReadDir(dir);
@@ -263,37 +242,58 @@ function modelDefs(): Array<{ id: string; name: string; provider: ProviderId }> 
 
 async function seedIfEmpty(): Promise<void> {
   await ensureZenFs();
-  const existing = await listDeepagentsThreads();
-  if (existing.length === 0) {
-    for (const thread of seedThreads()) {
-      await createDeepagentsThread({
-        thread_id: thread.id,
-        metadata: { title: thread.title },
-      });
-      await setDeepagentsThreadStatus(thread.id, thread.status);
+  const existingThreads = await readJsonFiles(THREADS_DIR);
+  if (existingThreads.length === 0) {
+    for (const seed of seedThreads()) {
+      await zenMkdir(THREADS_DIR, { recursive: true });
+      await zenWriteFile(
+        `${THREADS_DIR}/${seed.id}.json`,
+        encoder.encode(
+          JSON.stringify({
+            thread_id: seed.id,
+            created_at: seed.updated_at,
+            updated_at: seed.updated_at,
+            metadata: { title: seed.title },
+            status: seed.status.toLowerCase(),
+            values: null,
+            messages: null,
+          }),
+        ),
+      );
 
-      for (const msg of thread.messages) {
-        await saveDeepagentsMessage(thread.id, thread.updated_at, { ...msg, thread_id: thread.id });
-      }
-
-      await zenMkdir(`${TODOS_DIR}/${thread.id}`, { recursive: true });
-      for (const todo of thread.todos) {
+      await zenMkdir(`${MESSAGES_DIR}/${seed.id}`, { recursive: true });
+      for (const message of seed.messages) {
         await zenWriteFile(
-          `${TODOS_DIR}/${thread.id}/${todo.id}.json`,
-          encoder.encode(JSON.stringify({ ...todo, thread_id: thread.id })),
+          `${MESSAGES_DIR}/${seed.id}/${message.id}.json`,
+          encoder.encode(
+            JSON.stringify({
+              id: message.id,
+              thread_id: seed.id,
+              role: message.role,
+              content: message.content,
+              created_at: message.created_at,
+            }),
+          ),
         );
       }
 
-      await zenMkdir(`${SUBAGENTS_DIR}/${thread.id}`, { recursive: true });
-      for (const sa of thread.subagents) {
+      await zenMkdir(`${TODOS_DIR}/${seed.id}`, { recursive: true });
+      for (const todo of seed.todos) {
         await zenWriteFile(
-          `${SUBAGENTS_DIR}/${thread.id}/${sa.id}.json`,
-          encoder.encode(JSON.stringify({ ...sa, thread_id: thread.id })),
+          `${TODOS_DIR}/${seed.id}/${todo.id}.json`,
+          encoder.encode(JSON.stringify({ ...todo, thread_id: seed.id })),
+        );
+      }
+
+      await zenMkdir(`${SUBAGENTS_DIR}/${seed.id}`, { recursive: true });
+      for (const subagent of seed.subagents) {
+        await zenWriteFile(
+          `${SUBAGENTS_DIR}/${seed.id}/${subagent.id}.json`,
+          encoder.encode(JSON.stringify({ ...subagent, thread_id: seed.id })),
         );
       }
     }
   }
-
   await ensureWorkspaceScaffold();
   await seedMockAgentEndpoints();
 }
@@ -372,15 +372,11 @@ export async function listWorkspaceFiles(
 }
 
 export async function getDefaultModel(): Promise<string> {
-  return (await readStoredDefaultModelItem()) ?? (await getDeepagentsDefaultModel());
+  return await getDeepagentsDefaultModel();
 }
 
 export async function getStoredDefaultModel(): Promise<string | null> {
-  return readStoredDefaultModelItem();
-}
-
-export async function getMigratableStoredDefaultModel(): Promise<string | null> {
-  return (await readStoredDefaultModelItem()) ?? (await getDeepagentsStoredDefaultModel());
+  return await getDeepagentsStoredDefaultModel();
 }
 
 export async function buildBootstrap(): Promise<BootstrapPayload> {
@@ -390,36 +386,20 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
   const defaultModel = await getDefaultModel();
   const providers = await readProvidersWithKeys();
   const models = modelDefs();
-
-  const threadRows = await listDeepagentsThreads();
-  const threads = threadRows
+  const seedById = new Map(seedThreads().map((thread) => [thread.id, thread]));
+  const threads = (await readJsonFiles(THREADS_DIR))
     .map((row) => {
       const rec = row as Record<string, unknown>;
-      const id = normalizeThreadId(rec.thread_id ?? rec.id);
       const metadata = (rec.metadata as Record<string, unknown> | undefined) ?? {};
       return {
-        id,
+        id: normalizeThreadId(rec.thread_id ?? rec.id),
         title: String(metadata.title ?? DEFAULT_THREAD_TITLE),
         status: toThreadStatus(rec.status),
         updated_at: String(rec.updated_at ?? new Date().toISOString()),
       };
     })
-    .filter((t) => t.id.length > 0)
-    .sort((a, b) => {
-      const order: string[] = [
-        MOCK_THREAD_IDS.gtd,
-        MOCK_THREAD_IDS.auth,
-        MOCK_THREAD_IDS.db,
-        MOCK_THREAD_IDS.ci,
-        MOCK_THREAD_IDS.idea,
-      ];
-      const ai = order.indexOf(a.id);
-      const bi = order.indexOf(b.id);
-      if (ai >= 0 && bi >= 0) return ai - bi;
-      if (ai >= 0) return -1;
-      if (bi >= 0) return 1;
-      return b.updated_at.localeCompare(a.updated_at);
-    });
+    .filter((thread) => thread.id.length > 0)
+    .sort((left, right) => right.updated_at.localeCompare(left.updated_at));
 
   const messages: BootstrapPayload["messages"] = {};
   const todos: BootstrapPayload["todos"] = {};
@@ -448,13 +428,9 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
     })
     .filter((endpoint) => endpoint.id.length > 0 && endpoint.removable);
 
-  const seedById = new Map(seedThreads().map((t) => [t.id, t]));
-
   for (const [index, thread] of threads.entries()) {
     const seeded = seedById.get(thread.id);
-
-    const msgRows = await listDeepagentsMessages(thread.id);
-    let parsedMessages = msgRows
+    const parsedMessages = (await readJsonFiles(`${MESSAGES_DIR}/${thread.id}`))
       .map((row) => {
         const rec = row as Record<string, unknown>;
         return {
@@ -464,16 +440,11 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
           created_at: String(rec.created_at ?? ""),
         };
       })
-      .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      .sort((left, right) => left.created_at.localeCompare(right.created_at))
       .map(({ id, role, content }) => ({ id, role, content }));
-    if (parsedMessages.length === 0 && seeded) {
-      parsedMessages = seeded.messages.map((m) => ({ id: m.id, role: toRole(m.role), content: m.content }));
-    }
     thread.title = deriveThreadTitle(parsedMessages, thread.title);
     messages[thread.id] = parsedMessages;
-
-    const todoRows = await readJsonFiles(`${TODOS_DIR}/${thread.id}`);
-    let parsedTodos = todoRows.map((row) => {
+    const parsedTodos = (await readJsonFiles(`${TODOS_DIR}/${thread.id}`)).map((row) => {
       const rec = row as Record<string, unknown>;
       return {
         id: String(rec.id ?? ""),
@@ -481,13 +452,9 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
         status: toTodoStatus(rec.status),
       };
     });
-    if (parsedTodos.length === 0 && seeded) {
-      parsedTodos = seeded.todos.map((t) => ({ id: t.id, content: t.content, status: toTodoStatus(t.status) }));
-    }
     todos[thread.id] = parsedTodos;
 
-    const subagentRows = await readJsonFiles(`${SUBAGENTS_DIR}/${thread.id}`);
-    let parsedSubagents = subagentRows.map((row) => {
+    const parsedSubagents = (await readJsonFiles(`${SUBAGENTS_DIR}/${thread.id}`)).map((row) => {
       const rec = row as Record<string, unknown>;
       return {
         id: String(rec.id ?? ""),
@@ -496,14 +463,6 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
         status: toSubagentStatus(rec.status),
       };
     });
-    if (parsedSubagents.length === 0 && seeded) {
-      parsedSubagents = seeded.subagents.map((s) => ({
-        id: s.id,
-        name: s.name,
-        description: s.description,
-        status: toSubagentStatus(s.status),
-      }));
-    }
     background_tasks[thread.id] = parsedSubagents;
 
     files[thread.id] = getMockThreadFiles(thread.id);

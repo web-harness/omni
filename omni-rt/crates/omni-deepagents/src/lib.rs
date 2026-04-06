@@ -1,3 +1,4 @@
+pub mod checkpoint_store;
 pub mod config_store;
 pub mod message_store;
 pub mod model_registry;
@@ -8,4 +9,5 @@ pub mod subagent_store;
 pub mod thread_store;
 pub mod title_generator;
 pub mod todo_store;
+#[cfg(target_arch = "wasm32")]
 pub mod wasm_api;

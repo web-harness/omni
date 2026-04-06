@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 pub mod file_types;
 pub mod fixtures;
 pub mod sw_api;
-#[cfg(target_arch = "wasm32")]
 pub mod thread_context;
 pub mod utils;
 
@@ -161,7 +160,6 @@ pub struct BrowserInferenceStatus {
     pub last_error: Option<String>,
 }
 
-#[cfg(target_arch = "wasm32")]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum StreamEvent {
     Token(String),
@@ -579,7 +577,6 @@ pub fn default_states() -> (
     )
 }
 
-#[cfg(target_arch = "wasm32")]
 pub async fn async_init(
     mut thread_state: dioxus::prelude::Signal<ThreadState>,
     mut chat_state: dioxus::prelude::Signal<ChatState>,
@@ -592,14 +589,13 @@ pub async fn async_init(
     iframe_dicebear_style: Option<String>,
 ) {
     use dioxus::signals::{ReadableExt, WritableExt};
-    use gloo_timers::future::TimeoutFuture;
     let mut payload_opt = None;
     for _ in 0..20 {
-        if let Ok(p) = sw_api::fetch_bootstrap().await {
-            payload_opt = Some(p);
+        if let Ok(payload) = sw_api::fetch_bootstrap().await {
+            payload_opt = Some(payload);
             break;
         }
-        TimeoutFuture::new(200).await;
+        pause_bootstrap_retry().await;
     }
     let Some(payload) = payload_opt else {
         return;
@@ -698,4 +694,14 @@ pub async fn async_init(
             }
         }
     }
+}
+
+#[cfg(target_arch = "wasm32")]
+async fn pause_bootstrap_retry() {
+    gloo_timers::future::TimeoutFuture::new(200).await;
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+async fn pause_bootstrap_retry() {
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 }

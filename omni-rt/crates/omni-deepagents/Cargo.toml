@@ -5,18 +5,27 @@ edition.workspace = true
 authors.workspace = true
 
 [dependencies]
-wasm-bindgen = "0.2"
-wasm-bindgen-futures = "0.4"
-js-sys = "0.3"
-web-sys = { version = "0.3", features = ["console", "ReadableStream", "ReadableStreamDefaultReader", "Response", "Headers"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-serde-wasm-bindgen = "0.4"
 omni-zenfs = { path = "../omni-zenfs" }
 omni-protocol = { path = "../omni-protocol" }
 uuid = { version = "1.0", features = ["v4", "serde", "js"] }
 chrono = { version = "0.4", features = ["serde"] }
 futures-core = "0.3"
+futures-util = "0.3"
+bytes = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["console", "ReadableStream", "ReadableStreamDefaultReader", "Response", "Headers"] }
+serde-wasm-bindgen = "0.4"
+
+[features]
+default = []
+native = ["omni-zenfs/native"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]

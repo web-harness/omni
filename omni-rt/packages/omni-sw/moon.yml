@@ -38,6 +38,8 @@ tasks:
       - --target=es2021
       - --format=esm
       - --outfile=../../../omni-ui/public/omni-sw-register.js
+      - --external:./omni-deepagents.js
+      - --external:./omni-zenfs.js
     deps:
       - omni-util:build
       - ensure-public-dir
@@ -76,11 +78,8 @@ tasks:
       - --chunk-names=[name]-[hash]
       - --inject:./shims/node-globals.ts
       - --external:./omni-bashkit.js
-      - --external:/omni-bashkit.js
       - --external:./omni-deepagents.js
-      - --external:/omni-deepagents.js
       - --external:./omni-zenfs.js
-      - --external:/omni-zenfs.js
       - '--define:process.env.NODE_ENV="production"'
       - --define:global=globalThis
       - --alias:node:async_hooks=./shims/async-hooks.ts
@@ -98,30 +97,50 @@ tasks:
       - --alias:node:fs/promises=./shims/fs.ts
       - --alias:node:os=./shims/empty.ts
       - --alias:os=./shims/empty.ts
-      - --alias:node:crypto=./shims/empty.ts
-      - --alias:crypto=./shims/empty.ts
       - --alias:node:stream=./shims/empty.ts
       - --alias:stream=./shims/empty.ts
-      - --alias:node:util=./shims/empty.ts
-      - --alias:util=./shims/empty.ts
-      - --alias:node:events=./shims/empty.ts
-      - --alias:events=./shims/empty.ts
-      - --alias:node:http=./shims/empty.ts
-      - --alias:http=./shims/empty.ts
-      - --alias:node:https=./shims/empty.ts
-      - --alias:https=./shims/empty.ts
-      - --alias:node:net=./shims/empty.ts
-      - --alias:net=./shims/empty.ts
-      - --alias:node:tls=./shims/empty.ts
-      - --alias:tls=./shims/empty.ts
-      - --alias:node:zlib=./shims/empty.ts
-      - --alias:zlib=./shims/empty.ts
-      - --alias:node:url=./shims/empty.ts
-      - --alias:url=./shims/empty.ts
-      - --alias:node:querystring=./shims/empty.ts
-      - --alias:querystring=./shims/empty.ts
-      - --alias:node:string_decoder=./shims/empty.ts
-      - --alias:string_decoder=./shims/empty.ts
+    deps:
+      - omni-util:build
+      - ensure-public-dir
+      - clean-public
+    inputs:
+      - '@group(sources)'
+      - shims/**/*
+      - '@group(configs)'
+    options:
+      shell: false
+      internal: true
+  build-agent-module:
+    command: esbuild
+    args:
+      - src/agent-module.ts
+      - --bundle
+      - --platform=browser
+      - --target=es2021
+      - --format=esm
+      - --outfile=../../../omni-ui/public/omni-agent-module.js
+      - --inject:./shims/node-globals.ts
+      - --external:./omni-deepagents.js
+      - --external:./omni-zenfs.js
+      - '--define:process.env.NODE_ENV="production"'
+      - --define:global=globalThis
+      - --alias:node:async_hooks=./shims/async-hooks.ts
+      - --alias:async_hooks=./shims/async-hooks.ts
+      - --alias:path=./shims/path.ts
+      - --alias:node:path=./shims/path.ts
+      - --alias:child_process=./shims/child-process.ts
+      - --alias:node:child_process=./shims/child-process.ts
+      - --alias:buffer=./shims/buffer.ts
+      - --alias:node:buffer=./shims/buffer.ts
+      - --alias:process=./shims/process.ts
+      - --alias:node:process=./shims/process.ts
+      - --alias:fs=./shims/fs.ts
+      - --alias:node:fs=./shims/fs.ts
+      - --alias:node:fs/promises=./shims/fs.ts
+      - --alias:node:os=./shims/empty.ts
+      - --alias:os=./shims/empty.ts
+      - --alias:node:stream=./shims/empty.ts
+      - --alias:stream=./shims/empty.ts
     deps:
       - omni-util:build
       - ensure-public-dir
@@ -142,6 +161,8 @@ tasks:
       - --target=es2021
       - --format=esm
       - --outfile=../../../omni-ui/public/omni-sw-register.js
+      - --external:./omni-deepagents.js
+      - --external:./omni-zenfs.js
       - --watch
     deps:
       - omni-util:watch
@@ -165,11 +186,8 @@ tasks:
       - --chunk-names=[name]-[hash]
       - --inject:./shims/node-globals.ts
       - --external:./omni-bashkit.js
-      - --external:/omni-bashkit.js
       - --external:./omni-deepagents.js
-      - --external:/omni-deepagents.js
       - --external:./omni-zenfs.js
-      - --external:/omni-zenfs.js
       - '--define:process.env.NODE_ENV="production"'
       - --define:global=globalThis
       - --alias:node:async_hooks=./shims/async-hooks.ts
@@ -187,30 +205,52 @@ tasks:
       - --alias:node:fs/promises=./shims/fs.ts
       - --alias:node:os=./shims/empty.ts
       - --alias:os=./shims/empty.ts
-      - --alias:node:crypto=./shims/empty.ts
-      - --alias:crypto=./shims/empty.ts
       - --alias:node:stream=./shims/empty.ts
       - --alias:stream=./shims/empty.ts
-      - --alias:node:util=./shims/empty.ts
-      - --alias:util=./shims/empty.ts
-      - --alias:node:events=./shims/empty.ts
-      - --alias:events=./shims/empty.ts
-      - --alias:node:http=./shims/empty.ts
-      - --alias:http=./shims/empty.ts
-      - --alias:node:https=./shims/empty.ts
-      - --alias:https=./shims/empty.ts
-      - --alias:node:net=./shims/empty.ts
-      - --alias:net=./shims/empty.ts
-      - --alias:node:tls=./shims/empty.ts
-      - --alias:tls=./shims/empty.ts
-      - --alias:node:zlib=./shims/empty.ts
-      - --alias:zlib=./shims/empty.ts
-      - --alias:node:url=./shims/empty.ts
-      - --alias:url=./shims/empty.ts
-      - --alias:node:querystring=./shims/empty.ts
-      - --alias:querystring=./shims/empty.ts
-      - --alias:node:string_decoder=./shims/empty.ts
-      - --alias:string_decoder=./shims/empty.ts
+      - --watch
+    deps:
+      - omni-util:watch
+      - ensure-public-dir
+      - clean-public
+    inputs:
+      - '@group(sources)'
+      - shims/**/*
+      - '@group(configs)'
+    preset: server
+    options:
+      shell: false
+      internal: true
+  watch-agent-module:
+    command: esbuild
+    args:
+      - src/agent-module.ts
+      - --bundle
+      - --platform=browser
+      - --target=es2021
+      - --format=esm
+      - --outfile=../../../omni-ui/public/omni-agent-module.js
+      - --inject:./shims/node-globals.ts
+      - --external:./omni-deepagents.js
+      - --external:./omni-zenfs.js
+      - '--define:process.env.NODE_ENV="production"'
+      - --define:global=globalThis
+      - --alias:node:async_hooks=./shims/async-hooks.ts
+      - --alias:async_hooks=./shims/async-hooks.ts
+      - --alias:path=./shims/path.ts
+      - --alias:node:path=./shims/path.ts
+      - --alias:child_process=./shims/child-process.ts
+      - --alias:node:child_process=./shims/child-process.ts
+      - --alias:buffer=./shims/buffer.ts
+      - --alias:node:buffer=./shims/buffer.ts
+      - --alias:process=./shims/process.ts
+      - --alias:node:process=./shims/process.ts
+      - --alias:fs=./shims/fs.ts
+      - --alias:node:fs=./shims/fs.ts
+      - --alias:node:fs/promises=./shims/fs.ts
+      - --alias:node:os=./shims/empty.ts
+      - --alias:os=./shims/empty.ts
+      - --alias:node:stream=./shims/empty.ts
+      - --alias:stream=./shims/empty.ts
       - --watch
     deps:
       - omni-util:watch

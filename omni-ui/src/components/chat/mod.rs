@@ -7,14 +7,13 @@ use futures_util::StreamExt;
 use omni_rt::deepagents::model_registry::browser_model_spec;
 
 use crate::components::ui::{Badge, BadgeVariant, Popover};
-#[cfg(target_arch = "wasm32")]
 use crate::lib::thread_context::apply_stream_event;
+use crate::lib::utils::app_url;
 use crate::lib::{
     AgentEndpoint, AgentEndpointState, ChatState, ModelState, Role, TasksState, ThreadState,
     ToolCall, ToolResult, UiState, WorkspaceState,
 };
 
-#[cfg(target_arch = "wasm32")]
 #[derive(Clone)]
 struct StreamRequest {
     thread_id: String,
@@ -23,11 +22,21 @@ struct StreamRequest {
     endpoint: Option<AgentEndpoint>,
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-#[derive(Clone)]
-struct StreamRequest;
+#[cfg(all(not(target_arch = "wasm32"), feature = "desktop"))]
+#[derive(serde::Serialize)]
+struct DesktopAgentModuleRequest {
+    body: serde_json::Value,
+    #[serde(rename = "baseUrl")]
+    base_url: String,
+}
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(not(target_arch = "wasm32"), feature = "desktop"))]
+#[derive(serde::Deserialize)]
+struct DesktopAgentModuleEvent {
+    event: String,
+    data: serde_json::Value,
+}
+
 fn send_stream_request(
     stream: &Coroutine<StreamRequest>,
     thread_id: String,
@@ -41,17 +50,6 @@ fn send_stream_request(
         model_id,
         endpoint,
     });
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn send_stream_request(
-    stream: &Coroutine<StreamRequest>,
-    _thread_id: String,
-    _input: String,
-    _model_id: String,
-    _endpoint: Option<AgentEndpoint>,
-) {
-    stream.send(StreamRequest);
 }
 
 fn browser_download_bytes(
@@ -102,9 +100,137 @@ fn browser_download_progress_percent(
     Some(((loaded_bytes as u128 * 100) / total_bytes as u128).min(100) as u8)
 }
 
+fn stream_request_body(req: &StreamRequest) -> serde_json::Value {
+    serde_json::json!({
+        "thread_id": req.thread_id,
+        "messages": [
+            {
+                "role": "user",
+                "content": req.input,
+            }
+        ],
+        "stream_mode": ["messages", "values"],
+        "metadata": {
+            "model_id": req.model_id,
+            "agent_id": req.endpoint.as_ref().map(|endpoint| endpoint.id.clone()).unwrap_or_else(|| "main".to_string()),
+            "agent_name": req.endpoint.as_ref().map(|endpoint| endpoint.name.clone()).unwrap_or_else(|| "Main Agent".to_string()),
+            "agent_url": req.endpoint.as_ref().map(|endpoint| endpoint.url.clone()).unwrap_or_default(),
+            "agent_bearer_token": req.endpoint.as_ref().map(|endpoint| endpoint.bearer_token.clone()).unwrap_or_default(),
+            "agent_mode": if req.endpoint.as_ref().map(|endpoint| endpoint.removable).unwrap_or(false) { "direct" } else { "main" },
+        },
+    })
+}
+
+fn apply_sse_event(
+    req: &StreamRequest,
+    thread_state: &Signal<ThreadState>,
+    chat_state: &mut Signal<ChatState>,
+    tasks_state: &mut Signal<TasksState>,
+    event: omni_rt::deepagents::sse::SseEvent,
+) -> bool {
+    match event {
+        omni_rt::deepagents::sse::SseEvent::Message(value) => {
+            let content = value
+                .get("content")
+                .and_then(|content| content.as_str())
+                .map(str::to_string)
+                .unwrap_or_else(|| value.to_string());
+            if !content.is_empty() {
+                let active_tid = thread_state.read().active_thread_id.clone();
+                apply_stream_event(
+                    active_tid.as_deref(),
+                    &mut chat_state.write(),
+                    &mut tasks_state.write(),
+                    crate::lib::StreamEvent::Token(content),
+                );
+            }
+            false
+        }
+        omni_rt::deepagents::sse::SseEvent::MessageComplete(_) => false,
+        omni_rt::deepagents::sse::SseEvent::Values(_) => false,
+        omni_rt::deepagents::sse::SseEvent::Done => {
+            apply_stream_event(
+                Some(&req.thread_id),
+                &mut chat_state.write(),
+                &mut tasks_state.write(),
+                crate::lib::StreamEvent::Done,
+            );
+            true
+        }
+        omni_rt::deepagents::sse::SseEvent::Error(error) => {
+            chat_state.write().error = Some(error);
+            chat_state.write().is_streaming = false;
+            true
+        }
+    }
+}
+
+#[cfg(all(not(target_arch = "wasm32"), feature = "desktop"))]
+async fn run_desktop_stream_via_eval(
+    req: &StreamRequest,
+    thread_state: &Signal<ThreadState>,
+    chat_state: &mut Signal<ChatState>,
+    tasks_state: &mut Signal<TasksState>,
+) {
+    let mut eval = document::eval(
+        r#"
+        const payload = await dioxus.recv();
+        const module = await import("/omni-agent-module.js");
+        const events = await module.executeRunStream(payload.body, payload.baseUrl);
+        for await (const event of events) {
+            dioxus.send(event);
+        }
+        dioxus.send({ event: "end", data: null });
+        "#,
+    );
+
+    if let Err(error) = eval.send(DesktopAgentModuleRequest {
+        body: stream_request_body(req),
+        base_url: app_url("").trim_end_matches('/').to_string(),
+    }) {
+        chat_state.write().error = Some(error.to_string());
+        chat_state.write().is_streaming = false;
+        return;
+    }
+
+    loop {
+        match eval.recv::<DesktopAgentModuleEvent>().await {
+            Ok(frame) => {
+                let event = match frame.event.as_str() {
+                    "message" | "messages/partial" => {
+                        omni_rt::deepagents::sse::SseEvent::Message(frame.data)
+                    }
+                    "messages/complete" => {
+                        omni_rt::deepagents::sse::SseEvent::MessageComplete(frame.data)
+                    }
+                    "values" => omni_rt::deepagents::sse::SseEvent::Values(frame.data),
+                    "error" => omni_rt::deepagents::sse::SseEvent::Error(
+                        frame
+                            .data
+                            .get("message")
+                            .and_then(|value| value.as_str())
+                            .map(str::to_string)
+                            .unwrap_or_else(|| frame.data.to_string()),
+                    ),
+                    "end" => omni_rt::deepagents::sse::SseEvent::Done,
+                    _ => continue,
+                };
+
+                if apply_sse_event(req, thread_state, chat_state, tasks_state, event) {
+                    break;
+                }
+            }
+            Err(error) => {
+                chat_state.write().error = Some(error.to_string());
+                chat_state.write().is_streaming = false;
+                break;
+            }
+        }
+    }
+}
+
 #[component]
 pub fn ChatContainer(thread_id: String) -> Element {
-    #[cfg(target_arch = "wasm32")]
     let stream = {
         let thread_state = use_context::<Signal<ThreadState>>();
         let mut chat_state = use_context::<Signal<ChatState>>();
@@ -115,61 +241,37 @@ pub fn ChatContainer(thread_id: String) -> Element {
                 chat_state.write().is_streaming = true;
                 chat_state.write().error = None;
 
-                use omni_rt::deepagents::sse::{SseEvent, SseStream};
-                let body = serde_json::json!({
-                    "thread_id": req.thread_id,
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": req.input,
-                        }
-                    ],
-                    "stream_mode": ["messages", "values"],
-                    "metadata": {
-                        "model_id": req.model_id,
-                        "agent_id": req.endpoint.as_ref().map(|endpoint| endpoint.id.clone()).unwrap_or_else(|| "main".to_string()),
-                        "agent_name": req.endpoint.as_ref().map(|endpoint| endpoint.name.clone()).unwrap_or_else(|| "Main Agent".to_string()),
-                        "agent_url": req.endpoint.as_ref().map(|endpoint| endpoint.url.clone()).unwrap_or_default(),
-                        "agent_bearer_token": req.endpoint.as_ref().map(|endpoint| endpoint.bearer_token.clone()).unwrap_or_default(),
-                        "agent_mode": if req.endpoint.as_ref().map(|endpoint| endpoint.removable).unwrap_or(false) { "direct" } else { "main" },
-                    },
-                })
-                .to_string();
+                #[cfg(all(not(target_arch = "wasm32"), feature = "desktop"))]
+                {
+                    run_desktop_stream_via_eval(
+                        &req,
+                        &thread_state,
+                        &mut chat_state,
+                        &mut tasks_state,
+                    )
+                    .await;
+                    continue;
+                }
 
-                match SseStream::connect("/runs/stream", &body).await {
+                #[cfg(any(target_arch = "wasm32", not(feature = "desktop")))]
+                match omni_rt::deepagents::sse::SseStream::connect(
+                    &app_url("runs/stream"),
+                    &stream_request_body(&req).to_string(),
+                )
+                .await
+                {
                     Ok(mut stream) => loop {
                         match stream.next_event().await {
-                            Ok(Some(SseEvent::Message(value))) => {
-                                let content = value
-                                    .get("content")
-                                    .and_then(|content| content.as_str())
-                                    .map(str::to_string)
-                                    .unwrap_or_else(|| value.to_string());
-                                if !content.is_empty() {
-                                    let active_tid = thread_state.read().active_thread_id.clone();
-                                    apply_stream_event(
-                                        active_tid.as_deref(),
-                                        &mut chat_state.write(),
-                                        &mut tasks_state.write(),
-                                        crate::lib::StreamEvent::Token(content),
-                                    );
+                            Ok(Some(event)) => {
+                                if apply_sse_event(
+                                    &req,
+                                    &thread_state,
+                                    &mut chat_state,
+                                    &mut tasks_state,
+                                    event,
+                                ) {
+                                    break;
                                 }
-                            }
-                            Ok(Some(SseEvent::MessageComplete(_))) => {}
-                            Ok(Some(SseEvent::Values(_))) => {}
-                            Ok(Some(SseEvent::Done)) => {
-                                apply_stream_event(
-                                    Some(&req.thread_id),
-                                    &mut chat_state.write(),
-                                    &mut tasks_state.write(),
-                                    crate::lib::StreamEvent::Done,
-                                );
-                                break;
-                            }
-                            Ok(Some(SseEvent::Error(e))) => {
-                                chat_state.write().error = Some(e);
-                                chat_state.write().is_streaming = false;
-                                break;
                             }
                             Err(e) => {
                                 chat_state.write().error = Some(e.to_string());
@@ -190,11 +292,6 @@ pub fn ChatContainer(thread_id: String) -> Element {
             }
         })
     };
-
-    #[cfg(not(target_arch = "wasm32"))]
-    let stream = use_coroutine(move |mut rx: UnboundedReceiver<StreamRequest>| async move {
-        while rx.next().await.is_some() {}
-    });
 
     let chat_state = use_context::<Signal<ChatState>>();
     let tasks_state = use_context::<Signal<TasksState>>();
@@ -543,16 +640,6 @@ fn ChatInput(thread_id: String, stream: Coroutine<StreamRequest>) -> Element {
                 div { class: "mt-2 flex items-center gap-2",
                     ModelSwitcher {}
                     WorkspacePicker {}
-                    {
-                        let active_target = agent_state
-                            .read()
-                            .active_endpoint()
-                            .map(|endpoint| endpoint.name.clone())
-                            .unwrap_or_else(|| "Main Agent".to_string());
-                        rsx! {
-                            omni-text { "data-text": "Using: {active_target}", "data-strategy": "truncate", "data-max-lines": "1", class: "text-[10px] text-muted-foreground whitespace-nowrap" }
-                        }
-                    }
                     omni-text { "data-text": "~2.4k input · ~580 output · $0.012", "data-strategy": "none", "data-max-lines": "1", class: "ml-auto text-[10px] text-muted-foreground whitespace-nowrap" }
                 }
             }

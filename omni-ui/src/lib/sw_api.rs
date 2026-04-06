@@ -1,12 +1,10 @@
-#[cfg(target_arch = "wasm32")]
 use super::utils::app_url;
 use super::{AgentEndpoint, BrowserInferenceStatus};
-#[cfg(target_arch = "wasm32")]
-use gloo_net::http::Request;
-#[cfg(target_arch = "wasm32")]
-use serde::Deserialize;
+use reqwest::Method;
+use serde::{Deserialize, Serialize};
 #[cfg(target_arch = "wasm32")]
 use std::cell::RefCell;
+use std::collections::HashMap;
 #[cfg(target_arch = "wasm32")]
 use std::rc::Rc;
 #[cfg(target_arch = "wasm32")]
@@ -14,17 +12,13 @@ use wasm_bindgen::closure::Closure;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-#[cfg(target_arch = "wasm32")]
 use super::{
     BackgroundTask, FileInfo, ModelConfig, Provider, Todo, ToolCall, ToolResult, UiMessage,
     UiThread,
 };
 
 #[cfg(target_arch = "wasm32")]
-use std::collections::HashMap;
-
-#[cfg(target_arch = "wasm32")]
-#[wasm_bindgen(module = "/public/omni-inference-client.js")]
+#[wasm_bindgen(module = "/omni-inference-client.js")]
 extern "C" {
     #[wasm_bindgen(catch, js_name = getBrowserInferenceStatus)]
     async fn js_get_browser_inference_status() -> Result<JsValue, JsValue>;
@@ -50,6 +44,13 @@ extern "C" {
 }
 
 #[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(module = "/omni-sw-register.js")]
+extern "C" {
+    #[wasm_bindgen(catch, js_name = loadBootstrapPayloadJson)]
+    async fn js_load_bootstrap_payload_json() -> Result<JsValue, JsValue>;
+}
+
+#[cfg(target_arch = "wasm32")]
 pub struct BrowserInferenceStatusSubscription {
     callback: Closure<dyn FnMut(JsValue)>,
     handle: BrowserInferenceStatusStreamHandle,
@@ -66,8 +67,7 @@ impl Drop for BrowserInferenceStatusSubscription {
 #[cfg(not(target_arch = "wasm32"))]
 pub struct BrowserInferenceStatusSubscription;
 
-#[cfg(target_arch = "wasm32")]
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct BootstrapPayload {
     pub threads: Vec<UiThread>,
     pub messages: HashMap<String, Vec<UiMessage>>,
@@ -88,25 +88,21 @@ pub struct BootstrapPayload {
     pub agent_endpoints: Vec<AgentEndpoint>,
 }
 
-#[cfg(target_arch = "wasm32")]
 fn default_dicebear_style() -> String {
     "bottts-neutral".into()
 }
 
-#[cfg(target_arch = "wasm32")]
 #[derive(Deserialize)]
 struct ItemResponse {
     value: serde_json::Value,
 }
 
-#[cfg(target_arch = "wasm32")]
 #[derive(Deserialize)]
 #[allow(dead_code)]
 struct SearchItemsResponse {
     items: Vec<ItemResponse>,
 }
 
-#[cfg(target_arch = "wasm32")]
 #[derive(Deserialize)]
 struct ProtocolThreadResponse {
     thread_id: String,
@@ -115,7 +111,6 @@ struct ProtocolThreadResponse {
     updated_at: String,
 }
 
-#[cfg(target_arch = "wasm32")]
 #[derive(Deserialize)]
 struct ProvidersResponseItem {
     id: super::ProviderId,
@@ -123,7 +118,6 @@ struct ProvidersResponseItem {
     has_api_key: bool,
 }
 
-#[cfg(target_arch = "wasm32")]
 fn err_msg(err: impl ToString) -> std::io::Error {
     std::io::Error::other(err.to_string())
 }
@@ -145,7 +139,6 @@ fn unavailable() -> std::io::Error {
     std::io::Error::other("sw_api is only available on wasm32 targets")
 }
 
-#[cfg(target_arch = "wasm32")]
 fn parse_thread_status(raw: &str) -> super::ThreadStatus {
     match raw {
         "busy" => super::ThreadStatus::Busy,
@@ -155,56 +148,79 @@ fn parse_thread_status(raw: &str) -> super::ThreadStatus {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 fn store_item_url(namespace: &[&str], key: &str) -> String {
     let mut url = app_url("store/items?");
     for segment in namespace {
-        let encoded = js_sys::encode_uri_component(segment)
-            .as_string()
-            .unwrap_or_else(|| (*segment).to_string());
+        let encoded = urlencoding::encode(segment).into_owned();
         url.push_str("namespace=");
         url.push_str(&encoded);
         url.push('&');
     }
-    let encoded_key = js_sys::encode_uri_component(key)
-        .as_string()
-        .unwrap_or_else(|| key.to_string());
+    let encoded_key = urlencoding::encode(key).into_owned();
     url.push_str("key=");
     url.push_str(&encoded_key);
     url
 }
 
-#[cfg(target_arch = "wasm32")]
-pub async fn fetch_bootstrap() -> Result<BootstrapPayload, std::io::Error> {
-    let response = Request::get(&app_url("x/bootstrap"))
-        .send()
-        .await
-        .map_err(err_msg)?;
-
-    if !response.ok() {
-        return Err(std::io::Error::other(format!(
-            "bootstrap request failed: {}",
-            response.status()
-        )));
-    }
-
-    response.json::<BootstrapPayload>().await.map_err(err_msg)
+fn http_client() -> reqwest::Client {
+    reqwest::Client::new()
 }
 
-#[cfg(target_arch = "wasm32")]
+async fn send_json_request<T: serde::Serialize + ?Sized>(
+    method: Method,
+    url: String,
+    body: Option<&T>,
+) -> Result<reqwest::Response, std::io::Error> {
+    let request = http_client().request(method, url);
+    let request = if let Some(body) = body {
+        request.json(body)
+    } else {
+        request
+    };
+    request.send().await.map_err(err_msg)
+}
+
+pub async fn fetch_bootstrap() -> Result<BootstrapPayload, std::io::Error> {
+    #[cfg(target_arch = "wasm32")]
+    {
+        let value = js_load_bootstrap_payload_json()
+            .await
+            .map_err(|error| err_msg(js_value_to_string(&error)))?;
+        let payload = value
+            .as_string()
+            .ok_or_else(|| err_msg("bootstrap payload JSON bridge returned a non-string value"))?;
+        return serde_json::from_str::<BootstrapPayload>(&payload).map_err(err_msg);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let response =
+            send_json_request(Method::GET, app_url("x/bootstrap"), Option::<&()>::None).await?;
+
+        if !response.status().is_success() {
+            return Err(std::io::Error::other(format!(
+                "bootstrap request failed: {}",
+                response.status()
+            )));
+        }
+
+        response.json::<BootstrapPayload>().await.map_err(err_msg)
+    }
+}
+
 pub async fn create_thread() -> Result<UiThread, std::io::Error> {
-    let response = Request::post(&app_url("threads"))
-        .json(&serde_json::json!({
+    let response = send_json_request(
+        Method::POST,
+        app_url("threads"),
+        Some(&serde_json::json!({
             "metadata": {
                 "title": "New Thread"
             }
-        }))
-        .map_err(err_msg)?
-        .send()
-        .await
-        .map_err(err_msg)?;
+        })),
+    )
+    .await?;
 
-    if !response.ok() {
+    if !response.status().is_success() {
         return Err(std::io::Error::other(format!(
             "create thread failed: {}",
             response.status()
@@ -229,14 +245,15 @@ pub async fn create_thread() -> Result<UiThread, std::io::Error> {
     })
 }
 
-#[cfg(target_arch = "wasm32")]
 pub async fn delete_thread(thread_id: &str) -> Result<(), std::io::Error> {
-    let response = Request::delete(&app_url(&format!("threads/{thread_id}")))
-        .send()
-        .await
-        .map_err(err_msg)?;
+    let response = send_json_request(
+        Method::DELETE,
+        app_url(&format!("threads/{thread_id}")),
+        Option::<&()>::None,
+    )
+    .await?;
 
-    if response.ok() {
+    if response.status().is_success() {
         Ok(())
     } else {
         Err(std::io::Error::other(format!(
@@ -246,14 +263,15 @@ pub async fn delete_thread(thread_id: &str) -> Result<(), std::io::Error> {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 pub async fn get_api_key(provider: &str) -> Result<String, std::io::Error> {
-    let response = Request::get(&store_item_url(&["config", "api-keys"], provider))
-        .send()
-        .await
-        .map_err(err_msg)?;
+    let response = send_json_request(
+        Method::GET,
+        store_item_url(&["config", "api-keys"], provider),
+        Option::<&()>::None,
+    )
+    .await?;
 
-    if !response.ok() {
+    if !response.status().is_success() {
         return Err(std::io::Error::other(format!(
             "get api key failed: {}",
             response.status()
@@ -264,20 +282,19 @@ pub async fn get_api_key(provider: &str) -> Result<String, std::io::Error> {
     Ok(payload.value.as_str().unwrap_or_default().to_string())
 }
 
-#[cfg(target_arch = "wasm32")]
 pub async fn set_api_key(provider: &str, value: &str) -> Result<(), std::io::Error> {
-    let response = Request::put(&app_url("store/items"))
-        .json(&serde_json::json!({
+    let response = send_json_request(
+        Method::PUT,
+        app_url("store/items"),
+        Some(&serde_json::json!({
             "namespace": ["config", "api-keys"],
             "key": provider,
             "value": value,
-        }))
-        .map_err(err_msg)?
-        .send()
-        .await
-        .map_err(err_msg)?;
+        })),
+    )
+    .await?;
 
-    if response.ok() {
+    if response.status().is_success() {
         Ok(())
     } else {
         Err(std::io::Error::other(format!(
@@ -287,19 +304,18 @@ pub async fn set_api_key(provider: &str, value: &str) -> Result<(), std::io::Err
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 pub async fn delete_api_key(provider: &str) -> Result<(), std::io::Error> {
-    let response = Request::delete(&app_url("store/items"))
-        .json(&serde_json::json!({
+    let response = send_json_request(
+        Method::DELETE,
+        app_url("store/items"),
+        Some(&serde_json::json!({
             "namespace": ["config", "api-keys"],
             "key": provider,
-        }))
-        .map_err(err_msg)?
-        .send()
-        .await
-        .map_err(err_msg)?;
+        })),
+    )
+    .await?;
 
-    if response.ok() {
+    if response.status().is_success() {
         Ok(())
     } else {
         Err(std::io::Error::other(format!(
@@ -309,21 +325,20 @@ pub async fn delete_api_key(provider: &str) -> Result<(), std::io::Error> {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 #[allow(dead_code)]
 pub async fn list_agent_endpoints() -> Result<Vec<AgentEndpoint>, std::io::Error> {
-    let response = Request::post(&app_url("store/items/search"))
-        .json(&serde_json::json!({
+    let response = send_json_request(
+        Method::POST,
+        app_url("store/items/search"),
+        Some(&serde_json::json!({
             "namespace_prefix": ["config", "agent-endpoints"],
             "limit": 200,
             "offset": 0,
-        }))
-        .map_err(err_msg)?
-        .send()
-        .await
-        .map_err(err_msg)?;
+        })),
+    )
+    .await?;
 
-    if !response.ok() {
+    if !response.status().is_success() {
         return Err(std::io::Error::other(format!(
             "list agent endpoints failed: {}",
             response.status()
@@ -341,20 +356,19 @@ pub async fn list_agent_endpoints() -> Result<Vec<AgentEndpoint>, std::io::Error
         .collect()
 }
 
-#[cfg(target_arch = "wasm32")]
 pub async fn set_agent_endpoint(endpoint: &AgentEndpoint) -> Result<(), std::io::Error> {
-    let response = Request::put(&app_url("store/items"))
-        .json(&serde_json::json!({
+    let response = send_json_request(
+        Method::PUT,
+        app_url("store/items"),
+        Some(&serde_json::json!({
             "namespace": ["config", "agent-endpoints"],
             "key": endpoint.id,
             "value": endpoint,
-        }))
-        .map_err(err_msg)?
-        .send()
-        .await
-        .map_err(err_msg)?;
+        })),
+    )
+    .await?;
 
-    if response.ok() {
+    if response.status().is_success() {
         Ok(())
     } else {
         Err(std::io::Error::other(format!(
@@ -364,19 +378,18 @@ pub async fn set_agent_endpoint(endpoint: &AgentEndpoint) -> Result<(), std::io:
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 pub async fn delete_agent_endpoint(id: &str) -> Result<(), std::io::Error> {
-    let response = Request::delete(&app_url("store/items"))
-        .json(&serde_json::json!({
+    let response = send_json_request(
+        Method::DELETE,
+        app_url("store/items"),
+        Some(&serde_json::json!({
             "namespace": ["config", "agent-endpoints"],
             "key": id,
-        }))
-        .map_err(err_msg)?
-        .send()
-        .await
-        .map_err(err_msg)?;
+        })),
+    )
+    .await?;
 
-    if response.ok() {
+    if response.status().is_success() {
         Ok(())
     } else {
         Err(std::io::Error::other(format!(
@@ -386,22 +399,21 @@ pub async fn delete_agent_endpoint(id: &str) -> Result<(), std::io::Error> {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 pub async fn set_agent_rail_style(style: &str) -> Result<(), std::io::Error> {
-    let response = Request::put(&app_url("store/items"))
-        .json(&serde_json::json!({
+    let response = send_json_request(
+        Method::PUT,
+        app_url("store/items"),
+        Some(&serde_json::json!({
             "namespace": ["config", "agent-rail"],
             "key": "dicebear-style",
             "value": {
                 "style": style,
             },
-        }))
-        .map_err(err_msg)?
-        .send()
-        .await
-        .map_err(err_msg)?;
+        })),
+    )
+    .await?;
 
-    if response.ok() {
+    if response.status().is_success() {
         Ok(())
     } else {
         Err(std::io::Error::other(format!(
@@ -411,14 +423,11 @@ pub async fn set_agent_rail_style(style: &str) -> Result<(), std::io::Error> {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 pub async fn list_providers_with_keys() -> Result<Vec<Provider>, std::io::Error> {
-    let response = Request::get(&app_url("x/providers"))
-        .send()
-        .await
-        .map_err(err_msg)?;
+    let response =
+        send_json_request(Method::GET, app_url("x/providers"), Option::<&()>::None).await?;
 
-    if !response.ok() {
+    if !response.status().is_success() {
         return Err(std::io::Error::other(format!(
             "list providers failed: {}",
             response.status()
@@ -440,22 +449,21 @@ pub async fn list_providers_with_keys() -> Result<Vec<Provider>, std::io::Error>
         .collect())
 }
 
-#[cfg(target_arch = "wasm32")]
 pub async fn set_default_model(model_id: &str) -> Result<(), std::io::Error> {
-    let response = Request::put(&app_url("store/items"))
-        .json(&serde_json::json!({
+    let response = send_json_request(
+        Method::PUT,
+        app_url("store/items"),
+        Some(&serde_json::json!({
             "namespace": ["config"],
             "key": "default_model",
             "value": {
                 "model_id": model_id,
             },
-        }))
-        .map_err(err_msg)?
-        .send()
-        .await
-        .map_err(err_msg)?;
+        })),
+    )
+    .await?;
 
-    if response.ok() {
+    if response.status().is_success() {
         Ok(())
     } else {
         Err(std::io::Error::other(format!(
@@ -534,17 +542,16 @@ where
     Err(unavailable())
 }
 
-#[cfg(target_arch = "wasm32")]
 pub async fn list_workspace_files(workspace: &str) -> Result<Vec<super::FileInfo>, std::io::Error> {
-    let encoded = js_sys::encode_uri_component(workspace)
-        .as_string()
-        .unwrap_or_else(|| "/home/workspace".to_string());
-    let response = Request::get(&app_url(&format!("x/files?workspace={encoded}")))
-        .send()
-        .await
-        .map_err(err_msg)?;
+    let encoded = urlencoding::encode(workspace).into_owned();
+    let response = send_json_request(
+        Method::GET,
+        app_url(&format!("x/files?workspace={encoded}")),
+        Option::<&()>::None,
+    )
+    .await?;
 
-    if !response.ok() {
+    if !response.status().is_success() {
         return Err(std::io::Error::other(format!(
             "list files failed: {}",
             response.status()
@@ -555,43 +562,6 @@ pub async fn list_workspace_files(workspace: &str) -> Result<Vec<super::FileInfo
         .json::<Vec<super::FileInfo>>()
         .await
         .map_err(err_msg)
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-pub async fn list_workspace_files(
-    _workspace: &str,
-) -> Result<Vec<super::FileInfo>, std::io::Error> {
-    Err(unavailable())
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-#[allow(dead_code)]
-pub async fn set_default_model(_model_id: &str) -> Result<(), std::io::Error> {
-    Err(unavailable())
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-#[allow(dead_code)]
-pub async fn list_agent_endpoints() -> Result<Vec<AgentEndpoint>, std::io::Error> {
-    Err(unavailable())
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-#[allow(dead_code)]
-pub async fn set_agent_endpoint(_endpoint: &AgentEndpoint) -> Result<(), std::io::Error> {
-    Err(unavailable())
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-#[allow(dead_code)]
-pub async fn delete_agent_endpoint(_id: &str) -> Result<(), std::io::Error> {
-    Err(unavailable())
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-#[allow(dead_code)]
-pub async fn set_agent_rail_style(_style: &str) -> Result<(), std::io::Error> {
-    Err(unavailable())
 }
 
 #[cfg(not(target_arch = "wasm32"))]

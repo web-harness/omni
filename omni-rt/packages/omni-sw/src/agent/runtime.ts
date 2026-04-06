@@ -28,6 +28,7 @@ import {
   type ProtocolMessage,
   type StoredSseEvent,
 } from "../run-store.js";
+import { encodeSseChunk } from "../sse.js";
 import {
   deriveThreadTitle,
   getApiKey as getProviderApiKey,
@@ -474,11 +475,6 @@ function providerForModel(modelId: string): string {
   return "ollama";
 }
 
-function sseChunk(frame: StoredSseEvent): Uint8Array {
-  const idLine = frame.id ? `id: ${frame.id}\n` : "";
-  return new TextEncoder().encode(`${idLine}event: ${frame.event}\ndata: ${JSON.stringify(frame.data)}\n\n`);
-}
-
 async function loadBashkitExecutor(): Promise<BashkitExecute> {
   if (!bashkitReadyPromise) {
     bashkitReadyPromise = initBashkit();
@@ -617,7 +613,7 @@ function streamResponseForRecord(
   let subscriber: ((frame: StoredSseEvent) => void) | undefined;
   const stream = new ReadableStream({
     start(controller) {
-      const push = (frame: StoredSseEvent) => controller.enqueue(sseChunk(frame));
+      const push = (frame: StoredSseEvent) => controller.enqueue(encodeSseChunk(frame));
       if (replayExisting) {
         for (const frame of record.events ?? []) {
           push(frame);

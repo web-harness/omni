@@ -8,14 +8,23 @@ authors.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-bashkit = { git = "https://github.com/everruns/bashkit" }
 omni-zenfs = { path = "../omni-zenfs" }
 async-trait = "0.1"
+futures-channel = "0.3"
+tokio = { version = "1", features = ["sync", "macros", "io-util", "rt", "time"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+bashkit = { git = "https://github.com/everruns/bashkit", features = ["realfs"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+bashkit = { git = "https://github.com/everruns/bashkit" }
 js-sys = "0.3"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
-futures-channel = "0.3"
-tokio = { version = "1", features = ["sync", "macros", "io-util", "rt", "time"] }
+
+[features]
+default = []
+native = ["omni-zenfs/native"]
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

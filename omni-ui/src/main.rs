@@ -14,6 +14,8 @@ use wasm_bindgen::JsCast;
 mod components;
 mod lib;
 mod routes;
+#[cfg(feature = "desktop")]
+mod server;
 
 use components::{
     AgentRail, BackgroundTasksSection, Button, ButtonVariant, ChatContainer, Dialog, FilesSection,
@@ -51,6 +53,22 @@ struct IframeBootstrapConfig {
     dicebear_style: String,
     #[serde(default)]
     agents: Vec<IframeAgentConfig>,
+}
+
+#[cfg(all(not(target_arch = "wasm32"), feature = "desktop"))]
+#[derive(Deserialize)]
+struct DesktopExecuteRequest {
+    command: String,
+    cwd: Option<String>,
+}
+
+#[cfg(all(not(target_arch = "wasm32"), feature = "desktop"))]
+#[derive(serde::Serialize)]
+struct DesktopExecuteResponse {
+    output: String,
+    #[serde(rename = "exitCode")]
+    exit_code: i32,
+    truncated: bool,
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -269,7 +287,61 @@ fn main() {
         return;
     }
 
+    #[cfg(all(not(target_arch = "wasm32"), feature = "desktop"))]
+    start_desktop_server();
+
     dioxus::launch(App);
+}
+
+#[cfg(all(not(target_arch = "wasm32"), feature = "desktop"))]
+fn start_desktop_server() {
+    let (port_tx, port_rx) = std::sync::mpsc::sync_channel(1);
+    std::thread::Builder::new()
+        .name("omni-desktop-server".to_string())
+        .spawn(move || {
+            let runtime = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .expect("failed to build desktop runtime");
+            runtime.block_on(async {
+                let app = axum::Router::new()
+                    .merge(crate::server::store_api::router())
+                    .route("/x/execute", axum::routing::post(desktop_execute))
+                    .layer(tower_http::cors::CorsLayer::permissive());
+                let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+                    .await
+                    .expect("failed to bind desktop api server");
+                let port = listener
+                    .local_addr()
+                    .expect("failed to read desktop api socket address")
+                    .port();
+                port_tx
+                    .send(port)
+                    .expect("failed to publish desktop api port");
+                axum::serve(listener, app)
+                    .await
+                    .expect("desktop api server exited unexpectedly");
+            });
+        })
+        .expect("failed to spawn desktop api server");
+    let port = port_rx
+        .recv()
+        .expect("failed to receive bound desktop api port");
+    crate::lib::utils::set_desktop_api_port(port);
+}
+
+#[cfg(all(not(target_arch = "wasm32"), feature = "desktop"))]
+async fn desktop_execute(
+    axum::Json(body): axum::Json<DesktopExecuteRequest>,
+) -> Result<axum::Json<DesktopExecuteResponse>, crate::server::store_api::ApiError> {
+    let (output, exit_code, truncated) = omni_rt::bashkit::execute_native(body.command, body.cwd)
+        .await
+        .map_err(crate::server::store_api::io_error)?;
+    Ok(axum::Json(DesktopExecuteResponse {
+        output,
+        exit_code,
+        truncated,
+    }))
 }
 
 #[component]
@@ -311,49 +383,18 @@ fn App() -> Element {
     let sw_url = lib::utils::app_url("omni-sw.js");
     let sw_register_url = lib::utils::app_url("omni-sw-register.js");
 
-    #[cfg(target_arch = "wasm32")]
     let thread_signal = use_context_provider(|| Signal::new(threads));
-    #[cfg(not(target_arch = "wasm32"))]
-    use_context_provider(|| Signal::new(threads));
-
-    #[cfg(target_arch = "wasm32")]
     let chat_signal = use_context_provider(|| Signal::new(chat));
-    #[cfg(not(target_arch = "wasm32"))]
-    use_context_provider(|| Signal::new(chat));
-
-    #[cfg(target_arch = "wasm32")]
     let tasks_signal = use_context_provider(|| Signal::new(tasks));
-    #[cfg(not(target_arch = "wasm32"))]
-    use_context_provider(|| Signal::new(tasks));
-
-    #[cfg(target_arch = "wasm32")]
     let workspace_signal = use_context_provider(|| Signal::new(workspace));
-    #[cfg(not(target_arch = "wasm32"))]
-    use_context_provider(|| Signal::new(workspace));
-
-    #[cfg(target_arch = "wasm32")]
     let model_signal = use_context_provider(|| Signal::new(model));
-    #[cfg(not(target_arch = "wasm32"))]
-    use_context_provider(|| Signal::new(model));
-
-    #[cfg(target_arch = "wasm32")]
-    let ui_signal = use_context_provider(|| Signal::new(ui));
-    #[cfg(not(target_arch = "wasm32"))]
-    use_context_provider(|| Signal::new(ui));
-    #[cfg(target_arch = "wasm32")]
+    let _ui_signal = use_context_provider(|| Signal::new(ui));
     let background_task_signal = use_context_provider(|| Signal::new(background_tasks));
-    #[cfg(not(target_arch = "wasm32"))]
-    use_context_provider(|| Signal::new(background_tasks));
-
-    #[cfg(target_arch = "wasm32")]
     let agent_endpoint_signal = use_context_provider(|| Signal::new(agent_endpoints));
-    #[cfg(not(target_arch = "wasm32"))]
-    use_context_provider(|| Signal::new(agent_endpoints));
 
     #[cfg(target_arch = "wasm32")]
-    install_iframe_runtime_listener(ui_signal, agent_endpoint_signal);
+    install_iframe_runtime_listener(_ui_signal, agent_endpoint_signal);
 
-    #[cfg(target_arch = "wasm32")]
     use_future(move || {
         let iframe_agent_endpoints_override = iframe_agent_endpoints_override.clone();
         let iframe_dicebear_style_override = iframe_dicebear_style_override.clone();
@@ -572,10 +613,10 @@ pub fn AppLayout() -> Element {
 pub fn Home() -> Element {
     let thread_state = use_context::<Signal<ThreadState>>();
     let navigator = use_navigator();
-    let first = thread_state.read().threads.first().map(|t| t.id.clone());
 
     use_effect(move || {
-        if let Some(id) = first.clone() {
+        let first = thread_state.read().threads.first().map(|t| t.id.clone());
+        if let Some(id) = first {
             navigator.replace(Route::ThreadView { id });
         }
     });

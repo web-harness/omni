@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { parseSseFrames } from "../sse.js";
 
 const mockState = vi.hoisted(() => {
   const encoder = new TextEncoder();
@@ -166,26 +167,6 @@ function jsonRequest(url: string, method: string, body?: unknown): Request {
     headers: { "Content-Type": "application/json" },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
-}
-
-function parseSseFrames(text: string): Array<{ id?: string; event?: string; data?: unknown }> {
-  return text
-    .trim()
-    .split("\n\n")
-    .filter(Boolean)
-    .map((frame) => {
-      const entry: { id?: string; event?: string; data?: unknown } = {};
-      for (const line of frame.split("\n")) {
-        if (line.startsWith("id: ")) {
-          entry.id = line.slice(4);
-        } else if (line.startsWith("event: ")) {
-          entry.event = line.slice(7);
-        } else if (line.startsWith("data: ")) {
-          entry.data = JSON.parse(line.slice(6));
-        }
-      }
-      return entry;
-    });
 }
 
 beforeEach(() => {

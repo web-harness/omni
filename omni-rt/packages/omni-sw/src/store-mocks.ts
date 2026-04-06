@@ -121,6 +121,10 @@ export const SCAFFOLD_FILES: Array<{ path: string; content: string }> = [
 ];
 
 export function seedThreads(): SeedThread[] {
+  const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+  const messageTime = (minutesAfterStart: number) =>
+    new Date(Date.now() - 4 * 60 * 60 * 1000 + minutesAfterStart * 60 * 1000).toISOString();
+
   const genericTodos: SeedThread["todos"] = [
     { id: "t1", content: "Wire dock slots", status: "completed" },
     { id: "t2", content: "Port sidebar interactions", status: "in_progress" },
@@ -146,28 +150,28 @@ export function seedThreads(): SeedThread[] {
   return [
     {
       id: MOCK_THREAD_IDS.gtd,
-      title: "Implement todo management sys...",
+      title: "New Thread",
       status: "Busy",
-      updated_at: "9m ago",
+      updated_at: fourHoursAgo,
       messages: [
         {
           id: "m1",
           role: "user",
           content:
             "Build a todo management system with three modes: GTD (Getting Things Done), Kanban, and Chaos Mode (random prioritization). Research and implement all three.",
-          created_at: "1",
+          created_at: messageTime(0),
         },
       ],
       todos: [
         {
           id: "t1",
-          content: "Research GTD (Getting Things Done) methodology using a background task",
+          content: "Research GTD (Getting Things Done) methodology using subagent",
           status: "in_progress",
         },
-        { id: "t2", content: "Research Kanban methodology using a background task", status: "in_progress" },
+        { id: "t2", content: "Research Kanban methodology using subagent", status: "in_progress" },
         {
           id: "t3",
-          content: "Research Chaos Mode (random prioritization) approach using a background task",
+          content: "Research Chaos Mode (random prioritization) approach using subagent",
           status: "pending",
         },
         {
@@ -209,16 +213,21 @@ export function seedThreads(): SeedThread[] {
     },
     {
       id: MOCK_THREAD_IDS.auth,
-      title: "Implement Auth Flow",
+      title: "New Thread",
       status: "Interrupted",
-      updated_at: "49m ago",
+      updated_at: fourHoursAgo,
       messages: [
-        { id: "m1", role: "user", content: "Ship OAuth login with refresh rotation and audit trail.", created_at: "1" },
+        {
+          id: "m1",
+          role: "user",
+          content: "Ship OAuth login with refresh rotation and audit trail.",
+          created_at: messageTime(1),
+        },
         {
           id: "m2",
           role: "assistant",
           content: "Copy. I will update auth middleware, add token persistence, and run smoke tests.",
-          created_at: "2",
+          created_at: messageTime(2),
         },
       ],
       todos: genericTodos,
@@ -226,16 +235,16 @@ export function seedThreads(): SeedThread[] {
     },
     {
       id: MOCK_THREAD_IDS.db,
-      title: "Database Migration",
+      title: "New Thread",
       status: "Idle",
-      updated_at: "52m ago",
+      updated_at: fourHoursAgo,
       messages: [
-        { id: "m1", role: "user", content: "Need migration plan for v3 schema.", created_at: "1" },
+        { id: "m1", role: "user", content: "Need migration plan for v3 schema.", created_at: messageTime(3) },
         {
           id: "m2",
           role: "assistant",
           content: "Migration paused pending approval to write production scripts.",
-          created_at: "2",
+          created_at: messageTime(4),
         },
       ],
       todos: genericTodos,
@@ -243,18 +252,18 @@ export function seedThreads(): SeedThread[] {
     },
     {
       id: MOCK_THREAD_IDS.ci,
-      title: "Setup CI Pipeline",
+      title: "New Thread",
       status: "Idle",
-      updated_at: "58m ago",
+      updated_at: fourHoursAgo,
       messages: [],
       todos: genericTodos,
       subagents: genericSubagents,
     },
     {
       id: MOCK_THREAD_IDS.idea,
-      title: "What would be a good...",
+      title: "New Thread",
       status: "Idle",
-      updated_at: "1h ago",
+      updated_at: fourHoursAgo,
       messages: [],
       todos: genericTodos,
       subagents: genericSubagents,
@@ -270,12 +279,10 @@ export function getMockThreadFiles(threadId: string): Array<{ path: string; is_d
       { path: "public/index.html", is_dir: false, size: 6900 },
       { path: "public/styles.css", is_dir: false, size: 3400 },
       { path: "scripts", is_dir: true, size: null },
-      { path: "scripts/flush_todos_node_script.js", is_dir: false, size: 381 },
+      { path: "scripts/flush_todos.js", is_dir: false, size: 381 },
       { path: "server", is_dir: true, size: null },
       { path: "server/server.js", is_dir: false, size: 850 },
       { path: "server/todos.json", is_dir: false, size: 314 },
-      { path: "test2", is_dir: true, size: null },
-      { path: "test2/hello_french.txt", is_dir: false, size: 78 },
     ];
   }
   return [

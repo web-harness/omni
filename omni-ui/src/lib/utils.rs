@@ -1,3 +1,18 @@
+#[cfg(all(not(target_arch = "wasm32"), feature = "desktop"))]
+static DESKTOP_API_PORT: std::sync::OnceLock<u16> = std::sync::OnceLock::new();
+
+#[cfg(all(not(target_arch = "wasm32"), feature = "desktop"))]
+pub fn set_desktop_api_port(port: u16) {
+    let _ = DESKTOP_API_PORT.set(port);
+}
+
+#[cfg(all(not(target_arch = "wasm32"), feature = "desktop"))]
+pub fn desktop_api_port() -> u16 {
+    *DESKTOP_API_PORT
+        .get()
+        .expect("desktop api port must be initialized before app launch")
+}
+
 pub fn relative_time(input: &str) -> String {
     use chrono::{DateTime, Utc};
     let Ok(then) = DateTime::parse_from_rfc3339(input) else {
@@ -32,6 +47,13 @@ pub fn file_name(path: &str) -> String {
     path.rsplit('/').next().unwrap_or(path).to_string()
 }
 
+#[cfg(all(not(target_arch = "wasm32"), feature = "desktop"))]
+pub fn app_url(path: &str) -> String {
+    let path = path.trim_start_matches('/');
+    format!("http://127.0.0.1:{}/{path}", desktop_api_port())
+}
+
+#[cfg(not(all(not(target_arch = "wasm32"), feature = "desktop")))]
 pub fn app_url(path: &str) -> String {
     let base_path = option_env!("OMNI_BASE_PATH")
         .unwrap_or("")
