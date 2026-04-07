@@ -9,6 +9,7 @@ Follow your instructions carefully and do not deviate from them. If you are unsu
 - [Core Principles](#core-principles)
 - [Implementation Principles](#implementation-principles)
 - [Repo Conventions](#repo-conventions)
+- [Build and Runtime Architecture](#build-and-runtime-architecture)
 - [Dioxus Dependency](#dioxus-dependency)
 - [Debugging this application](#debugging-this-application)
 - [UI with RSX](#ui-with-rsx)
@@ -32,15 +33,19 @@ Follow your instructions carefully and do not deviate from them. If you are unsu
 ## Core Principles
 
 - You are forbidden to do "stop-and-ask behavior". Go until instructions are 100% exhausted and finished.
-- You are to never use the web_sys crate directly
-- You are to never use js_sys crate directly
-- You are to never use custom events or hacks to achieve your goals.
+- Do not introduce new direct `web_sys` usage unless it matches an existing repo-approved interop boundary.
+- Do not introduce new direct `js_sys` usage unless it matches an existing repo-approved interop boundary.
+- The currently approved interop exceptions are narrow and already exist in the repo:
+	- `omni-ui/src/main.rs` iframe bootstrap/runtime message listeners
+	- `omni-ui/src/lib/sw_api.rs` JS bridge helpers for service worker / inference interop
+	- `omni-ui/src/components/chat/mod.rs` service-worker readiness flag read
+- Do not add new custom event systems or hacks to achieve your goals.
 - You are not allowed to use RequestAnimationFrame, setTimeout or any other shortcuts to achieve your goals.
 - You are only allowed to use the official Dioxus APIs, concepts and features to achieve your goals
 - You are strictly forbidden from doubting the Dioxus APIs, concepts and features. If you think something is missing, you are to make it yourself using Dioxus APIs, concepts and features. You are not allowed to doubt the Dioxus team or their decisions. They know best.
 - Follow repo's README.md for general project information.
 - Backwards compatibility and defensive programming is forbidden, until asked explicitly by the user.
-- Do not enter runtime debugging or browser testing unless explicitly asked by the user. Focus on your code and let the tooling do its job.
+- Do not debug Dioxus tooling or Moon orchestration unless the user explicitly asks for that. Focus on your code and let the existing tooling rebuild. Browser verification of your code is allowed and expected when needed.
 
 ## Implementation Principles
 
@@ -70,13 +75,34 @@ Implement This plan. Continue until 100% completion. No interrupts.
 - `omni-rt/packages/` is for pure JavaScript and TypeScript packages.
 - Do not put pure JS/TS projects under `omni-rt/crates/`.
 - `omni-rt/crates/omni-zenfs` stays under `crates` because it is not a pure JS/TS package.
+- `omni-ui/` is the main Dioxus application shell for web and desktop.
+- `omni-wc/` is the Lit + Storybook web-components surface for embedding and demos.
 - The Moon workspace is the source of truth for build orchestration. Keep project paths aligned with `.moon/workspace.yml`.
 - Prefer direct Moon task commands over helper scripts when the task can be expressed cleanly in Moon config.
 - Prefer direct `esbuild` commands in Moon tasks for JS/TS package build and watch flows.
 - Keep per-package cleanup local to that package. Do not introduce centralized cleanup tasks that serialize unrelated builds.
 - `omni-ui/public/` is a generated asset sink for package outputs. Treat it as build output, not handwritten source.
+- Dioxus loads generated runtime/viewer modules from `omni-ui/public/` using injected module scripts and metadata in `omni-ui/src/main.rs`.
+- `omni-sw` is the browser service-worker runtime. In web mode it handles route families rooted at `/agents`, `/threads`, `/store`, `/x`, and `/runs`.
+- `omni-inference` is the browser inference runtime and model-download layer. It emits JS modules plus `wllama` WASM assets into `omni-ui/public/`.
+- `omni-deepagents` and `omni-bashkit` are Rust crates that compile to WASM and are exposed through `wasm-bindgen` outputs in `omni-ui/public/`.
+- Desktop mode mirrors key web runtime APIs through Axum routes in `omni-ui/src/server/store_api.rs` and bootstrap assembly in `omni-ui/src/server/bootstrap.rs`.
 - Moon `format` tasks must always set `cache: false` so formatting runs fresh every time.
 - When moving packages between `crates` and `packages`, update `package.json`, `package-lock.json`, `.moon/workspace.yml`, README/AGENTS docs, and any hard-coded sample paths that reference the old location.
+
+## Build and Runtime Architecture
+
+- Root `package.json` is a convenience wrapper around Moon tasks. Prefer `moon run ...` or the existing npm scripts instead of ad-hoc helper commands.
+- `omni-ui:dev` runs `dx serve --platform web` and depends on the generated assets/watchers from the TS runtime packages.
+- `omni-ui:build` runs `dx bundle --platform web`; `omni-ui:build-native` runs `dx bundle --platform desktop`.
+- Most `omni-rt/packages/*` projects build with direct `esbuild` commands into `omni-ui/public/`.
+- `omni-util` is the shared TS utility layer used by many frontend/runtime packages.
+- Viewer packages like Monaco, PDF.js, Marked, SheetJS, Plyr, docx-preview, Popper, Dockview, Dicebear, and pptx-renderer are wrapped as generated modules consumed by Dioxus.
+- `omni-sw` is not just a cache layer; it is an in-browser runtime/API surface that dispatches store, thread, run, and bootstrap requests.
+- `omni-rt/crates/omni-protocol` is the shared contract layer for Agent/Thread/Run/Store types.
+- `omni-rt/crates/omni-deepagents` owns persistent thread/message/run/todo/config/checkpoint logic and exposes wasm APIs consumed by the service-worker runtime.
+- `omni-rt/crates/omni-zenfs` provides filesystem integration used by both browser runtime code and native Rust code.
+- `omni-rt/crates/omni-bashkit` provides sandboxed shell execution and is wired into the service-worker agent runtime through generated WASM bindings.
 
 ## Dioxus Dependency
 
@@ -84,13 +110,13 @@ You can add Dioxus to your `Cargo.toml` like this:
 
 ```toml
 [dependencies]
-dioxus = { version = "0.7.1" }
+dioxus = { version = "0.7.4", features = ["router"] }
 
 [features]
-default = ["web", "webview", "server"]
+default = ["web"]
 web = ["dioxus/web"]
-webview = ["dioxus/desktop"]
-server = ["dioxus/server"]
+desktop = ["dioxus/desktop"]
+mobile = ["dioxus/mobile"]
 ```
 
 ## Debugging this application
@@ -106,6 +132,14 @@ You are usually put into debugging mode while the user already has "dx serve" ru
 Always focus on your own code.
 
 Only if no server is running, you can do so with "dx serve" or "npm start" in the project directory. This will watch for file changes and rebuild the project automatically. You can view the app in the browser at `http://localhost:8080` (or the port specified in your configuration).
+
+Prefer the repo's actual dev entrypoints:
+
+- root: `npm run dev` -> Moon -> `omni-ui:dev`
+- root: `npm run dev:native` -> Moon -> `omni-ui:dev-native`
+- root: `npm run storybook` -> Moon -> `omni-wc:dev`
+
+If you need to understand a missing asset or runtime module, check the corresponding Moon project under `omni-rt/packages/*/moon.yml` or `omni-rt/crates/*/moon.yml` instead of debugging Dioxus itself.
 
 ## UI with RSX
 
@@ -315,7 +349,7 @@ fn App() -> Element {
 ```
 
 ```toml
-dioxus = { version = "0.7.1", features = ["router"] }
+dioxus = { version = "0.7.4", features = ["router"] }
 ```
 
 ## Fullstack
@@ -323,7 +357,7 @@ dioxus = { version = "0.7.1", features = ["router"] }
 Fullstack enables server rendering and ipc calls. It uses Cargo features (`server` and a client feature like `web`) to split the code into a server and client binaries.
 
 ```toml
-dioxus = { version = "0.7.1", features = ["fullstack"] }
+dioxus = { version = "0.7.4", features = ["fullstack"] }
 ```
 
 ## Server Functions
