@@ -62,10 +62,66 @@ tasks:
       - dist/
     toolchains:
       - system
-  build-pages:
-    extends: build
-    env:
-      OMNI_BASE_PATH: /omni/app
+  prepare-pages-assets:
+    command: shx
+    args:
+      - echo
+      - pages-assets-ready
+    deps:
+      - omni-util:build
+      - omni-docxjs:build
+      - omni-dicebear:build
+      - omni-dock:build
+      - omni-popper:build
+      - omni-marked:build
+      - omni-monaco:build
+      - omni-pdfjs:build
+      - omni-pptx-renderer:build
+      - omni-plyr:build
+      - omni-pretext:build
+      - omni-sheetjs:build
+      - omni-zenfs:build
+      - omni-zenfs:build-wasm
+      - omni-deepagents:build
+      - omni-bashkit:build
+      - omni-inference:build-main
+      - omni-inference:build-client
+      - omni-inference:build-register
+      - omni-inference:copy-wasm
+      - omni-sw:build-main
+      - omni-sw:build-register
+      - omni-sw:copy-sql-wasm
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+    options:
+      internal: true
+      runFromWorkspaceRoot: true
+    toolchains:
+      - system
+  build-pages-debug:
+    command: dx
+    args:
+      - bundle
+      - --platform
+      - web
+      - --base-path
+      - /omni/app
+      - --out-dir
+      - ../target/dx/omni-ui/dist-pages-snippets-debug
+    deps:
+      - prepare-pages-assets
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+    outputs:
+      - /target/dx/omni-ui/dist-pages-snippets-debug/
+    options:
+      internal: true
+    toolchains:
+      - system
+  build-pages-release:
+    command: dx
     args:
       - bundle
       - --platform
@@ -75,8 +131,113 @@ tasks:
       - /omni/app
       - --out-dir
       - dist
+    deps:
+      - prepare-pages-assets
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+    outputs:
+      - dist/
     options:
-      mergeArgs: replace
+      internal: true
+    toolchains:
+      - system
+  clean-pages-asset-snippets:
+    command: shx
+    args:
+      - rm
+      - -rf
+      - omni-ui/dist/public/assets/snippets
+    deps:
+      - build-pages-release
+    inputs:
+      - '@group(configs)'
+    options:
+      internal: true
+      runFromWorkspaceRoot: true
+    toolchains:
+      - system
+  create-pages-asset-snippets:
+    command: shx
+    args:
+      - mkdir
+      - -p
+      - omni-ui/dist/public/assets/snippets
+    deps:
+      - clean-pages-asset-snippets
+      - build-pages-debug
+    inputs:
+      - '@group(configs)'
+    options:
+      internal: true
+      runFromWorkspaceRoot: true
+    toolchains:
+      - system
+  copy-pages-debug-snippets:
+    command: shx
+    args:
+      - cp
+      - -r
+      - target/dx/omni-ui/debug/web/public/wasm/snippets/.
+      - omni-ui/dist/public/assets/snippets
+    deps:
+      - create-pages-asset-snippets
+    inputs:
+      - '@group(configs)'
+    options:
+      internal: true
+      runFromWorkspaceRoot: true
+    toolchains:
+      - system
+  copy-pages-release-snippets:
+    command: shx
+    args:
+      - cp
+      - -r
+      - target/dx/omni-ui/release/web/public/snippets/.
+      - omni-ui/dist/public/assets/snippets
+    deps:
+      - create-pages-asset-snippets
+    inputs:
+      - '@group(configs)'
+    options:
+      internal: true
+      runFromWorkspaceRoot: true
+    toolchains:
+      - system
+  copy-pages-asset-runtime-modules:
+    command: shx
+    args:
+      - cp
+      - omni-ui/dist/public/omni-zenfs.js
+      - omni-ui/dist/public/assets/omni-zenfs.js
+    deps:
+      - build-pages-release
+    inputs:
+      - '@group(configs)'
+    options:
+      internal: true
+      runFromWorkspaceRoot: true
+    toolchains:
+      - system
+  build-pages:
+    command: shx
+    args:
+      - echo
+      - pages-build-ready
+    deps:
+      - copy-pages-debug-snippets
+      - copy-pages-release-snippets
+      - copy-pages-asset-runtime-modules
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+    outputs:
+      - dist/
+    options:
+      runFromWorkspaceRoot: true
+    toolchains:
+      - system
   build-native:
     command: dx
     args:
