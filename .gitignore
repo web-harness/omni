@@ -36,3 +36,11 @@ dist/
 storybook-static/
 .moon/cache/
 /docs
+/deploy-local
+/local-pages-root
+/config.yaml
+/litellm_cache
+/.mcp_data
+
+/.graphify**
+/graphify-*/

@@ -24,13 +24,6 @@ use components::{
 use lib::{default_states, ModelState, Theme, ThreadState, UiState, WorkspaceState};
 use routes::Route;
 
-const FAVICON: Asset = asset!("/assets/favicon.ico");
-const MAIN_CSS: Asset = asset!("/assets/main.css");
-const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
-const FONT_REGULAR: Asset = asset!("/assets/fonts/JetBrainsMono-Regular.woff2");
-const FONT_MEDIUM: Asset = asset!("/assets/fonts/JetBrainsMono-Medium.woff2");
-const FONT_SEMIBOLD: Asset = asset!("/assets/fonts/JetBrainsMono-SemiBold.woff2");
-const FONT_BOLD: Asset = asset!("/assets/fonts/JetBrainsMono-Bold.woff2");
 #[cfg(target_arch = "wasm32")]
 const IFRAME_BOOTSTRAP_EVENT: &str = "omni-iframe-config";
 #[cfg(target_arch = "wasm32")]
@@ -307,6 +300,7 @@ fn start_desktop_server() {
                 let app = axum::Router::new()
                     .merge(crate::server::store_api::router())
                     .route("/x/execute", axum::routing::post(desktop_execute))
+                    .fallback(axum::routing::any(crate::server::assets::serve))
                     .layer(tower_http::cors::CorsLayer::permissive());
                 let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
                     .await
@@ -366,22 +360,29 @@ fn App() -> Element {
             agent_endpoints.endpoints = lib::merge_agent_endpoints(endpoints);
         }
     }
-    let dock_url = lib::utils::app_url("omni-dock.js");
-    let dicebear_url = lib::utils::app_url("omni-dicebear.js");
-    let popper_url = lib::utils::app_url("omni-popper.js");
-    let monaco_url = lib::utils::app_url("omni-monaco.js");
-    let marked_url = lib::utils::app_url("omni-marked.js");
-    let sheetjs_url = lib::utils::app_url("omni-sheetjs.js");
-    let docxjs_url = lib::utils::app_url("omni-docxjs.js");
-    let pdfjs_worker_url = lib::utils::app_url("omni-pdfjs.worker.js");
-    let pdfjs_url = lib::utils::app_url("omni-pdfjs.js");
-    let pptx_renderer_url = lib::utils::app_url("omni-pptx-renderer.js");
-    let plyr_url = lib::utils::app_url("omni-plyr.js");
-    let pretext_url = lib::utils::app_url("omni-pretext.js");
-    let inference_url = lib::utils::app_url("omni-inference.js");
-    let inference_register_url = lib::utils::app_url("omni-inference-register.js");
-    let sw_url = lib::utils::app_url("omni-sw.js");
-    let sw_register_url = lib::utils::app_url("omni-sw-register.js");
+    let favicon_url = lib::utils::api_url("assets/favicon.ico");
+    let main_css_url = lib::utils::api_url("assets/main.css");
+    let tailwind_css_url = lib::utils::api_url("assets/tailwind.css");
+    let font_regular_url = lib::utils::api_url("assets/fonts/JetBrainsMono-Regular.woff2");
+    let font_medium_url = lib::utils::api_url("assets/fonts/JetBrainsMono-Medium.woff2");
+    let font_semibold_url = lib::utils::api_url("assets/fonts/JetBrainsMono-SemiBold.woff2");
+    let font_bold_url = lib::utils::api_url("assets/fonts/JetBrainsMono-Bold.woff2");
+    let dock_url = lib::utils::api_url("omni-dock.js");
+    let dicebear_url = lib::utils::api_url("omni-dicebear.js");
+    let popper_url = lib::utils::api_url("omni-popper.js");
+    let monaco_url = lib::utils::api_url("omni-monaco.js");
+    let marked_url = lib::utils::api_url("omni-marked.js");
+    let sheetjs_url = lib::utils::api_url("omni-sheetjs.js");
+    let docxjs_url = lib::utils::api_url("omni-docxjs.js");
+    let pdfjs_worker_url = lib::utils::api_url("omni-pdfjs.worker.js");
+    let pdfjs_url = lib::utils::api_url("omni-pdfjs.js");
+    let pptx_renderer_url = lib::utils::api_url("omni-pptx-renderer.js");
+    let plyr_url = lib::utils::api_url("omni-plyr.js");
+    let pretext_url = lib::utils::api_url("omni-pretext.js");
+    let inference_url = lib::utils::api_url("omni-inference.js");
+    let inference_register_url = lib::utils::api_url("omni-inference-register.js");
+    let sw_url = lib::utils::api_url("omni-sw.js");
+    let sw_register_url = lib::utils::api_url("omni-sw-register.js");
 
     let thread_signal = use_context_provider(|| Signal::new(threads));
     let chat_signal = use_context_provider(|| Signal::new(chat));
@@ -419,14 +420,14 @@ fn App() -> Element {
     });
 
     rsx! {
-        document::Link { rel: "icon", href: FAVICON }
-        document::Link { rel: "stylesheet", href: MAIN_CSS }
-        document::Link { rel: "stylesheet", href: TAILWIND_CSS }
+        document::Link { rel: "icon", href: favicon_url }
+        document::Link { rel: "stylesheet", href: main_css_url }
+        document::Link { rel: "stylesheet", href: tailwind_css_url }
         document::Style {
-            "@font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:400;font-display:swap;src:url('{FONT_REGULAR}') format('woff2')}}
-            @font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:500;font-display:swap;src:url('{FONT_MEDIUM}') format('woff2')}}
-            @font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:600;font-display:swap;src:url('{FONT_SEMIBOLD}') format('woff2')}}
-            @font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:700;font-display:swap;src:url('{FONT_BOLD}') format('woff2')}}"
+            "@font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:400;font-display:swap;src:url('{font_regular_url}') format('woff2')}}
+            @font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:500;font-display:swap;src:url('{font_medium_url}') format('woff2')}}
+            @font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:600;font-display:swap;src:url('{font_semibold_url}') format('woff2')}}
+            @font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:700;font-display:swap;src:url('{font_bold_url}') format('woff2')}}"
         }
         document::Script { src: dock_url, r#type: "module", defer: true }
         document::Script { src: dicebear_url, r#type: "module", defer: true }
@@ -440,10 +441,12 @@ fn App() -> Element {
         document::Script { src: pptx_renderer_url, r#type: "module", defer: true }
         document::Script { src: plyr_url, r#type: "module", defer: true }
         document::Script { src: pretext_url, r#type: "module", defer: true }
-        document::Meta { name: "omni-inference-url", content: inference_url }
-        document::Script { src: inference_register_url, r#type: "module", defer: true }
-        document::Meta { name: "omni-sw-url", content: sw_url }
-        document::Script { src: sw_register_url, r#type: "module", defer: true }
+        if cfg!(target_arch = "wasm32") {
+            document::Meta { name: "omni-inference-url", content: inference_url }
+            document::Script { src: inference_register_url, r#type: "module", defer: true }
+            document::Meta { name: "omni-sw-url", content: sw_url }
+            document::Script { src: sw_register_url, r#type: "module", defer: true }
+        }
 
         Router::<Route> {}
     }

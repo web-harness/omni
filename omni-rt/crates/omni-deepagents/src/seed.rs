@@ -1,4 +1,4 @@
-use crate::{message_store, subagent_store, thread_store, todo_store};
+use crate::{message_store, subagent_store, thread_store, todo_store, workspace_seed};
 use chrono::Utc;
 use message_store::StoredMessage;
 use omni_protocol::ThreadStatus;
@@ -7,6 +7,24 @@ use subagent_store::{StoredSubagent, SubagentStatus};
 use todo_store::{StoredTodo, TodoStatus};
 
 const THREADS_DIR: &str = "/home/db/threads";
+
+async fn backfill_seeded_workspaces(
+    threads: Vec<omni_protocol::Thread>,
+) -> Result<(), std::io::Error> {
+    for (index, mut thread) in threads.into_iter().enumerate() {
+        if thread.metadata.contains_key("workspace") {
+            continue;
+        }
+        thread.metadata.insert(
+            "workspace".to_string(),
+            serde_json::Value::String(
+                workspace_seed::default_workspace_for_index(index).to_string(),
+            ),
+        );
+        thread_store::save_thread(&thread).await?;
+    }
+    Ok(())
+}
 
 fn stored_message(
     id: &str,
@@ -34,6 +52,8 @@ pub async fn seed_if_empty() -> Result<(), std::io::Error> {
     }
     let existing = thread_store::list_threads().await?;
     if !existing.is_empty() {
+        backfill_seeded_workspaces(existing).await?;
+        workspace_seed::ensure_workspace_scaffold().await?;
         return Ok(());
     }
 
@@ -42,6 +62,7 @@ pub async fn seed_if_empty() -> Result<(), std::io::Error> {
     // --- Thread 1: Implement todo management system ---
     let t1 = thread_store::create_thread_with_status(
         "Implement todo management sys...",
+        workspace_seed::default_workspace_for_index(0),
         ThreadStatus::Busy,
         now.to_rfc3339(),
     )
@@ -119,6 +140,7 @@ pub async fn seed_if_empty() -> Result<(), std::io::Error> {
     // --- Thread 2: Implement Auth Flow ---
     let t2 = thread_store::create_thread_with_status(
         "Implement Auth Flow",
+        workspace_seed::default_workspace_for_index(1),
         ThreadStatus::Interrupted,
         (now - chrono::Duration::hours(16)).to_rfc3339(),
     )
@@ -182,6 +204,7 @@ pub async fn seed_if_empty() -> Result<(), std::io::Error> {
     // --- Thread 3: Database Migration ---
     let t3 = thread_store::create_thread_with_status(
         "Database Migration",
+        workspace_seed::default_workspace_for_index(2),
         ThreadStatus::Idle,
         (now - chrono::Duration::hours(46)).to_rfc3339(),
     )
@@ -251,6 +274,7 @@ pub async fn seed_if_empty() -> Result<(), std::io::Error> {
     // --- Thread 4: Setup CI Pipeline ---
     let t4 = thread_store::create_thread_with_status(
         "Setup CI Pipeline",
+        workspace_seed::default_workspace_for_index(0),
         ThreadStatus::Idle,
         (now - chrono::Duration::hours(73)).to_rfc3339(),
     )
@@ -294,6 +318,7 @@ pub async fn seed_if_empty() -> Result<(), std::io::Error> {
     // --- Thread 5: Collaboration question ---
     let t5 = thread_store::create_thread_with_status(
         "What would be a good approach...",
+        workspace_seed::default_workspace_for_index(0),
         ThreadStatus::Idle,
         (now - chrono::Duration::hours(111)).to_rfc3339(),
     )
@@ -305,5 +330,6 @@ pub async fn seed_if_empty() -> Result<(), std::io::Error> {
         stored_message("m13", t5id.clone(), "assistant", "For real-time collaboration, I'd recommend a CRDT-based approach using Yjs. Here's why:\n\n1. **Conflict-free merging** — no server coordination needed\n2. **Offline support** — changes sync when reconnected\n3. **Proven ecosystem** — works with CodeMirror, ProseMirror, etc.\n\nAlternatively, OT (Operational Transformation) works well if you need stricter ordering guarantees.", "2025-03-26T15:00:05Z"),
     ] { message_store::save_message(&msg).await?; }
 
+    workspace_seed::ensure_workspace_scaffold().await?;
     Ok(())
 }

@@ -67,6 +67,10 @@ pub async fn create_thread(title: Option<&str>) -> Result<Thread, std::io::Error
         "title".to_string(),
         serde_json::Value::String(title.unwrap_or("New Thread").to_string()),
     );
+    metadata.insert(
+        "workspace".to_string(),
+        serde_json::Value::String("/home/workspace".to_string()),
+    );
     create_thread_from_request(ThreadCreate {
         thread_id: None,
         metadata: Some(metadata),
@@ -77,6 +81,7 @@ pub async fn create_thread(title: Option<&str>) -> Result<Thread, std::io::Error
 
 pub async fn create_thread_with_status(
     title: &str,
+    workspace: &str,
     status: ThreadStatus,
     updated_at: String,
 ) -> Result<Thread, std::io::Error> {
@@ -84,6 +89,10 @@ pub async fn create_thread_with_status(
     metadata.insert(
         "title".to_string(),
         serde_json::Value::String(title.to_string()),
+    );
+    metadata.insert(
+        "workspace".to_string(),
+        serde_json::Value::String(workspace.to_string()),
     );
     let mut thread = create_thread_from_request(ThreadCreate {
         thread_id: None,
@@ -107,11 +116,18 @@ pub async fn create_thread_from_request(req: ThreadCreate) -> Result<Thread, std
     }
     let id = req.thread_id.unwrap_or_else(Uuid::new_v4);
     let now = Utc::now();
+    let mut metadata = req.metadata.unwrap_or_default();
+    if !metadata.contains_key("workspace") {
+        metadata.insert(
+            "workspace".to_string(),
+            serde_json::Value::String("/home/workspace".to_string()),
+        );
+    }
     let thread = Thread {
         thread_id: id,
         created_at: now,
         updated_at: now,
-        metadata: req.metadata.unwrap_or_default(),
+        metadata,
         status: ThreadStatus::Idle,
         values: None,
         messages: None,

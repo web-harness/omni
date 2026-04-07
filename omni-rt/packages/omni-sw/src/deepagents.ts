@@ -21,11 +21,13 @@ import initDeepagentsModule, {
   deepagents_set_api_key,
   deepagents_set_default_model,
   deepagents_set_thread_status,
+  deepagents_workspace_seed_entries,
 } from "./omni-deepagents.js";
 
 export type DeepagentsThread = Record<string, unknown>;
 export type DeepagentsMessage = Record<string, unknown>;
 export type DeepagentsRun = Record<string, unknown>;
+export type WorkspaceSeedEntry = { path: string; text?: string | null; fixture?: string | null; size: number };
 
 let readyPromise: Promise<void> | null = null;
 
@@ -94,6 +96,11 @@ export async function saveMessage(
 export async function deleteThreadMessages(threadId: string): Promise<void> {
   await ensureReady();
   await deepagents_delete_thread_messages(threadId);
+}
+
+export async function workspaceSeedEntries(): Promise<WorkspaceSeedEntry[]> {
+  await ensureReady();
+  return (await deepagents_workspace_seed_entries()) as WorkspaceSeedEntry[];
 }
 
 export async function getDefaultModel(): Promise<string> {

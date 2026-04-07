@@ -22,9 +22,8 @@ import {
   setDefaultModel as setDeepagentsDefaultModel,
 } from "./deepagents.js";
 import {
-  DEFAULT_WORKSPACE_ORDER,
   MOCK_THREAD_IDS,
-  SCAFFOLD_FILES,
+  scaffoldFilesFromStore,
   getMockThreadFiles,
   getMockToolCalls,
   getMockToolResults,
@@ -329,7 +328,7 @@ async function ensureWorkspaceScaffold(): Promise<void> {
     await zenWriteFile(path, encoder.encode(content));
   };
 
-  for (const file of SCAFFOLD_FILES) {
+  for (const file of await scaffoldFilesFromStore()) {
     await writeIfMissing(file.path, file.content);
   }
 }
@@ -337,7 +336,7 @@ async function ensureWorkspaceScaffold(): Promise<void> {
 export async function listWorkspaceFiles(
   root: string,
 ): Promise<Array<{ path: string; is_dir: boolean; size: number | null }>> {
-  const byWorkspace = getMockWorkspaceFiles();
+  const byWorkspace = await getMockWorkspaceFiles();
   if (root in byWorkspace) {
     return byWorkspace[root] ?? [];
   }
@@ -396,6 +395,7 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
         title: String(metadata.title ?? DEFAULT_THREAD_TITLE),
         status: toThreadStatus(rec.status),
         updated_at: String(rec.updated_at ?? new Date().toISOString()),
+        workspace: String(metadata.workspace ?? "/home/workspace"),
       };
     })
     .filter((thread) => thread.id.length > 0)
@@ -408,7 +408,7 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
   const tool_results: BootstrapPayload["tool_results"] = {};
   const background_tasks: BootstrapPayload["background_tasks"] = {};
   const workspace_path: BootstrapPayload["workspace_path"] = {};
-  const workspace_files = getMockWorkspaceFiles();
+  const workspace_files = await getMockWorkspaceFiles();
   const railStyleItem = (await readJson(`${AGENT_RAIL_DIR}/dicebear-style.json`)) as Record<string, unknown> | null;
   const storedDicebearStyle = String(
     (railStyleItem?.value as Record<string, unknown> | undefined)?.style ?? railStyleItem?.style ?? "bottts-neutral",
@@ -428,7 +428,7 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
     })
     .filter((endpoint) => endpoint.id.length > 0 && endpoint.removable);
 
-  for (const [index, thread] of threads.entries()) {
+  for (const thread of threads) {
     const seeded = seedById.get(thread.id);
     const parsedMessages = (await readJsonFiles(`${MESSAGES_DIR}/${thread.id}`))
       .map((row) => {
@@ -469,9 +469,7 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
     tool_calls[thread.id] = getMockToolCalls(thread.id);
     tool_results[thread.id] = getMockToolResults(thread.id);
 
-    const ws =
-      index === 1 ? DEFAULT_WORKSPACE_ORDER[1] : index === 2 ? DEFAULT_WORKSPACE_ORDER[2] : DEFAULT_WORKSPACE_ORDER[0];
-    workspace_path[thread.id] = ws;
+    workspace_path[thread.id] = thread.workspace;
   }
 
   return {

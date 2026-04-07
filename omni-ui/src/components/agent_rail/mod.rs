@@ -6,6 +6,31 @@ use std::rc::Rc;
 use crate::components::ui::{Button, Input, Popover};
 use crate::lib::{agent_config_hash, derive_agent_name, AgentEndpoint, AgentEndpointState};
 
+fn agent_initials(name: &str) -> String {
+    let mut initials = name
+        .split(|ch: char| !ch.is_alphanumeric())
+        .filter(|part| !part.is_empty())
+        .filter_map(|part| part.chars().next())
+        .take(2)
+        .collect::<String>()
+        .to_uppercase();
+
+    if initials.is_empty() {
+        initials = name
+            .chars()
+            .filter(|ch| ch.is_alphanumeric())
+            .take(2)
+            .collect::<String>()
+            .to_uppercase();
+    }
+
+    if initials.is_empty() {
+        "AG".to_string()
+    } else {
+        initials
+    }
+}
+
 #[component]
 fn RailTooltip(
     open: bool,
@@ -102,6 +127,7 @@ fn AgentRailButton(
     } else {
         "relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-sm border border-border bg-background-elevated hover:border-primary/50 hover:bg-background-interactive transition-opacity duration-150"
     };
+    let fallback_initials = agent_initials(&endpoint.name);
 
     rsx! {
         div {
@@ -124,8 +150,11 @@ fn AgentRailButton(
                             class: "{button_class} {opacity_class}",
                             onclick: move |evt| on_activate.call(evt),
                             if endpoint.removable {
+                                div { class: "absolute inset-0 flex items-center justify-center bg-gradient-to-br from-status-info/25 via-primary/15 to-background-elevated text-[11px] font-semibold text-foreground",
+                                    "{fallback_initials.clone()}"
+                                }
                                 omni-dicebear {
-                                    class: "block h-full w-full",
+                                    class: "relative z-10 block h-full w-full",
                                     seed: "{endpoint.id}",
                                     "avatar-style": "{dicebear_style}",
                                     size: "36",

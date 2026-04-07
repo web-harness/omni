@@ -1,3 +1,5 @@
+import { workspaceSeedEntries } from "./deepagents.js";
+
 export type SeedThread = {
   id: string;
   title: string;
@@ -61,64 +63,51 @@ export const MOCK_THREAD_IDS = {
   idea: "55555555-5555-4555-8555-555555555555",
 } as const;
 
-export const DEFAULT_WORKSPACE_ORDER = [
-  "/home/user/projects/test",
-  "/home/user/projects/omni",
-  "/home/user/projects/omni-rt",
-];
+export async function scaffoldFilesFromStore(): Promise<Array<{ path: string; content: string }>> {
+  const entries = await workspaceSeedEntries();
+  return entries.map((entry) => ({
+    path: entry.path,
+    content: entry.text ?? `seed:${entry.fixture ?? entry.path.split("/").pop() ?? "sample.txt"}\n`,
+  }));
+}
 
-export const SCAFFOLD_FILES: Array<{ path: string; content: string }> = [
-  { path: "/home/workspace/README.md", content: "# Workspace\n" },
-  { path: "/home/user/projects/test/public/app.js", content: "console.log('app');\n" },
-  {
-    path: "/home/user/projects/test/public/index.html",
-    content: "<!doctype html><html><body>test</body></html>\n",
-  },
-  { path: "/home/user/projects/test/public/styles.css", content: "body { font-family: monospace; }\n" },
-  {
-    path: "/home/user/projects/test/scripts/flush_todos.js",
-    content: "#!/usr/bin/env node\nconsole.log('flush todos');\n",
-  },
-  { path: "/home/user/projects/test/server/server.js", content: "export const server = true;\n" },
-  { path: "/home/user/projects/test/server/todos.json", content: '{\n  "todos": []\n}\n' },
-  { path: "/home/user/projects/test/fixtures/sample.rs", content: 'fn main() { println!("sample"); }\n' },
-  { path: "/home/user/projects/test/fixtures/sample.ts", content: "export const sample = true;\n" },
-  { path: "/home/user/projects/test/fixtures/sample.py", content: "print('sample')\n" },
-  { path: "/home/user/projects/test/fixtures/sample.sh", content: "#!/usr/bin/env bash\necho sample\n" },
-  { path: "/home/user/projects/test/fixtures/sample.md", content: "# Sample\n" },
-  { path: "/home/user/projects/test/fixtures/sample.html", content: "<!doctype html><html></html>\n" },
-  { path: "/home/user/projects/test/fixtures/sample.css", content: "body{}\n" },
-  { path: "/home/user/projects/test/fixtures/sample.json", content: '{"ok":true}\n' },
-  { path: "/home/user/projects/test/fixtures/sample.toml", content: 'name = "sample"\n' },
-  { path: "/home/user/projects/test/fixtures/sample.txt", content: "sample\n" },
-  {
-    path: "/home/user/projects/test/fixtures/sample.svg",
-    content: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>\n',
-  },
-  { path: "/home/user/projects/test/fixtures/sample.png", content: "png\n" },
-  { path: "/home/user/projects/test/fixtures/sample.jpg", content: "jpg\n" },
-  { path: "/home/user/projects/test/fixtures/sample.pdf", content: "%PDF-1.4\n" },
-  { path: "/home/user/projects/test/fixtures/sample.xlsx", content: "PK\n" },
-  { path: "/home/user/projects/test/fixtures/sample.docx", content: "PK\n" },
-  { path: "/home/user/projects/test/fixtures/sample.pptx", content: "PK\n" },
-  { path: "/home/user/projects/test/fixtures/sample.wav", content: "RIFF\n" },
-  { path: "/home/user/projects/test/fixtures/sample.mp3", content: "ID3\n" },
-  { path: "/home/user/projects/test/fixtures/sample.mp4", content: "mp4\n" },
-  { path: "/home/user/projects/test/fixtures/sample.bin", content: "bin\n" },
-  { path: "/home/user/projects/omni/src/main.rs", content: "fn main() {}\n" },
-  { path: "/home/user/projects/omni/src/components/chat/mod.rs", content: "pub fn chat() {}\n" },
-  { path: "/home/user/projects/omni/src/components/sidebar/mod.rs", content: "pub fn sidebar() {}\n" },
-  { path: "/home/user/projects/omni/src/lib/mod.rs", content: "pub mod sample;\n" },
-  { path: "/home/user/projects/omni/Cargo.toml", content: '[package]\nname = "omni"\n' },
-  { path: "/home/user/projects/omni/README.md", content: "# omni\n" },
-  { path: "/home/user/projects/omni-rt/crates/omni-protocol/src/lib.rs", content: "pub struct Protocol;\n" },
-  { path: "/home/user/projects/omni-rt/crates/omni-rt/src/main.rs", content: "fn main() {}\n" },
-  {
-    path: "/home/user/projects/omni-rt/packages/omni-dock/src/omni-dock.ts",
-    content: "export const dock = true;\n",
-  },
-  { path: "/home/user/projects/omni-rt/Cargo.toml", content: "[workspace]\n" },
-];
+export async function getMockWorkspaceFiles(): Promise<
+  Record<string, Array<{ path: string; is_dir: boolean; size: number | null }>>
+> {
+  const entries = await workspaceSeedEntries();
+  const grouped = new Map<string, Array<{ path: string; is_dir: boolean; size: number | null }>>();
+
+  for (const entry of entries) {
+    const parts = entry.path.split("/").filter(Boolean);
+    if (parts.length < 2) continue;
+    const root = `/${parts[0]}/${parts[1]}${parts[2] ? `/${parts[2]}` : ""}`;
+    const relative = entry.path.slice(root.length + 1);
+    const list = grouped.get(root) ?? [];
+    const seen = new Set(list.map((item) => item.path));
+
+    const relativeParts = relative.split("/");
+    let current = "";
+    for (const segment of relativeParts.slice(0, -1)) {
+      current = current ? `${current}/${segment}` : segment;
+      if (!seen.has(current)) {
+        list.push({ path: current, is_dir: true, size: null });
+        seen.add(current);
+      }
+    }
+
+    if (!seen.has(relative)) {
+      list.push({ path: relative, is_dir: false, size: entry.size });
+    }
+    grouped.set(root, list);
+  }
+
+  return Object.fromEntries(
+    Array.from(grouped.entries()).map(([root, list]) => [
+      root,
+      list.sort((left, right) => left.path.localeCompare(right.path)),
+    ]),
+  );
+}
 
 export function seedThreads(): SeedThread[] {
   const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
@@ -292,98 +281,6 @@ export function getMockThreadFiles(threadId: string): Array<{ path: string; is_d
     { path: "src/lib/mod.rs", is_dir: false, size: 7903 },
     { path: "README.md", is_dir: false, size: 4089 },
   ];
-}
-
-export function getMockWorkspaceFiles(): Record<string, Array<{ path: string; is_dir: boolean; size: number | null }>> {
-  return {
-    "/home/workspace": [
-      { path: "public", is_dir: true, size: null },
-      { path: "public/app.js", is_dir: false, size: 2600 },
-      { path: "public/index.html", is_dir: false, size: 6900 },
-      { path: "public/styles.css", is_dir: false, size: 3400 },
-      { path: "scripts", is_dir: true, size: null },
-      { path: "scripts/flush_todos.js", is_dir: false, size: 381 },
-      { path: "server", is_dir: true, size: null },
-      { path: "server/server.js", is_dir: false, size: 850 },
-      { path: "server/todos.json", is_dir: false, size: 314 },
-      { path: "fixtures", is_dir: true, size: null },
-      { path: "fixtures/sample.rs", is_dir: false, size: 512 },
-      { path: "fixtures/sample.ts", is_dir: false, size: 620 },
-      { path: "fixtures/sample.py", is_dir: false, size: 580 },
-      { path: "fixtures/sample.sh", is_dir: false, size: 410 },
-      { path: "fixtures/sample.md", is_dir: false, size: 740 },
-      { path: "fixtures/sample.html", is_dir: false, size: 890 },
-      { path: "fixtures/sample.css", is_dir: false, size: 660 },
-      { path: "fixtures/sample.json", is_dir: false, size: 520 },
-      { path: "fixtures/sample.toml", is_dir: false, size: 280 },
-      { path: "fixtures/sample.txt", is_dir: false, size: 940 },
-      { path: "fixtures/sample.svg", is_dir: false, size: 480 },
-      { path: "fixtures/sample.png", is_dir: false, size: 120 },
-      { path: "fixtures/sample.jpg", is_dir: false, size: 120 },
-      { path: "fixtures/sample.pdf", is_dir: false, size: 800 },
-      { path: "fixtures/sample.xlsx", is_dir: false, size: 2138 },
-      { path: "fixtures/sample.docx", is_dir: false, size: 1672 },
-      { path: "fixtures/sample.pptx", is_dir: false, size: 5605 },
-      { path: "fixtures/sample.wav", is_dir: false, size: 46 },
-      { path: "fixtures/sample.mp3", is_dir: false, size: 64 },
-      { path: "fixtures/sample.mp4", is_dir: false, size: 256 },
-      { path: "fixtures/sample.bin", is_dir: false, size: 128 },
-    ],
-    "/home/user/projects/test": [
-      { path: "public", is_dir: true, size: null },
-      { path: "public/app.js", is_dir: false, size: 2600 },
-      { path: "public/index.html", is_dir: false, size: 6900 },
-      { path: "public/styles.css", is_dir: false, size: 3400 },
-      { path: "scripts", is_dir: true, size: null },
-      { path: "scripts/flush_todos.js", is_dir: false, size: 381 },
-      { path: "server", is_dir: true, size: null },
-      { path: "server/server.js", is_dir: false, size: 850 },
-      { path: "server/todos.json", is_dir: false, size: 314 },
-      { path: "fixtures", is_dir: true, size: null },
-      { path: "fixtures/sample.rs", is_dir: false, size: 512 },
-      { path: "fixtures/sample.ts", is_dir: false, size: 620 },
-      { path: "fixtures/sample.py", is_dir: false, size: 580 },
-      { path: "fixtures/sample.sh", is_dir: false, size: 410 },
-      { path: "fixtures/sample.md", is_dir: false, size: 740 },
-      { path: "fixtures/sample.html", is_dir: false, size: 890 },
-      { path: "fixtures/sample.css", is_dir: false, size: 660 },
-      { path: "fixtures/sample.json", is_dir: false, size: 520 },
-      { path: "fixtures/sample.toml", is_dir: false, size: 280 },
-      { path: "fixtures/sample.txt", is_dir: false, size: 940 },
-      { path: "fixtures/sample.svg", is_dir: false, size: 480 },
-      { path: "fixtures/sample.png", is_dir: false, size: 120 },
-      { path: "fixtures/sample.jpg", is_dir: false, size: 120 },
-      { path: "fixtures/sample.pdf", is_dir: false, size: 800 },
-      { path: "fixtures/sample.xlsx", is_dir: false, size: 2138 },
-      { path: "fixtures/sample.docx", is_dir: false, size: 1672 },
-      { path: "fixtures/sample.pptx", is_dir: false, size: 5605 },
-      { path: "fixtures/sample.wav", is_dir: false, size: 46 },
-      { path: "fixtures/sample.mp3", is_dir: false, size: 64 },
-      { path: "fixtures/sample.mp4", is_dir: false, size: 256 },
-      { path: "fixtures/sample.bin", is_dir: false, size: 128 },
-    ],
-    "/home/user/projects/omni": [
-      { path: "src", is_dir: true, size: null },
-      { path: "src/main.rs", is_dir: false, size: 9612 },
-      { path: "src/components", is_dir: true, size: null },
-      { path: "src/components/chat/mod.rs", is_dir: false, size: 14020 },
-      { path: "src/components/sidebar/mod.rs", is_dir: false, size: 3400 },
-      { path: "src/lib", is_dir: true, size: null },
-      { path: "src/lib/mod.rs", is_dir: false, size: 7903 },
-      { path: "Cargo.toml", is_dir: false, size: 1200 },
-      { path: "README.md", is_dir: false, size: 4089 },
-    ],
-    "/home/user/projects/omni-rt": [
-      { path: "crates", is_dir: true, size: null },
-      { path: "crates/omni-protocol", is_dir: true, size: null },
-      { path: "crates/omni-protocol/src/lib.rs", is_dir: false, size: 5120 },
-      { path: "crates/omni-rt", is_dir: true, size: null },
-      { path: "crates/omni-rt/src/main.rs", is_dir: false, size: 3800 },
-      { path: "crates/omni-dock", is_dir: true, size: null },
-      { path: "crates/omni-dock/src/omni-dock.ts", is_dir: false, size: 8200 },
-      { path: "Cargo.toml", is_dir: false, size: 980 },
-    ],
-  };
 }
 
 export function getMockToolCalls(threadId: string): Array<{ id: string; name: string; args: unknown }> {

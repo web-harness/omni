@@ -1,4 +1,4 @@
-use crate::{config_store, message_store, run_store, thread_store};
+use crate::{config_store, message_store, run_store, thread_store, workspace_seed};
 use omni_protocol::{Message, RunSearchRequest, ThreadCreate, ThreadPatch, ThreadStatus};
 use serde::Serialize;
 use serde_wasm_bindgen::{from_value, to_value};
@@ -115,6 +115,11 @@ pub async fn deepagents_delete_thread_messages(thread_id: String) -> Result<(), 
     message_store::delete_thread_messages(&thread_id)
         .await
         .map_err(to_js_error)
+}
+
+#[wasm_bindgen]
+pub fn deepagents_workspace_seed_entries() -> Result<JsValue, JsValue> {
+    serialize(&workspace_seed::workspace_seed_entry_views())
 }
 
 #[wasm_bindgen]

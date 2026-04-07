@@ -11,3 +11,4 @@ pub mod title_generator;
 pub mod todo_store;
 #[cfg(target_arch = "wasm32")]
 pub mod wasm_api;
+pub mod workspace_seed;

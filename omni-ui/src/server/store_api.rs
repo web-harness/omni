@@ -24,16 +24,16 @@ pub fn router() -> Router {
         .route("/x/providers", get(get_providers))
         .route("/x/files", get(get_files))
         .route("/agents/search", post(search_agents))
-        .route("/agents/:id", get(get_agent))
-        .route("/agents/:id/schemas", get(get_agent_schema))
+        .route("/agents/{id}", get(get_agent))
+        .route("/agents/{id}/schemas", get(get_agent_schema))
         .route("/threads", post(create_thread))
         .route("/threads/search", post(search_threads))
         .route(
-            "/threads/:id",
+            "/threads/{id}",
             get(get_thread).patch(patch_thread).delete(delete_thread),
         )
-        .route("/threads/:id/history", get(thread_history))
-        .route("/threads/:id/copy", post(copy_thread))
+        .route("/threads/{id}/history", get(thread_history))
+        .route("/threads/{id}/copy", post(copy_thread))
         .route(
             "/store/items",
             get(get_store_item)
