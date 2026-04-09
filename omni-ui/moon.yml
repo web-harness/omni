@@ -194,13 +194,11 @@ tasks:
     toolchains:
       - system
   fix-pages-dioxus-web-snippet-layout:
-    command: node
+    command: shx
     args:
-      - -e
-      - >-
-        const fs=require('fs'),path=require('path'),base='omni-ui/dist/public/assets/snippets';
-        const dir=fs.readdirSync(base).find(d=>d.startsWith('dioxus-web-'));
-        if(dir){const src=path.join(base,dir,'inline1.js'),dst=path.join(base,dir,'inline0.js');fs.copyFileSync(src,dst);}
+      - cp
+      - omni-ui/dist/public/assets/snippets/dioxus-web-*/inline1.js
+      - omni-ui/dist/public/assets/snippets/dioxus-web-*/inline0.js
     deps:
       - copy-pages-release-snippets
     inputs:
