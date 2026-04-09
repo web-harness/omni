@@ -112,8 +112,8 @@ pub async fn build_bootstrap() -> Result<BootstrapPayload, std::io::Error> {
                 },
             })
             .collect::<Vec<_>>();
-        let bootstrap_tool_calls = seeded_tool_calls_for(&title, &thread_todos);
-        let bootstrap_tool_results = seeded_tool_results_for(&title, &thread_todos);
+        let bootstrap_tool_calls = seeded_tool_calls_for(&thread_id, &thread_todos);
+        let bootstrap_tool_results = seeded_tool_results_for(&thread_id, &thread_todos);
         todos.insert(thread_id.clone(), thread_todos);
 
         let thread_background = subagent_store::list_subagents(&thread_id)
@@ -132,7 +132,10 @@ pub async fn build_bootstrap() -> Result<BootstrapPayload, std::io::Error> {
             })
             .collect::<Vec<_>>();
         let mut bootstrap_tool_calls = bootstrap_tool_calls;
-        bootstrap_tool_calls.extend(seeded_background_task_calls_for(&title, &thread_background));
+        bootstrap_tool_calls.extend(seeded_background_task_calls_for(
+            &thread_id,
+            &thread_background,
+        ));
         background_tasks.insert(thread_id.clone(), thread_background);
 
         files.insert(thread_id.clone(), Vec::new());
@@ -296,7 +299,7 @@ fn message_content(value: &serde_json::Value) -> String {
     }
 }
 
-const NATIVE_DEMO_THREAD_TITLE: &str = "Implement todo management sys...";
+const NATIVE_GTD_THREAD_ID: &str = "11111111-1111-4111-8111-111111111111";
 
 fn seeded_agent_endpoints(endpoints: Vec<AgentEndpoint>) -> Vec<AgentEndpoint> {
     if !endpoints.is_empty() {
@@ -321,8 +324,8 @@ fn seeded_agent_endpoints(endpoints: Vec<AgentEndpoint>) -> Vec<AgentEndpoint> {
     ]
 }
 
-fn seeded_tool_calls_for(title: &str, todos: &[Todo]) -> Vec<ToolCall> {
-    if title != NATIVE_DEMO_THREAD_TITLE || todos.is_empty() {
+fn seeded_tool_calls_for(thread_id: &str, todos: &[Todo]) -> Vec<ToolCall> {
+    if thread_id != NATIVE_GTD_THREAD_ID || todos.is_empty() {
         return Vec::new();
     }
 
@@ -346,8 +349,8 @@ fn seeded_tool_calls_for(title: &str, todos: &[Todo]) -> Vec<ToolCall> {
     }]
 }
 
-fn seeded_background_task_calls_for(title: &str, tasks: &[BackgroundTask]) -> Vec<ToolCall> {
-    if title != NATIVE_DEMO_THREAD_TITLE {
+fn seeded_background_task_calls_for(thread_id: &str, tasks: &[BackgroundTask]) -> Vec<ToolCall> {
+    if thread_id != NATIVE_GTD_THREAD_ID {
         return Vec::new();
     }
 
@@ -361,8 +364,8 @@ fn seeded_background_task_calls_for(title: &str, tasks: &[BackgroundTask]) -> Ve
         .collect()
 }
 
-fn seeded_tool_results_for(title: &str, todos: &[Todo]) -> Vec<ToolResult> {
-    if title != NATIVE_DEMO_THREAD_TITLE || todos.is_empty() {
+fn seeded_tool_results_for(thread_id: &str, todos: &[Todo]) -> Vec<ToolResult> {
+    if thread_id != NATIVE_GTD_THREAD_ID || todos.is_empty() {
         return Vec::new();
     }
 
@@ -377,7 +380,7 @@ fn seeded_tool_results_for(title: &str, todos: &[Todo]) -> Vec<ToolResult> {
 mod tests {
     use super::{
         seeded_agent_endpoints, seeded_background_task_calls_for, seeded_tool_calls_for,
-        seeded_tool_results_for, NATIVE_DEMO_THREAD_TITLE,
+        seeded_tool_results_for, NATIVE_GTD_THREAD_ID,
     };
 
     #[test]
@@ -418,7 +421,7 @@ mod tests {
             },
         ];
 
-        let calls = seeded_tool_calls_for(NATIVE_DEMO_THREAD_TITLE, &todos);
+        let calls = seeded_tool_calls_for(NATIVE_GTD_THREAD_ID, &todos);
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].name, "update_todos");
         assert_eq!(
@@ -450,7 +453,7 @@ mod tests {
             status: crate::lib::BackgroundTaskStatus::Running,
         }];
 
-        let calls = seeded_background_task_calls_for(NATIVE_DEMO_THREAD_TITLE, &tasks);
+        let calls = seeded_background_task_calls_for(NATIVE_GTD_THREAD_ID, &tasks);
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].id, "tc-sa1");
         assert_eq!(calls[0].name, "dispatch_subagent");
@@ -471,7 +474,7 @@ mod tests {
             status: crate::lib::TodoStatus::Completed,
         }];
 
-        let results = seeded_tool_results_for(NATIVE_DEMO_THREAD_TITLE, &todos);
+        let results = seeded_tool_results_for(NATIVE_GTD_THREAD_ID, &todos);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].tool_call_id, "tc-todos");
         assert!(!results[0].is_error);

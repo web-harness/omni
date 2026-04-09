@@ -1,7 +1,7 @@
-use crate::{config_store, message_store, run_store, thread_store, workspace_seed};
+use crate::{config_store, message_store, mock_data, run_store, thread_store, workspace_seed};
 use omni_protocol::{Message, RunSearchRequest, ThreadCreate, ThreadPatch, ThreadStatus};
 use serde::Serialize;
-use serde_wasm_bindgen::{from_value, to_value};
+use serde_wasm_bindgen::from_value;
 use wasm_bindgen::prelude::*;
 
 fn to_js_error(error: std::io::Error) -> JsValue {
@@ -9,7 +9,10 @@ fn to_js_error(error: std::io::Error) -> JsValue {
 }
 
 fn serialize<T: Serialize>(value: &T) -> Result<JsValue, JsValue> {
-    to_value(value).map_err(|error| JsValue::from_str(&error.to_string()))
+    let serializer = serde_wasm_bindgen::Serializer::new().serialize_maps_as_objects(true);
+    value
+        .serialize(&serializer)
+        .map_err(|error| JsValue::from_str(&error.to_string()))
 }
 
 #[wasm_bindgen]
@@ -212,4 +215,49 @@ pub async fn deepagents_delete_run(run_id: String) -> Result<(), JsValue> {
     let run_id =
         uuid::Uuid::parse_str(&run_id).map_err(|error| JsValue::from_str(&error.to_string()))?;
     run_store::delete_run(run_id).await.map_err(to_js_error)
+}
+
+#[wasm_bindgen]
+pub fn deepagents_mock_thread_ids() -> Result<JsValue, JsValue> {
+    serialize(&mock_data::mock_thread_ids())
+}
+
+#[wasm_bindgen]
+pub fn deepagents_seed_threads() -> Result<JsValue, JsValue> {
+    serialize(&mock_data::seed_threads())
+}
+
+#[wasm_bindgen]
+pub fn deepagents_seed_agent_endpoints() -> Result<JsValue, JsValue> {
+    serialize(&mock_data::seed_agent_endpoints())
+}
+
+#[wasm_bindgen]
+pub fn deepagents_hash_agent_config(url: String, bearer_token: String) -> String {
+    mock_data::hash_agent_config(&url, &bearer_token)
+}
+
+#[wasm_bindgen]
+pub fn deepagents_mock_thread_files(thread_id: String) -> Result<JsValue, JsValue> {
+    serialize(&mock_data::mock_thread_files(&thread_id))
+}
+
+#[wasm_bindgen]
+pub fn deepagents_mock_tool_calls(thread_id: String) -> Result<JsValue, JsValue> {
+    serialize(&mock_data::mock_tool_calls(&thread_id))
+}
+
+#[wasm_bindgen]
+pub fn deepagents_mock_tool_results(thread_id: String) -> Result<JsValue, JsValue> {
+    serialize(&mock_data::mock_tool_results(&thread_id))
+}
+
+#[wasm_bindgen]
+pub fn deepagents_mock_workspace_files() -> Result<JsValue, JsValue> {
+    serialize(&mock_data::mock_workspace_files())
+}
+
+#[wasm_bindgen]
+pub fn deepagents_scaffold_files() -> Result<JsValue, JsValue> {
+    serialize(&mock_data::scaffold_files())
 }

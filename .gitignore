@@ -46,3 +46,6 @@ storybook-static/
 /graphify-*/
 /deploy/
 /local-pages/
+/.lcm
+/.playwright**
+/tmp**

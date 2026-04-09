@@ -28,14 +28,14 @@ vi.mock("./deepagents.js", () => ({
 }));
 
 vi.mock("./store-mocks.js", () => ({
-  DEFAULT_WORKSPACE_ORDER: [],
   MOCK_THREAD_IDS: {},
-  SCAFFOLD_FILES: [],
-  getMockThreadFiles: vi.fn(() => []),
-  getMockToolCalls: vi.fn(() => []),
-  getMockToolResults: vi.fn(() => []),
-  getMockWorkspaceFiles: vi.fn(() => ({})),
-  seedThreads: vi.fn(() => []),
+  getMockThreadFiles: vi.fn(async () => []),
+  getMockToolCalls: vi.fn(async () => []),
+  getMockToolResults: vi.fn(async () => []),
+  getMockWorkspaceFiles: vi.fn(async () => ({})),
+  scaffoldFilesFromStore: vi.fn(async () => []),
+  seedAgentEndpoints: vi.fn(async () => []),
+  seedThreads: vi.fn(async () => []),
 }));
 
 describe("store-data thread titles", () => {

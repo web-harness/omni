@@ -85,6 +85,16 @@ pub async fn create_thread_with_status(
     status: ThreadStatus,
     updated_at: String,
 ) -> Result<Thread, std::io::Error> {
+    create_thread_with_id_and_status(None, title, workspace, status, updated_at).await
+}
+
+pub async fn create_thread_with_id_and_status(
+    id: Option<Uuid>,
+    title: &str,
+    workspace: &str,
+    status: ThreadStatus,
+    updated_at: String,
+) -> Result<Thread, std::io::Error> {
     let mut metadata = HashMap::new();
     metadata.insert(
         "title".to_string(),
@@ -95,7 +105,7 @@ pub async fn create_thread_with_status(
         serde_json::Value::String(workspace.to_string()),
     );
     let mut thread = create_thread_from_request(ThreadCreate {
-        thread_id: None,
+        thread_id: id,
         metadata: Some(metadata),
         if_exists: None,
     })

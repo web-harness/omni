@@ -243,7 +243,7 @@ async function seedIfEmpty(): Promise<void> {
   await ensureZenFs();
   const existingThreads = await readJsonFiles(THREADS_DIR);
   if (existingThreads.length === 0) {
-    for (const seed of seedThreads()) {
+    for (const seed of await seedThreads()) {
       await zenMkdir(THREADS_DIR, { recursive: true });
       await zenWriteFile(
         `${THREADS_DIR}/${seed.id}.json`,
@@ -305,7 +305,7 @@ async function seedMockAgentEndpoints(): Promise<void> {
   }
 
   const now = new Date().toISOString();
-  for (const endpoint of seedAgentEndpoints()) {
+  for (const endpoint of await seedAgentEndpoints()) {
     await zenWriteFile(
       `${AGENT_ENDPOINTS_DIR}/${endpoint.id}.json`,
       encoder.encode(
@@ -385,7 +385,7 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
   const defaultModel = await getDefaultModel();
   const providers = await readProvidersWithKeys();
   const models = modelDefs();
-  const seedById = new Map(seedThreads().map((thread) => [thread.id, thread]));
+  const seedById = new Map((await seedThreads()).map((thread) => [thread.id, thread]));
   const threads = (await readJsonFiles(THREADS_DIR))
     .map((row) => {
       const rec = row as Record<string, unknown>;
@@ -466,9 +466,9 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
     });
     background_tasks[thread.id] = parsedSubagents;
 
-    files[thread.id] = getMockThreadFiles(thread.id);
-    tool_calls[thread.id] = getMockToolCalls(thread.id);
-    tool_results[thread.id] = getMockToolResults(thread.id);
+    files[thread.id] = await getMockThreadFiles(thread.id);
+    tool_calls[thread.id] = await getMockToolCalls(thread.id);
+    tool_results[thread.id] = await getMockToolResults(thread.id);
 
     workspace_path[thread.id] = thread.workspace;
   }
