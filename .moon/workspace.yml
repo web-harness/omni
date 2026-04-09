@@ -17,7 +17,6 @@ projects:
   omni-pdfjs: omni-rt/packages/omni-pdfjs
   omni-pptx-renderer: omni-rt/packages/omni-pptx-renderer
   omni-plyr: omni-rt/packages/omni-plyr
-  omni-popper: omni-rt/packages/omni-popper
   omni-pretext: omni-rt/packages/omni-pretext
   omni-sheetjs: omni-rt/packages/omni-sheetjs
   omni-inference: omni-rt/packages/omni-inference

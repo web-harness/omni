@@ -9,7 +9,6 @@
     "@omni/omni-monaco": "file:../omni-rt/packages/omni-monaco",
     "@omni/omni-pdfjs": "file:../omni-rt/packages/omni-pdfjs",
     "@omni/omni-plyr": "file:../omni-rt/packages/omni-plyr",
-    "@omni/omni-popper": "file:../omni-rt/packages/omni-popper",
     "@omni/omni-pptx-renderer": "file:../omni-rt/packages/omni-pptx-renderer",
     "@omni/omni-pretext": "file:../omni-rt/packages/omni-pretext",
     "@omni/omni-sheetjs": "file:../omni-rt/packages/omni-sheetjs",

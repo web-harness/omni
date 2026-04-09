@@ -348,6 +348,52 @@ impl AgentEndpointState {
     }
 }
 
+#[derive(Clone, PartialEq, Default)]
+pub struct AddAgentDraft {
+    pub name: String,
+    pub url: String,
+    pub token: String,
+}
+
+#[derive(Clone, PartialEq)]
+pub enum FloatingPanelKind {
+    AgentTooltip { label: String },
+    AddAgentPopover,
+    AgentCloseBadge { agent_id: String },
+    ModelPicker { thread_id: String },
+    WorkspacePicker { thread_id: String },
+}
+
+#[derive(Clone, PartialEq)]
+pub struct FloatingPanel {
+    pub id: String,
+    pub kind: FloatingPanelKind,
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+#[derive(Clone, PartialEq, Default)]
+pub struct FloatingDockState {
+    pub panels: Vec<FloatingPanel>,
+}
+
+impl FloatingDockState {
+    pub fn open(&mut self, panel: FloatingPanel) {
+        self.panels.retain(|p| p.id != panel.id);
+        self.panels.push(panel);
+    }
+
+    pub fn close(&mut self, id: &str) {
+        self.panels.retain(|p| p.id != id);
+    }
+
+    pub fn is_open(&self, id: &str) -> bool {
+        self.panels.iter().any(|p| p.id == id)
+    }
+}
+
 const FNV_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
 const FNV_PRIME: u64 = 0x100000001b3;
 

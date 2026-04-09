@@ -175,26 +175,32 @@ pub fn Popover(
     trigger: Element,
     children: Element,
 ) -> Element {
-    let open_attr = if open { "true" } else { "" };
+    let mut trigger_rect = use_signal(|| (0.0f64, 0.0f64, 0.0f64, 0.0f64));
+
+    let content_x = trigger_rect().0;
+    let content_y = trigger_rect().3 + 8.0;
+
     rsx! {
+        div {
+            style: "display: contents;",
+            onmounted: move |e| async move {
+                if let Ok(rect) = e.get_client_rect().await {
+                    trigger_rect.set((rect.origin.x, rect.origin.y, rect.origin.x + rect.size.width, rect.origin.y + rect.size.height));
+                }
+            },
+            {trigger}
+        }
         if open {
             div {
-                class: "fixed inset-0 z-[100] bg-black/65",
+                class: "fixed inset-0 z-[100]",
                 onclick: move |_| on_close.call(()),
                 onkeydown: move |e: Event<KeyboardData>| {
                     if e.key() == Key::Escape { on_close.call(()); }
                 },
             }
-        }
-        omni-popper {
-            placement: "bottom-start",
-            offset: "0,8",
-            strategy: "fixed",
-            "open": "{open_attr}",
-            div { slot: "trigger", {trigger} }
             div {
-                slot: "content",
-                class: "z-[110] w-[360px] rounded-sm border border-border bg-background-elevated p-2 shadow-xl",
+                class: "fixed z-[110] w-[360px] rounded-sm border border-border bg-background-elevated p-2 shadow-xl",
+                style: "left: {content_x}px; top: {content_y}px;",
                 onclick: move |e: MouseEvent| e.stop_propagation(),
                 {children}
             }

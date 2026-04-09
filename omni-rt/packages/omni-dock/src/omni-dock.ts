@@ -10,6 +10,7 @@ import type {
   CreateComponentOptions,
   DockviewApi,
   DockviewGroupPanel,
+  FloatingGroupOptions,
   GroupPanelPartInitParameters,
   IContentRenderer,
   ITabRenderer,
@@ -29,6 +30,15 @@ type PanelSpec = {
     referencePanel?: string;
     direction?: "left" | "right" | "above" | "below" | "within";
   };
+};
+
+type FloatingPanelSpec = {
+  id: string;
+  slot: string;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
 };
 
 type DockGroupOptions = AddGroupOptions & {
@@ -161,9 +171,11 @@ class OmniDock extends LitElement {
   @property({ attribute: "data-panels" }) dataPanels = "";
   @property({ attribute: "data-active-panel" }) dataActivePanel = "";
   @property({ attribute: "data-proportions" }) dataProportions = "";
+  @property({ attribute: "data-floating-panels" }) dataFloatingPanels = "";
 
   private api: DockviewApi | null = null;
   private _programmaticClose = false;
+  private _floatingPanelIds = new Set<string>();
   value = "";
 
   render() {
@@ -192,9 +204,11 @@ class OmniDock extends LitElement {
       if (!this._programmaticClose) {
         const relay = this.querySelector<HTMLInputElement>("[data-dock-relay]");
         if (relay) {
-          relay.value = panel.id;
+          const prefix = this._floatingPanelIds.has(panel.id) ? "floating:" : "";
+          relay.value = prefix + panel.id;
           relay.dispatchEvent(new Event("input", { bubbles: true }));
         }
+        this._floatingPanelIds.delete(panel.id);
       }
     });
     this.initializePanels();
@@ -210,6 +224,9 @@ class OmniDock extends LitElement {
     }
     if (changedProps.has("dataProportions")) {
       this.applyProportions();
+    }
+    if (changedProps.has("dataFloatingPanels")) {
+      this.diffFloatingPanels();
     }
   }
 
@@ -302,6 +319,58 @@ class OmniDock extends LitElement {
     for (const spec of specs) {
       if (!existingIds.has(spec.id)) {
         this.addPanelFromSpec(spec);
+      }
+    }
+  }
+
+  private parseFloatingPanelSpecs(): FloatingPanelSpec[] {
+    if (!this.dataFloatingPanels) return [];
+    try {
+      const parsed = JSON.parse(this.dataFloatingPanels) as FloatingPanelSpec[];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private addFloatingPanelFromSpec(spec: FloatingPanelSpec): void {
+    if (!this.api) return;
+    const group = this.api.addGroup({ hideHeader: true });
+    const panel = this.api.addPanel({
+      id: spec.id,
+      component: spec.slot,
+      tabComponent: "omni-tab",
+      title: spec.id,
+      position: { referenceGroup: group.id },
+    });
+    group.locked = true;
+    const opts: FloatingGroupOptions = { x: spec.x, y: spec.y };
+    if (spec.width !== undefined) opts.width = spec.width;
+    if (spec.height !== undefined) opts.height = spec.height;
+    this.api.addFloatingGroup(panel, opts);
+    this._floatingPanelIds.add(spec.id);
+  }
+
+  private diffFloatingPanels(): void {
+    if (!this.api) return;
+    const specs = this.parseFloatingPanelSpecs();
+    const specIds = new Set(specs.map((s) => s.id));
+
+    for (const id of [...this._floatingPanelIds]) {
+      if (!specIds.has(id)) {
+        const panel = this.api.getPanel(id);
+        if (panel) {
+          this._programmaticClose = true;
+          panel.api.close();
+          this._programmaticClose = false;
+        }
+        this._floatingPanelIds.delete(id);
+      }
+    }
+
+    for (const spec of specs) {
+      if (!this._floatingPanelIds.has(spec.id)) {
+        this.addFloatingPanelFromSpec(spec);
       }
     }
   }
