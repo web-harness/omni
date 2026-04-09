@@ -67,8 +67,9 @@ fn AgentRailButton(
             onmouseenter: move |_| {
                 on_hover_change.call(true);
                 let (x0, y0, x1, y1) = trigger_rect();
-                let tooltip_x = x1 + 4.0;
-                let tooltip_y = (y0 + y1) / 2.0 - 12.0;
+                let (ox, oy) = floating_dock.read().dock_origin;
+                let tooltip_x = x1 - ox + 4.0;
+                let tooltip_y = (y0 + y1) / 2.0 - oy - 12.0;
                 floating_dock.write().open(FloatingPanel {
                     id: format!("tooltip-{}", endpoint_id),
                     kind: FloatingPanelKind::AgentTooltip { label: endpoint_name.clone() },
@@ -81,8 +82,8 @@ fn AgentRailButton(
                     floating_dock.write().open(FloatingPanel {
                         id: format!("badge-{}", endpoint_id),
                         kind: FloatingPanelKind::AgentCloseBadge { agent_id: endpoint_id.clone() },
-                        x: x1 - 10.0,
-                        y: y0 - 10.0,
+                        x: x1 - ox - 10.0,
+                        y: y0 - oy - 10.0,
                         width: 20.0,
                         height: 20.0,
                     });
@@ -172,7 +173,7 @@ pub fn AgentRail() -> Element {
     });
 
     rsx! {
-        div { class: "relative flex h-full w-12 shrink-0 flex-col border-r border-border bg-background",
+        div { class: "relative flex h-full w-full flex-col bg-background",
             if let Some(endpoint) = pinned_endpoint {
                 {
                     let endpoint_id = endpoint.id.clone();
@@ -264,11 +265,13 @@ pub fn AgentRail() -> Element {
                     },
                     onmouseenter: move |_| {
                         add_hovered.set(true);
+                        let (x0, y0, x1, y1) = add_button_rect();
+                        let (ox, oy) = floating_dock.read().dock_origin;
                         floating_dock.write().open(FloatingPanel {
                             id: "add-agent-tooltip".to_string(),
                             kind: FloatingPanelKind::AgentTooltip { label: "Add New Agent".to_string() },
-                            x: 52.0,
-                            y: (add_button_rect().1 + add_button_rect().3) / 2.0 - 12.0,
+                            x: x1 - ox + 4.0,
+                            y: (y0 + y1) / 2.0 - oy - 12.0,
                             width: 0.0,
                             height: 24.0,
                         });
@@ -283,12 +286,13 @@ pub fn AgentRail() -> Element {
                         class: "flex h-9 w-9 items-center justify-center rounded-sm border border-dashed border-border bg-background-elevated text-muted-foreground hover:border-primary hover:text-foreground transition-opacity duration-150 {add_button_opacity}",
                         onclick: move |_| {
                             floating_dock.write().close("add-agent-tooltip");
-                            let (_, y0, _, _) = add_button_rect();
+                            let (x0, y0, x1, y1) = add_button_rect();
+                            let (ox, oy) = floating_dock.read().dock_origin;
                             floating_dock.write().open(FloatingPanel {
                                 id: "add-agent-popover".to_string(),
                                 kind: FloatingPanelKind::AddAgentPopover,
-                                x: 52.0,
-                                y: y0,
+                                x: x1 - ox + 4.0,
+                                y: y0 - oy,
                                 width: 240.0,
                                 height: 180.0,
                             });

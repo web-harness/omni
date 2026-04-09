@@ -594,7 +594,8 @@ pub fn AppLayout() -> Element {
 
     let open_tabs = workspace_state.read().open_tabs_for(&thread_id);
     let mut panels = vec![
-        json!({"id":"sidebar","slot":"sidebar","title":"Threads","position":{"direction":"left"}}),
+        json!({"id":"agent-rail","slot":"agent-rail","title":"Agents","position":{"direction":"left"},"hideHeader":true,"fixedWidth":48}),
+        json!({"id":"sidebar","slot":"sidebar","title":"Threads","position":{"referencePanel":"agent-rail","direction":"right"}}),
         json!({"id":"chat","slot":"chat","title":"Chat","position":{"referencePanel":"sidebar","direction":"right"}}),
         json!({"id":"tasks","slot":"tasks","title":"Tasks","position":{"referencePanel":"chat","direction":"right"}}),
         json!({"id":"files","slot":"files","title":"Files","position":{"referencePanel":"tasks","direction":"below"}}),
@@ -638,15 +639,19 @@ pub fn AppLayout() -> Element {
 
     rsx! {
         div {
-            class: "h-screen w-screen overflow-hidden bg-background text-foreground flex",
+            class: "h-screen w-screen overflow-hidden bg-background text-foreground",
             "data-theme": theme,
-            AgentRail {}
             omni-dock {
-                class: "min-w-0 flex-1 h-screen",
+                class: "w-full h-screen",
                 "data-panels": panel_config,
                 "data-active-panel": active_panel.clone(),
-                "data-proportions": "20,60,20",
+                "data-proportions": "48px,20,60,20",
                 "data-floating-panels": floating_config,
+                onmounted: move |evt| async move {
+                    if let Ok(cr) = evt.get_client_rect().await {
+                        floating_dock.write().dock_origin = (cr.min_x(), cr.min_y());
+                    }
+                },
                 input {
                     r#type: "hidden",
                     "data-dock-relay": "true",
@@ -661,6 +666,7 @@ pub fn AppLayout() -> Element {
                         }
                     },
                 },
+                div { slot: "agent-rail", class: "h-full w-full overflow-hidden", AgentRail {} }
                 div { slot: "sidebar", class: "h-full w-full overflow-hidden", ThreadSidebar {} }
                 div { slot: "chat", class: "h-full w-full overflow-hidden",
                     if thread_state.read().show_kanban {

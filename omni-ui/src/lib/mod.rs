@@ -377,6 +377,7 @@ pub struct FloatingPanel {
 #[derive(Clone, PartialEq, Default)]
 pub struct FloatingDockState {
     pub panels: Vec<FloatingPanel>,
+    pub dock_origin: (f64, f64),
 }
 
 impl FloatingDockState {
