@@ -5,6 +5,7 @@ export type SeedThread = {
   title: string;
   status: "Idle" | "Busy" | "Interrupted" | "Error";
   updated_at: string;
+  workspace?: string;
   messages: Array<{ id: string; role: "user" | "assistant" | "tool"; content: string; created_at: string }>;
   todos: Array<{ id: string; content: string; status: "pending" | "in_progress" | "completed" | "cancelled" }>;
   subagents: Array<{
@@ -79,24 +80,36 @@ export async function getMockWorkspaceFiles(): Promise<
 
   for (const entry of entries) {
     const parts = entry.path.split("/").filter(Boolean);
-    if (parts.length < 2) continue;
-    const root = `/${parts[0]}/${parts[1]}${parts[2] ? `/${parts[2]}` : ""}`;
+    let root = "";
+    if (parts[0] === "home" && parts[1] === "workspace") {
+      root = "/home/workspace";
+    } else if (parts[0] === "home" && parts[1] === "user" && parts[2] === "projects" && parts[3]) {
+      root = `/home/user/projects/${parts[3]}`;
+    }
+    if (!root || entry.path.length <= root.length) continue;
+
     const relative = entry.path.slice(root.length + 1);
+
+    // For the test project workspace, only show project files (not fixtures or README)
+    if (root === "/home/user/projects/test") {
+      if (relative.startsWith("fixtures/") || relative === "README.md") continue;
+    }
+
     const list = grouped.get(root) ?? [];
     const seen = new Set(list.map((item) => item.path));
-
     const relativeParts = relative.split("/");
-    let current = "";
+    let current = root;
     for (const segment of relativeParts.slice(0, -1)) {
-      current = current ? `${current}/${segment}` : segment;
+      current = `${current}/${segment}`;
       if (!seen.has(current)) {
         list.push({ path: current, is_dir: true, size: null });
         seen.add(current);
       }
     }
 
-    if (!seen.has(relative)) {
-      list.push({ path: relative, is_dir: false, size: entry.size });
+    if (!seen.has(entry.path)) {
+      list.push({ path: entry.path, is_dir: false, size: entry.size });
+      seen.add(entry.path);
     }
     grouped.set(root, list);
   }
@@ -142,6 +155,7 @@ export function seedThreads(): SeedThread[] {
       title: "New Thread",
       status: "Busy",
       updated_at: fourHoursAgo,
+      workspace: "/home/user/projects/test",
       messages: [
         {
           id: "m1",

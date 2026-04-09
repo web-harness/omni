@@ -2,11 +2,12 @@ import { resolveServiceWorkerScope } from "@omni/omni-util/service-worker";
 
 import { buildBootstrap } from "./store-data.js";
 
-// URL is injected by Dioxus via <meta name="omni-sw-url"> so the hashed asset path is correct
+const DEFAULT_SW_URL = new URL("./omni-sw.js", import.meta.url).href;
+
 const SW_URL =
   typeof document !== "undefined"
-    ? (document.querySelector<HTMLMetaElement>('meta[name="omni-sw-url"]')?.content ?? "/omni-sw.js")
-    : "/omni-sw.js";
+    ? (document.querySelector<HTMLMetaElement>('meta[name="omni-sw-url"]')?.content ?? DEFAULT_SW_URL)
+    : DEFAULT_SW_URL;
 const READY_CHANNEL = "omni-sw-ready";
 const FIRST_ACTIVATION_RELOAD_KEY = "__omni_sw_first_activation_reload";
 let ready = false;

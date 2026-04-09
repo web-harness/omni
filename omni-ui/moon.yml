@@ -101,6 +101,8 @@ tasks:
       - system
   build-pages-debug:
     command: dx
+    env:
+      OMNI_BASE_PATH: /omni/app
     args:
       - bundle
       - --platform
@@ -122,6 +124,8 @@ tasks:
       - system
   build-pages-release:
     command: dx
+    env:
+      OMNI_BASE_PATH: /omni/app
     args:
       - bundle
       - --platform
@@ -165,23 +169,7 @@ tasks:
       - omni-ui/dist/public/assets/snippets
     deps:
       - clean-pages-asset-snippets
-      - build-pages-debug
-    inputs:
-      - '@group(configs)'
-    options:
-      internal: true
-      runFromWorkspaceRoot: true
-    toolchains:
-      - system
-  copy-pages-debug-snippets:
-    command: shx
-    args:
-      - cp
-      - -r
-      - target/dx/omni-ui/debug/web/public/wasm/snippets/.
-      - omni-ui/dist/public/assets/snippets
-    deps:
-      - create-pages-asset-snippets
+      - build-pages-release
     inputs:
       - '@group(configs)'
     options:
@@ -194,10 +182,27 @@ tasks:
     args:
       - cp
       - -r
-      - target/dx/omni-ui/release/web/public/snippets/.
+      - omni-ui/dist/public/wasm/snippets/.
       - omni-ui/dist/public/assets/snippets
     deps:
       - create-pages-asset-snippets
+    inputs:
+      - '@group(configs)'
+    options:
+      internal: true
+      runFromWorkspaceRoot: true
+    toolchains:
+      - system
+  fix-pages-dioxus-web-snippet-layout:
+    command: node
+    args:
+      - -e
+      - >-
+        const fs=require('fs'),path=require('path'),base='omni-ui/dist/public/assets/snippets';
+        const dir=fs.readdirSync(base).find(d=>d.startsWith('dioxus-web-'));
+        if(dir){const src=path.join(base,dir,'inline1.js'),dst=path.join(base,dir,'inline0.js');fs.copyFileSync(src,dst);}
+    deps:
+      - copy-pages-release-snippets
     inputs:
       - '@group(configs)'
     options:
@@ -209,8 +214,11 @@ tasks:
     command: shx
     args:
       - cp
+      - -f
       - omni-ui/dist/public/omni-zenfs.js
-      - omni-ui/dist/public/assets/omni-zenfs.js
+      - omni-ui/dist/public/omni-deepagents_bg.wasm
+      - omni-ui/dist/public/omni-bashkit_bg.wasm
+      - omni-ui/dist/public/assets
     deps:
       - build-pages-release
     inputs:
@@ -226,8 +234,7 @@ tasks:
       - echo
       - pages-build-ready
     deps:
-      - copy-pages-debug-snippets
-      - copy-pages-release-snippets
+      - fix-pages-dioxus-web-snippet-layout
       - copy-pages-asset-runtime-modules
     inputs:
       - '@group(sources)'

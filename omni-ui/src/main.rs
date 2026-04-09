@@ -360,12 +360,39 @@ fn App() -> Element {
             agent_endpoints.endpoints = lib::merge_agent_endpoints(endpoints);
         }
     }
+    #[cfg(target_arch = "wasm32")]
+    let favicon_url = asset!("/assets/favicon.ico");
+    #[cfg(not(target_arch = "wasm32"))]
     let favicon_url = lib::utils::api_url("assets/favicon.ico");
+
+    #[cfg(target_arch = "wasm32")]
+    let main_css_url = asset!("/assets/main.css");
+    #[cfg(not(target_arch = "wasm32"))]
     let main_css_url = lib::utils::api_url("assets/main.css");
+
+    #[cfg(target_arch = "wasm32")]
+    let tailwind_css_url = asset!("/assets/tailwind.css");
+    #[cfg(not(target_arch = "wasm32"))]
     let tailwind_css_url = lib::utils::api_url("assets/tailwind.css");
+
+    #[cfg(target_arch = "wasm32")]
+    let font_regular_url = asset!("/assets/fonts/JetBrainsMono-Regular.woff2");
+    #[cfg(not(target_arch = "wasm32"))]
     let font_regular_url = lib::utils::api_url("assets/fonts/JetBrainsMono-Regular.woff2");
+
+    #[cfg(target_arch = "wasm32")]
+    let font_medium_url = asset!("/assets/fonts/JetBrainsMono-Medium.woff2");
+    #[cfg(not(target_arch = "wasm32"))]
     let font_medium_url = lib::utils::api_url("assets/fonts/JetBrainsMono-Medium.woff2");
+
+    #[cfg(target_arch = "wasm32")]
+    let font_semibold_url = asset!("/assets/fonts/JetBrainsMono-SemiBold.woff2");
+    #[cfg(not(target_arch = "wasm32"))]
     let font_semibold_url = lib::utils::api_url("assets/fonts/JetBrainsMono-SemiBold.woff2");
+
+    #[cfg(target_arch = "wasm32")]
+    let font_bold_url = asset!("/assets/fonts/JetBrainsMono-Bold.woff2");
+    #[cfg(not(target_arch = "wasm32"))]
     let font_bold_url = lib::utils::api_url("assets/fonts/JetBrainsMono-Bold.woff2");
     let dock_url = lib::utils::api_url("omni-dock.js");
     let dicebear_url = lib::utils::api_url("omni-dicebear.js");
@@ -441,12 +468,10 @@ fn App() -> Element {
         document::Script { src: pptx_renderer_url, r#type: "module", defer: true }
         document::Script { src: plyr_url, r#type: "module", defer: true }
         document::Script { src: pretext_url, r#type: "module", defer: true }
-        if cfg!(target_arch = "wasm32") {
-            document::Meta { name: "omni-inference-url", content: inference_url }
-            document::Script { src: inference_register_url, r#type: "module", defer: true }
-            document::Meta { name: "omni-sw-url", content: sw_url }
-            document::Script { src: sw_register_url, r#type: "module", defer: true }
-        }
+        document::Meta { name: "omni-inference-url", content: inference_url }
+        document::Script { src: inference_register_url, r#type: "module", defer: true }
+        document::Meta { name: "omni-sw-url", content: sw_url }
+        document::Script { src: sw_register_url, r#type: "module", defer: true }
 
         Router::<Route> {}
     }

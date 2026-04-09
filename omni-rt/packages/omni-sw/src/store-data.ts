@@ -252,7 +252,7 @@ async function seedIfEmpty(): Promise<void> {
             thread_id: seed.id,
             created_at: seed.updated_at,
             updated_at: seed.updated_at,
-            metadata: { title: seed.title },
+            metadata: { title: seed.title, ...(seed.workspace ? { workspace: seed.workspace } : {}) },
             status: seed.status.toLowerCase(),
             values: null,
             messages: null,
@@ -390,12 +390,13 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
     .map((row) => {
       const rec = row as Record<string, unknown>;
       const metadata = (rec.metadata as Record<string, unknown> | undefined) ?? {};
+      const id = normalizeThreadId(rec.thread_id ?? rec.id);
       return {
-        id: normalizeThreadId(rec.thread_id ?? rec.id),
+        id,
         title: String(metadata.title ?? DEFAULT_THREAD_TITLE),
         status: toThreadStatus(rec.status),
         updated_at: String(rec.updated_at ?? new Date().toISOString()),
-        workspace: String(metadata.workspace ?? "/home/workspace"),
+        workspace: String(metadata.workspace ?? seedById.get(id)?.workspace ?? "/home/workspace"),
       };
     })
     .filter((thread) => thread.id.length > 0)
