@@ -1,0 +1,14 @@
+{
+  "name": "@omni/omni-dockbar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "animejs": "^3.2.2",
+    "lit": "^3.2.0"
+  },
+  "devDependencies": {
+    "@types/animejs": "^3.1.12",
+    "esbuild": "^0.25.2"
+  }
+}

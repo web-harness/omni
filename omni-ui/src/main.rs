@@ -395,6 +395,7 @@ fn App() -> Element {
     #[cfg(not(target_arch = "wasm32"))]
     let font_bold_url = lib::utils::api_url("assets/fonts/JetBrainsMono-Bold.woff2");
     let dock_url = lib::utils::api_url("omni-dock.js");
+    let dockbar_url = lib::utils::api_url("omni-dockbar.js");
     let dicebear_url = lib::utils::api_url("omni-dicebear.js");
     let monaco_url = lib::utils::api_url("omni-monaco.js");
     let marked_url = lib::utils::api_url("omni-marked.js");
@@ -460,6 +461,7 @@ fn App() -> Element {
             @font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:700;font-display:swap;src:url('{font_bold_url}') format('woff2')}}"
         }
         document::Script { src: dock_url, r#type: "module", defer: true }
+        document::Script { src: dockbar_url, r#type: "module", defer: true }
         document::Script { src: dicebear_url, r#type: "module", defer: true }
         document::Script { src: monaco_url, r#type: "module", defer: true }
         document::Script { src: marked_url, r#type: "module", defer: true }

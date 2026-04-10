@@ -18,7 +18,8 @@
     "omni-rt/packages/omni-sheetjs",
     "omni-rt/packages/omni-inference",
     "omni-rt/packages/omni-sw",
-    "omni-rt/crates/omni-zenfs"
+    "omni-rt/crates/omni-zenfs",
+    "omni-rt/packages/omni-dockbar"
   ],
   "scripts": {
     "moon": "moon",

@@ -14,6 +14,7 @@
     "@omni/omni-sheetjs": "file:../omni-rt/packages/omni-sheetjs",
     "@omni/omni-sw": "file:../omni-rt/packages/omni-sw",
     "@omni/omni-util": "file:../omni-rt/packages/omni-util",
-    "@omni/omni-zenfs": "file:../omni-rt/crates/omni-zenfs"
+    "@omni/omni-zenfs": "file:../omni-rt/crates/omni-zenfs",
+    "@omni/omni-dockbar": "file:../omni-rt/packages/omni-dockbar"
   }
 }

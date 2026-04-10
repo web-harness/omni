@@ -12,6 +12,7 @@ projects:
   omni-docxjs: omni-rt/packages/omni-docxjs
   omni-dicebear: omni-rt/packages/omni-dicebear
   omni-dock: omni-rt/packages/omni-dock
+  omni-dockbar: omni-rt/packages/omni-dockbar
   omni-marked: omni-rt/packages/omni-marked
   omni-monaco: omni-rt/packages/omni-monaco
   omni-pdfjs: omni-rt/packages/omni-pdfjs

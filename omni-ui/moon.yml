@@ -9,6 +9,7 @@ dependsOn:
   - omni-docxjs
   - omni-dicebear
   - omni-dock
+  - omni-dockbar
   - omni-marked
   - omni-monaco
   - omni-pdfjs
@@ -35,6 +36,7 @@ tasks:
       - omni-docxjs:build
       - omni-dicebear:build
       - omni-dock:build
+      - omni-dockbar:build
       - omni-marked:build
       - omni-monaco:build
       - omni-pdfjs:build
@@ -70,6 +72,7 @@ tasks:
       - omni-docxjs:build
       - omni-dicebear:build
       - omni-dock:build
+      - omni-dockbar:build
       - omni-marked:build
       - omni-monaco:build
       - omni-pdfjs:build
@@ -253,6 +256,7 @@ tasks:
       - omni-docxjs:build
       - omni-dicebear:build
       - omni-dock:build
+      - omni-dockbar:build
       - omni-marked:build
       - omni-monaco:build
       - omni-pdfjs:build
@@ -293,6 +297,7 @@ tasks:
       - omni-docxjs:watch
       - omni-dicebear:watch
       - omni-dock:watch
+      - omni-dockbar:watch
       - omni-monaco:watch
       - omni-marked:watch
       - omni-pdfjs:watch
@@ -327,6 +332,7 @@ tasks:
       - omni-docxjs:watch
       - omni-dicebear:watch
       - omni-dock:watch
+      - omni-dockbar:watch
       - omni-monaco:watch
       - omni-marked:watch
       - omni-pdfjs:watch
