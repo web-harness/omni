@@ -1,10 +1,12 @@
 import { resolveServiceWorkerScope } from "@omni/omni-util/service-worker";
 import { formatError } from "@omni/omni-util";
 
+const DEFAULT_SW_URL = new URL("./omni-inference.js", import.meta.url).href;
+
 const SW_URL =
   typeof document !== "undefined"
-    ? (document.querySelector<HTMLMetaElement>('meta[name="omni-inference-url"]')?.content ?? "/omni-inference.js")
-    : "/omni-inference.js";
+    ? (document.querySelector<HTMLMetaElement>('meta[name="omni-inference-url"]')?.content ?? DEFAULT_SW_URL)
+    : DEFAULT_SW_URL;
 const READY_CHANNEL = "omni-inference-ready";
 
 type RegisterEnv = {

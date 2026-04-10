@@ -8,8 +8,8 @@ tasks:
     args:
       - rm
       - -f
-      - ../../../omni-ui/public/omni-popper.js
-      - ../../../omni-ui/public/omni-popper-*.js
+      - ../../../omni-ui/public/omni-dockbar.js
+      - ../../../omni-ui/public/omni-dockbar-*.js
     inputs:
       - '@group(configs)'
     options:
@@ -17,15 +17,14 @@ tasks:
   build:
     command: esbuild
     args:
-      - src/omni-popper.ts
+      - src/omni-dockbar.ts
       - --bundle
       - --format=esm
       - --splitting
       - --outdir=../../../omni-ui/public
-      - --entry-names=omni-popper
-      - --chunk-names=omni-popper-[name]-[hash]
+      - --entry-names=omni-dockbar
+      - --chunk-names=omni-dockbar-[name]-[hash]
     deps:
-      - omni-util:build
       - clean-public
     inputs:
       - '@group(sources)'
@@ -33,17 +32,15 @@ tasks:
   watch:
     command: esbuild
     args:
-      - src/omni-popper.ts
+      - src/omni-dockbar.ts
       - --bundle
       - --format=esm
       - --splitting
       - --outdir=../../../omni-ui/public
-      - --entry-names=omni-popper
-      - --chunk-names=omni-popper-[name]-[hash]
+      - --entry-names=omni-dockbar
+      - --chunk-names=omni-dockbar-[name]-[hash]
       - --watch
     inputs:
       - '@group(sources)'
       - '@group(configs)'
-    deps:
-      - omni-util:build
     preset: server

@@ -22,9 +22,8 @@ import {
   setDefaultModel as setDeepagentsDefaultModel,
 } from "./deepagents.js";
 import {
-  DEFAULT_WORKSPACE_ORDER,
   MOCK_THREAD_IDS,
-  SCAFFOLD_FILES,
+  ensureWorkspaceScaffold as ensureWorkspaceScaffoldWasm,
   getMockThreadFiles,
   getMockToolCalls,
   getMockToolResults,
@@ -53,7 +52,6 @@ export type BootstrapPayload = {
   tool_results: Record<string, Array<{ tool_call_id: string; content: string; is_error: boolean }>>;
   background_tasks: Record<string, Array<{ id: string; name: string; description: string; status: string }>>;
   workspace_path: Record<string, string>;
-  workspace_files: Record<string, Array<{ path: string; is_dir: boolean; size: number | null }>>;
   providers: Array<{ id: ProviderId; name: string; has_api_key: boolean }>;
   models: Array<{ id: string; name: string; provider: ProviderId }>;
   default_model: string;
@@ -244,7 +242,7 @@ async function seedIfEmpty(): Promise<void> {
   await ensureZenFs();
   const existingThreads = await readJsonFiles(THREADS_DIR);
   if (existingThreads.length === 0) {
-    for (const seed of seedThreads()) {
+    for (const seed of await seedThreads()) {
       await zenMkdir(THREADS_DIR, { recursive: true });
       await zenWriteFile(
         `${THREADS_DIR}/${seed.id}.json`,
@@ -253,7 +251,7 @@ async function seedIfEmpty(): Promise<void> {
             thread_id: seed.id,
             created_at: seed.updated_at,
             updated_at: seed.updated_at,
-            metadata: { title: seed.title },
+            metadata: { title: seed.title, ...(seed.workspace ? { workspace: seed.workspace } : {}) },
             status: seed.status.toLowerCase(),
             values: null,
             messages: null,
@@ -306,7 +304,7 @@ async function seedMockAgentEndpoints(): Promise<void> {
   }
 
   const now = new Date().toISOString();
-  for (const endpoint of seedAgentEndpoints()) {
+  for (const endpoint of await seedAgentEndpoints()) {
     await zenWriteFile(
       `${AGENT_ENDPOINTS_DIR}/${endpoint.id}.json`,
       encoder.encode(
@@ -323,52 +321,7 @@ async function seedMockAgentEndpoints(): Promise<void> {
 }
 
 async function ensureWorkspaceScaffold(): Promise<void> {
-  const writeIfMissing = async (path: string, content: string): Promise<void> => {
-    if (await exists(path)) return;
-    await zenMkdir(path.slice(0, path.lastIndexOf("/")), { recursive: true });
-    await zenWriteFile(path, encoder.encode(content));
-  };
-
-  for (const file of SCAFFOLD_FILES) {
-    await writeIfMissing(file.path, file.content);
-  }
-}
-
-export async function listWorkspaceFiles(
-  root: string,
-): Promise<Array<{ path: string; is_dir: boolean; size: number | null }>> {
-  const byWorkspace = getMockWorkspaceFiles();
-  if (root in byWorkspace) {
-    return byWorkspace[root] ?? [];
-  }
-
-  await ensureZenFs();
-  await ensureWorkspaceScaffold();
-  const cleanRoot = root?.startsWith("/") ? root : "/home/workspace";
-  if (!(await exists(cleanRoot))) {
-    return [];
-  }
-
-  const out: Array<{ path: string; is_dir: boolean; size: number | null }> = [];
-
-  const walk = async (dir: string, depth: number): Promise<void> => {
-    if (depth > 2) return;
-    const entries = await zenReadDir(dir);
-    for (const raw of entries) {
-      const entry = raw as DirEntry;
-      const full = `${dir}/${entry.name}`.replace(/\/+/g, "/");
-      if (entry.is_dir) {
-        out.push({ path: full, is_dir: true, size: null });
-        await walk(full, depth + 1);
-      } else if (entry.is_file) {
-        const bytes = await zenReadFile(full);
-        out.push({ path: full, is_dir: false, size: bytes.length });
-      }
-    }
-  };
-
-  await walk(cleanRoot, 0);
-  return out;
+  await ensureWorkspaceScaffoldWasm();
 }
 
 export async function getDefaultModel(): Promise<string> {
@@ -386,16 +339,18 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
   const defaultModel = await getDefaultModel();
   const providers = await readProvidersWithKeys();
   const models = modelDefs();
-  const seedById = new Map(seedThreads().map((thread) => [thread.id, thread]));
+  const seedById = new Map((await seedThreads()).map((thread) => [thread.id, thread]));
   const threads = (await readJsonFiles(THREADS_DIR))
     .map((row) => {
       const rec = row as Record<string, unknown>;
       const metadata = (rec.metadata as Record<string, unknown> | undefined) ?? {};
+      const id = normalizeThreadId(rec.thread_id ?? rec.id);
       return {
-        id: normalizeThreadId(rec.thread_id ?? rec.id),
+        id,
         title: String(metadata.title ?? DEFAULT_THREAD_TITLE),
         status: toThreadStatus(rec.status),
         updated_at: String(rec.updated_at ?? new Date().toISOString()),
+        workspace: String(metadata.workspace ?? seedById.get(id)?.workspace ?? "/home/workspace"),
       };
     })
     .filter((thread) => thread.id.length > 0)
@@ -408,7 +363,6 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
   const tool_results: BootstrapPayload["tool_results"] = {};
   const background_tasks: BootstrapPayload["background_tasks"] = {};
   const workspace_path: BootstrapPayload["workspace_path"] = {};
-  const workspace_files = getMockWorkspaceFiles();
   const railStyleItem = (await readJson(`${AGENT_RAIL_DIR}/dicebear-style.json`)) as Record<string, unknown> | null;
   const storedDicebearStyle = String(
     (railStyleItem?.value as Record<string, unknown> | undefined)?.style ?? railStyleItem?.style ?? "bottts-neutral",
@@ -428,7 +382,7 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
     })
     .filter((endpoint) => endpoint.id.length > 0 && endpoint.removable);
 
-  for (const [index, thread] of threads.entries()) {
+  for (const thread of threads) {
     const seeded = seedById.get(thread.id);
     const parsedMessages = (await readJsonFiles(`${MESSAGES_DIR}/${thread.id}`))
       .map((row) => {
@@ -465,13 +419,11 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
     });
     background_tasks[thread.id] = parsedSubagents;
 
-    files[thread.id] = getMockThreadFiles(thread.id);
-    tool_calls[thread.id] = getMockToolCalls(thread.id);
-    tool_results[thread.id] = getMockToolResults(thread.id);
+    files[thread.id] = await getMockThreadFiles(thread.id);
+    tool_calls[thread.id] = await getMockToolCalls(thread.id);
+    tool_results[thread.id] = await getMockToolResults(thread.id);
 
-    const ws =
-      index === 1 ? DEFAULT_WORKSPACE_ORDER[1] : index === 2 ? DEFAULT_WORKSPACE_ORDER[2] : DEFAULT_WORKSPACE_ORDER[0];
-    workspace_path[thread.id] = ws;
+    workspace_path[thread.id] = thread.workspace;
   }
 
   return {
@@ -483,7 +435,6 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
     tool_results,
     background_tasks,
     workspace_path,
-    workspace_files,
     providers,
     models,
     default_model: defaultModel,

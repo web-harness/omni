@@ -51,7 +51,6 @@ const mockState = vi.hoisted(() => {
 
 vi.mock("./store-data.js", () => ({
   buildBootstrap: vi.fn(async () => ({ ok: true })),
-  listWorkspaceFiles: vi.fn(async () => []),
   readProvidersWithKeys: vi.fn(async () => []),
   deleteThread: vi.fn(async (threadId: string) => {
     for (const key of [...mockState.files.keys()]) {

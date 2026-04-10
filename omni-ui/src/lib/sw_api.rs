@@ -1,4 +1,4 @@
-use super::utils::app_url;
+use super::utils::api_url;
 use super::{AgentEndpoint, BrowserInferenceStatus};
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
@@ -78,7 +78,6 @@ pub struct BootstrapPayload {
     #[serde(default)]
     pub background_tasks: HashMap<String, Vec<BackgroundTask>>,
     pub workspace_path: HashMap<String, String>,
-    pub workspace_files: HashMap<String, Vec<FileInfo>>,
     pub providers: Vec<Provider>,
     pub models: Vec<ModelConfig>,
     pub default_model: String,
@@ -149,7 +148,7 @@ fn parse_thread_status(raw: &str) -> super::ThreadStatus {
 }
 
 fn store_item_url(namespace: &[&str], key: &str) -> String {
-    let mut url = app_url("store/items?");
+    let mut url = api_url("store/items?");
     for segment in namespace {
         let encoded = urlencoding::encode(segment).into_owned();
         url.push_str("namespace=");
@@ -195,7 +194,7 @@ pub async fn fetch_bootstrap() -> Result<BootstrapPayload, std::io::Error> {
     #[cfg(not(target_arch = "wasm32"))]
     {
         let response =
-            send_json_request(Method::GET, app_url("x/bootstrap"), Option::<&()>::None).await?;
+            send_json_request(Method::GET, api_url("x/bootstrap"), Option::<&()>::None).await?;
 
         if !response.status().is_success() {
             return Err(std::io::Error::other(format!(
@@ -211,7 +210,7 @@ pub async fn fetch_bootstrap() -> Result<BootstrapPayload, std::io::Error> {
 pub async fn create_thread() -> Result<UiThread, std::io::Error> {
     let response = send_json_request(
         Method::POST,
-        app_url("threads"),
+        api_url("threads"),
         Some(&serde_json::json!({
             "metadata": {
                 "title": "New Thread"
@@ -248,7 +247,7 @@ pub async fn create_thread() -> Result<UiThread, std::io::Error> {
 pub async fn delete_thread(thread_id: &str) -> Result<(), std::io::Error> {
     let response = send_json_request(
         Method::DELETE,
-        app_url(&format!("threads/{thread_id}")),
+        api_url(&format!("threads/{thread_id}")),
         Option::<&()>::None,
     )
     .await?;
@@ -285,7 +284,7 @@ pub async fn get_api_key(provider: &str) -> Result<String, std::io::Error> {
 pub async fn set_api_key(provider: &str, value: &str) -> Result<(), std::io::Error> {
     let response = send_json_request(
         Method::PUT,
-        app_url("store/items"),
+        api_url("store/items"),
         Some(&serde_json::json!({
             "namespace": ["config", "api-keys"],
             "key": provider,
@@ -307,7 +306,7 @@ pub async fn set_api_key(provider: &str, value: &str) -> Result<(), std::io::Err
 pub async fn delete_api_key(provider: &str) -> Result<(), std::io::Error> {
     let response = send_json_request(
         Method::DELETE,
-        app_url("store/items"),
+        api_url("store/items"),
         Some(&serde_json::json!({
             "namespace": ["config", "api-keys"],
             "key": provider,
@@ -329,7 +328,7 @@ pub async fn delete_api_key(provider: &str) -> Result<(), std::io::Error> {
 pub async fn list_agent_endpoints() -> Result<Vec<AgentEndpoint>, std::io::Error> {
     let response = send_json_request(
         Method::POST,
-        app_url("store/items/search"),
+        api_url("store/items/search"),
         Some(&serde_json::json!({
             "namespace_prefix": ["config", "agent-endpoints"],
             "limit": 200,
@@ -359,7 +358,7 @@ pub async fn list_agent_endpoints() -> Result<Vec<AgentEndpoint>, std::io::Error
 pub async fn set_agent_endpoint(endpoint: &AgentEndpoint) -> Result<(), std::io::Error> {
     let response = send_json_request(
         Method::PUT,
-        app_url("store/items"),
+        api_url("store/items"),
         Some(&serde_json::json!({
             "namespace": ["config", "agent-endpoints"],
             "key": endpoint.id,
@@ -381,7 +380,7 @@ pub async fn set_agent_endpoint(endpoint: &AgentEndpoint) -> Result<(), std::io:
 pub async fn delete_agent_endpoint(id: &str) -> Result<(), std::io::Error> {
     let response = send_json_request(
         Method::DELETE,
-        app_url("store/items"),
+        api_url("store/items"),
         Some(&serde_json::json!({
             "namespace": ["config", "agent-endpoints"],
             "key": id,
@@ -402,7 +401,7 @@ pub async fn delete_agent_endpoint(id: &str) -> Result<(), std::io::Error> {
 pub async fn set_agent_rail_style(style: &str) -> Result<(), std::io::Error> {
     let response = send_json_request(
         Method::PUT,
-        app_url("store/items"),
+        api_url("store/items"),
         Some(&serde_json::json!({
             "namespace": ["config", "agent-rail"],
             "key": "dicebear-style",
@@ -425,7 +424,7 @@ pub async fn set_agent_rail_style(style: &str) -> Result<(), std::io::Error> {
 
 pub async fn list_providers_with_keys() -> Result<Vec<Provider>, std::io::Error> {
     let response =
-        send_json_request(Method::GET, app_url("x/providers"), Option::<&()>::None).await?;
+        send_json_request(Method::GET, api_url("x/providers"), Option::<&()>::None).await?;
 
     if !response.status().is_success() {
         return Err(std::io::Error::other(format!(
@@ -452,7 +451,7 @@ pub async fn list_providers_with_keys() -> Result<Vec<Provider>, std::io::Error>
 pub async fn set_default_model(model_id: &str) -> Result<(), std::io::Error> {
     let response = send_json_request(
         Method::PUT,
-        app_url("store/items"),
+        api_url("store/items"),
         Some(&serde_json::json!({
             "namespace": ["config"],
             "key": "default_model",
@@ -540,28 +539,6 @@ where
     F: FnMut(BrowserInferenceStatus) + 'static,
 {
     Err(unavailable())
-}
-
-pub async fn list_workspace_files(workspace: &str) -> Result<Vec<super::FileInfo>, std::io::Error> {
-    let encoded = urlencoding::encode(workspace).into_owned();
-    let response = send_json_request(
-        Method::GET,
-        app_url(&format!("x/files?workspace={encoded}")),
-        Option::<&()>::None,
-    )
-    .await?;
-
-    if !response.status().is_success() {
-        return Err(std::io::Error::other(format!(
-            "list files failed: {}",
-            response.status()
-        )));
-    }
-
-    response
-        .json::<Vec<super::FileInfo>>()
-        .await
-        .map_err(err_msg)
 }
 
 #[cfg(not(target_arch = "wasm32"))]

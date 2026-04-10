@@ -171,30 +171,27 @@ pub fn Dialog(
 #[component]
 pub fn Popover(
     #[props(default = false)] open: bool,
+    anchor_x: f64,
+    anchor_y: f64,
     on_close: EventHandler<()>,
     trigger: Element,
     children: Element,
 ) -> Element {
-    let open_attr = if open { "true" } else { "" };
+    let bottom_offset = anchor_y - 8.0;
+
     rsx! {
+        {trigger}
         if open {
             div {
-                class: "fixed inset-0 z-[100] bg-black/65",
+                class: "fixed inset-0 z-[100]",
                 onclick: move |_| on_close.call(()),
                 onkeydown: move |e: Event<KeyboardData>| {
                     if e.key() == Key::Escape { on_close.call(()); }
                 },
             }
-        }
-        omni-popper {
-            placement: "bottom-start",
-            offset: "0,8",
-            strategy: "fixed",
-            "open": "{open_attr}",
-            div { slot: "trigger", {trigger} }
             div {
-                slot: "content",
-                class: "z-[110] w-[360px] rounded-sm border border-border bg-background-elevated p-2 shadow-xl",
+                class: "fixed z-[110] w-[360px] rounded-sm border border-border bg-background-elevated p-2 shadow-xl",
+                style: "left: {anchor_x}px; bottom: calc(100vh - {bottom_offset}px);",
                 onclick: move |e: MouseEvent| e.stop_propagation(),
                 {children}
             }

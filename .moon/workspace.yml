@@ -12,12 +12,12 @@ projects:
   omni-docxjs: omni-rt/packages/omni-docxjs
   omni-dicebear: omni-rt/packages/omni-dicebear
   omni-dock: omni-rt/packages/omni-dock
+  omni-dockbar: omni-rt/packages/omni-dockbar
   omni-marked: omni-rt/packages/omni-marked
   omni-monaco: omni-rt/packages/omni-monaco
   omni-pdfjs: omni-rt/packages/omni-pdfjs
   omni-pptx-renderer: omni-rt/packages/omni-pptx-renderer
   omni-plyr: omni-rt/packages/omni-plyr
-  omni-popper: omni-rt/packages/omni-popper
   omni-pretext: omni-rt/packages/omni-pretext
   omni-sheetjs: omni-rt/packages/omni-sheetjs
   omni-inference: omni-rt/packages/omni-inference

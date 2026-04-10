@@ -9,12 +9,12 @@ dependsOn:
   - omni-docxjs
   - omni-dicebear
   - omni-dock
+  - omni-dockbar
   - omni-marked
   - omni-monaco
   - omni-pdfjs
   - omni-pptx-renderer
   - omni-plyr
-  - omni-popper
   - omni-pretext
   - omni-sheetjs
   - omni-inference
@@ -36,7 +36,7 @@ tasks:
       - omni-docxjs:build
       - omni-dicebear:build
       - omni-dock:build
-      - omni-popper:build
+      - omni-dockbar:build
       - omni-marked:build
       - omni-monaco:build
       - omni-pdfjs:build
@@ -72,7 +72,7 @@ tasks:
       - omni-docxjs:build
       - omni-dicebear:build
       - omni-dock:build
-      - omni-popper:build
+      - omni-dockbar:build
       - omni-marked:build
       - omni-monaco:build
       - omni-pdfjs:build
@@ -101,6 +101,8 @@ tasks:
       - system
   build-pages-debug:
     command: dx
+    env:
+      OMNI_BASE_PATH: /omni/app
     args:
       - bundle
       - --platform
@@ -122,6 +124,8 @@ tasks:
       - system
   build-pages-release:
     command: dx
+    env:
+      OMNI_BASE_PATH: /omni/app
     args:
       - bundle
       - --platform
@@ -165,23 +169,7 @@ tasks:
       - omni-ui/dist/public/assets/snippets
     deps:
       - clean-pages-asset-snippets
-      - build-pages-debug
-    inputs:
-      - '@group(configs)'
-    options:
-      internal: true
-      runFromWorkspaceRoot: true
-    toolchains:
-      - system
-  copy-pages-debug-snippets:
-    command: shx
-    args:
-      - cp
-      - -r
-      - target/dx/omni-ui/debug/web/public/wasm/snippets/.
-      - omni-ui/dist/public/assets/snippets
-    deps:
-      - create-pages-asset-snippets
+      - build-pages-release
     inputs:
       - '@group(configs)'
     options:
@@ -194,10 +182,25 @@ tasks:
     args:
       - cp
       - -r
-      - target/dx/omni-ui/release/web/public/snippets/.
+      - omni-ui/dist/public/wasm/snippets/.
       - omni-ui/dist/public/assets/snippets
     deps:
       - create-pages-asset-snippets
+    inputs:
+      - '@group(configs)'
+    options:
+      internal: true
+      runFromWorkspaceRoot: true
+    toolchains:
+      - system
+  fix-pages-dioxus-web-snippet-layout:
+    command: shx
+    args:
+      - cp
+      - omni-ui/dist/public/assets/snippets/dioxus-web-*/inline1.js
+      - omni-ui/dist/public/assets/snippets/dioxus-web-*/inline0.js
+    deps:
+      - copy-pages-release-snippets
     inputs:
       - '@group(configs)'
     options:
@@ -209,8 +212,11 @@ tasks:
     command: shx
     args:
       - cp
+      - -f
       - omni-ui/dist/public/omni-zenfs.js
-      - omni-ui/dist/public/assets/omni-zenfs.js
+      - omni-ui/dist/public/omni-deepagents_bg.wasm
+      - omni-ui/dist/public/omni-bashkit_bg.wasm
+      - omni-ui/dist/public/assets
     deps:
       - build-pages-release
     inputs:
@@ -226,8 +232,7 @@ tasks:
       - echo
       - pages-build-ready
     deps:
-      - copy-pages-debug-snippets
-      - copy-pages-release-snippets
+      - fix-pages-dioxus-web-snippet-layout
       - copy-pages-asset-runtime-modules
     inputs:
       - '@group(sources)'
@@ -251,7 +256,7 @@ tasks:
       - omni-docxjs:build
       - omni-dicebear:build
       - omni-dock:build
-      - omni-popper:build
+      - omni-dockbar:build
       - omni-marked:build
       - omni-monaco:build
       - omni-pdfjs:build
@@ -292,7 +297,7 @@ tasks:
       - omni-docxjs:watch
       - omni-dicebear:watch
       - omni-dock:watch
-      - omni-popper:watch
+      - omni-dockbar:watch
       - omni-monaco:watch
       - omni-marked:watch
       - omni-pdfjs:watch
@@ -327,7 +332,7 @@ tasks:
       - omni-docxjs:watch
       - omni-dicebear:watch
       - omni-dock:watch
-      - omni-popper:watch
+      - omni-dockbar:watch
       - omni-monaco:watch
       - omni-marked:watch
       - omni-pdfjs:watch

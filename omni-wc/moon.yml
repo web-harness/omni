@@ -13,12 +13,46 @@ tasks:
       - .storybook/**/*
     outputs:
       - storybook-static/
-  build-pages:
+  build-pages-storybook:
     extends: build
     env:
       BASE_PATH: /omni/
     options:
+      internal: true
       mergeArgs: replace
+  copy-app-to-storybook:
+    command: shx
+    args:
+      - cp
+      - -r
+      - omni-ui/dist/public/.
+      - omni-wc/storybook-static/app
+    deps:
+      - build-pages-storybook
+      - omni-ui:build-pages
+    inputs:
+      - '@group(configs)'
+    options:
+      runFromWorkspaceRoot: true
+    toolchains:
+      - system
+  build-pages:
+    command: shx
+    args:
+      - echo
+      - storybook-pages-ready
+    deps:
+      - copy-app-to-storybook
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+      - .storybook/**/*
+    outputs:
+      - storybook-static/
+    options:
+      runFromWorkspaceRoot: true
+    toolchains:
+      - system
   dev:
     command: storybook
     args:

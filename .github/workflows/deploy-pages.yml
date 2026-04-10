@@ -61,19 +61,13 @@ jobs:
       - name: Build Pages artifacts with moon
         run: npm run build:pages -- --force
 
-      - name: Assemble deploy directory
-        run: |
-          mkdir -p deploy/app
-          cp -r omni-wc/storybook-static/* deploy/
-          cp -r omni-ui/dist/public/* deploy/app/
-
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: deploy
+          path: omni-wc/storybook-static
 
       - id: deployment
         name: Deploy to GitHub Pages

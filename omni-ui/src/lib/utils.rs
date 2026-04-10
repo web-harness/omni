@@ -47,13 +47,6 @@ pub fn file_name(path: &str) -> String {
     path.rsplit('/').next().unwrap_or(path).to_string()
 }
 
-#[cfg(all(not(target_arch = "wasm32"), feature = "desktop"))]
-pub fn app_url(path: &str) -> String {
-    let path = path.trim_start_matches('/');
-    format!("http://127.0.0.1:{}/{path}", desktop_api_port())
-}
-
-#[cfg(not(all(not(target_arch = "wasm32"), feature = "desktop")))]
 pub fn app_url(path: &str) -> String {
     let base_path = option_env!("OMNI_BASE_PATH")
         .unwrap_or("")
@@ -65,4 +58,15 @@ pub fn app_url(path: &str) -> String {
     } else {
         format!("{base_path}/{path}")
     }
+}
+
+#[cfg(all(not(target_arch = "wasm32"), feature = "desktop"))]
+pub fn api_url(path: &str) -> String {
+    let path = path.trim_start_matches('/');
+    format!("http://127.0.0.1:{}/{path}", desktop_api_port())
+}
+
+#[cfg(not(all(not(target_arch = "wasm32"), feature = "desktop")))]
+pub fn api_url(path: &str) -> String {
+    app_url(path)
 }

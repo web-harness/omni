@@ -1,8 +1,24 @@
 use std::collections::HashMap;
+#[cfg(target_arch = "wasm32")]
+use std::sync::atomic::{AtomicBool, Ordering};
 
 #[cfg(not(target_arch = "wasm32"))]
 use omni_rt::deepagents::model_registry::BROWSER_MODEL_SPECS;
 use serde::{Deserialize, Serialize};
+
+#[cfg(target_arch = "wasm32")]
+static ZENFS_INITIALIZED: AtomicBool = AtomicBool::new(false);
+
+async fn ensure_zenfs() -> Result<(), std::io::Error> {
+    #[cfg(target_arch = "wasm32")]
+    {
+        if !ZENFS_INITIALIZED.load(Ordering::Acquire) {
+            omni_rt::zenfs::init().await?;
+            ZENFS_INITIALIZED.store(true, Ordering::Release);
+        }
+    }
+    Ok(())
+}
 
 pub mod file_types;
 pub mod fixtures;
@@ -78,6 +94,62 @@ pub struct FileInfo {
     pub path: String,
     pub is_dir: bool,
     pub size: Option<u64>,
+}
+
+pub async fn list_workspace_files(root: &str) -> Result<Vec<FileInfo>, std::io::Error> {
+    ensure_zenfs().await?;
+    let root = if root.is_empty() {
+        "/home/workspace"
+    } else {
+        root
+    };
+    if !omni_rt::zenfs::exists(root).await? {
+        return Ok(Vec::new());
+    }
+
+    let mut files = Vec::new();
+    walk_workspace(root, root, 0, &mut files).await?;
+    Ok(files)
+}
+
+async fn walk_workspace(
+    root: &str,
+    current: &str,
+    depth: usize,
+    files: &mut Vec<FileInfo>,
+) -> Result<(), std::io::Error> {
+    if depth > 2 {
+        return Ok(());
+    }
+
+    for entry in omni_rt::zenfs::read_dir(current).await? {
+        let path = if current == "/" {
+            format!("/{}", entry.name)
+        } else {
+            format!("{}/{}", current.trim_end_matches('/'), entry.name)
+        };
+        if entry.is_dir {
+            files.push(FileInfo {
+                path: path.clone(),
+                is_dir: true,
+                size: None,
+            });
+            Box::pin(walk_workspace(root, &path, depth + 1, files)).await?;
+        } else if entry.is_file {
+            let stat = omni_rt::zenfs::stat(&path).await.ok();
+            let seeded_size = omni_rt::deepagents::workspace_seed::seeded_size(&path);
+            files.push(FileInfo {
+                path,
+                is_dir: false,
+                size: seeded_size.or_else(|| stat.map(|item| item.size)),
+            });
+        }
+    }
+
+    if current == root {
+        files.sort_by(|left, right| left.path.cmp(&right.path));
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -345,6 +417,53 @@ impl AgentEndpointState {
         if self.active_agent_id.as_deref() == Some(id) {
             self.active_agent_id = None;
         }
+    }
+}
+
+#[derive(Clone, PartialEq, Default)]
+pub struct AddAgentDraft {
+    pub name: String,
+    pub url: String,
+    pub token: String,
+}
+
+#[derive(Clone, PartialEq)]
+pub enum FloatingPanelKind {
+    AgentTooltip { label: String },
+    AddAgentPopover,
+    AgentCloseBadge { agent_id: String },
+    ModelPicker { thread_id: String },
+    WorkspacePicker { thread_id: String },
+}
+
+#[derive(Clone, PartialEq)]
+pub struct FloatingPanel {
+    pub id: String,
+    pub kind: FloatingPanelKind,
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+#[derive(Clone, PartialEq, Default)]
+pub struct FloatingDockState {
+    pub panels: Vec<FloatingPanel>,
+    pub dock_origin: (f64, f64),
+}
+
+impl FloatingDockState {
+    pub fn open(&mut self, panel: FloatingPanel) {
+        self.panels.retain(|p| p.id != panel.id);
+        self.panels.push(panel);
+    }
+
+    pub fn close(&mut self, id: &str) {
+        self.panels.retain(|p| p.id != id);
+    }
+
+    pub fn is_open(&self, id: &str) -> bool {
+        self.panels.iter().any(|p| p.id == id)
     }
 }
 
@@ -676,7 +795,6 @@ pub async fn async_init(
     {
         let mut ws = workspace_state.write();
         ws.workspace_path = payload.workspace_path;
-        ws.workspace_files = payload.workspace_files;
     }
 
     let active_id = thread_state.read().active_thread_id.clone();
@@ -688,7 +806,7 @@ pub async fn async_init(
             .get(&workspace)
             .is_none()
         {
-            if let Ok(files) = sw_api::list_workspace_files(&workspace).await {
+            if let Ok(files) = list_workspace_files(&workspace).await {
                 let mut ws = workspace_state.write();
                 ws.workspace_files.insert(workspace, files);
             }

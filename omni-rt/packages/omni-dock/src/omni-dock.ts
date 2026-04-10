@@ -10,6 +10,7 @@ import type {
   CreateComponentOptions,
   DockviewApi,
   DockviewGroupPanel,
+  FloatingGroupOptions,
   GroupPanelPartInitParameters,
   IContentRenderer,
   ITabRenderer,
@@ -18,17 +19,27 @@ import type {
 
 const loadDockviewModule = createCachedLoader(() => import("dockview-core"));
 
-const PERMANENT_PANELS = new Set(["sidebar", "chat", "tasks", "files", "bg-tasks"]);
+const PERMANENT_PANELS = new Set(["agent-rail", "sidebar", "chat", "tasks", "files", "bg-tasks"]);
 
 type PanelSpec = {
   id: string;
   slot: string;
   title?: string;
   hideHeader?: boolean;
+  fixedWidth?: number;
   position?: {
     referencePanel?: string;
     direction?: "left" | "right" | "above" | "below" | "within";
   };
+};
+
+type FloatingPanelSpec = {
+  id: string;
+  slot: string;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
 };
 
 type DockGroupOptions = AddGroupOptions & {
@@ -161,9 +172,11 @@ class OmniDock extends LitElement {
   @property({ attribute: "data-panels" }) dataPanels = "";
   @property({ attribute: "data-active-panel" }) dataActivePanel = "";
   @property({ attribute: "data-proportions" }) dataProportions = "";
+  @property({ attribute: "data-floating-panels" }) dataFloatingPanels = "";
 
   private api: DockviewApi | null = null;
   private _programmaticClose = false;
+  private _floatingPanelIds = new Set<string>();
   value = "";
 
   render() {
@@ -192,9 +205,11 @@ class OmniDock extends LitElement {
       if (!this._programmaticClose) {
         const relay = this.querySelector<HTMLInputElement>("[data-dock-relay]");
         if (relay) {
-          relay.value = panel.id;
+          const prefix = this._floatingPanelIds.has(panel.id) ? "floating:" : "";
+          relay.value = prefix + panel.id;
           relay.dispatchEvent(new Event("input", { bubbles: true }));
         }
+        this._floatingPanelIds.delete(panel.id);
       }
     });
     this.initializePanels();
@@ -210,6 +225,9 @@ class OmniDock extends LitElement {
     }
     if (changedProps.has("dataProportions")) {
       this.applyProportions();
+    }
+    if (changedProps.has("dataFloatingPanels")) {
+      this.diffFloatingPanels();
     }
   }
 
@@ -233,22 +251,44 @@ class OmniDock extends LitElement {
     if (!this.api) return;
 
     if (spec.hideHeader) {
-      const groupOpts: DockGroupOptions = { hideHeader: true };
-      if (spec.position?.direction && spec.position.referencePanel) {
-        groupOpts.referencePanel = spec.position.referencePanel;
-        groupOpts.direction = spec.position.direction;
-      } else if (spec.position?.direction) {
-        groupOpts.direction = spec.position.direction;
+      if (spec.position?.referencePanel) {
+        const groupOpts: AddGroupOptions = {
+          hideHeader: true,
+          referencePanel: spec.position.referencePanel,
+          direction: spec.position.direction,
+        };
+        const group: DockviewGroupPanel = this.api.addGroup(groupOpts);
+        this.api.addPanel({
+          id: spec.id,
+          component: spec.slot,
+          tabComponent: "omni-tab",
+          title: spec.title ?? spec.id,
+          position: { referenceGroup: group.id },
+        });
+        group.locked = true;
+      } else {
+        const panelOptions: AddPanelOptions = {
+          id: spec.id,
+          component: spec.slot,
+          tabComponent: "omni-tab",
+          title: spec.title ?? spec.id,
+          ...(spec.fixedWidth !== undefined && {
+            minimumWidth: spec.fixedWidth,
+            maximumWidth: spec.fixedWidth,
+          }),
+        };
+        if (spec.position?.direction) {
+          panelOptions.position = {
+            direction: spec.position.direction,
+          } as AddPanelOptions["position"];
+        }
+        const panel = this.api.addPanel(panelOptions);
+        const group = panel.group;
+        if (group) {
+          group.model.header.hidden = true;
+          group.locked = true;
+        }
       }
-      const group: DockviewGroupPanel = this.api.addGroup(groupOpts);
-      this.api.addPanel({
-        id: spec.id,
-        component: spec.slot,
-        tabComponent: "omni-tab",
-        title: spec.title ?? spec.id,
-        position: { referenceGroup: group.id },
-      });
-      group.locked = true;
     } else {
       const options: AddPanelOptions = {
         id: spec.id,
@@ -306,24 +346,77 @@ class OmniDock extends LitElement {
     }
   }
 
+  private parseFloatingPanelSpecs(): FloatingPanelSpec[] {
+    if (!this.dataFloatingPanels) return [];
+    try {
+      const parsed = JSON.parse(this.dataFloatingPanels) as FloatingPanelSpec[];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private addFloatingPanelFromSpec(spec: FloatingPanelSpec): void {
+    if (!this.api) return;
+    const group = this.api.addGroup({ hideHeader: true });
+    const panel = this.api.addPanel({
+      id: spec.id,
+      component: spec.slot,
+      tabComponent: "omni-tab",
+      title: spec.id,
+      position: { referenceGroup: group.id },
+    });
+    group.locked = true;
+    const opts: FloatingGroupOptions = { x: spec.x, y: spec.y };
+    if (spec.width !== undefined) opts.width = spec.width;
+    if (spec.height !== undefined) opts.height = spec.height;
+    this.api.addFloatingGroup(panel, opts);
+    this._floatingPanelIds.add(spec.id);
+  }
+
+  private diffFloatingPanels(): void {
+    if (!this.api) return;
+    const specs = this.parseFloatingPanelSpecs();
+    const specIds = new Set(specs.map((s) => s.id));
+
+    for (const id of [...this._floatingPanelIds]) {
+      if (!specIds.has(id)) {
+        const panel = this.api.getPanel(id);
+        if (panel) {
+          this._programmaticClose = true;
+          panel.api.close();
+          this._programmaticClose = false;
+        }
+        this._floatingPanelIds.delete(id);
+      }
+    }
+
+    for (const spec of specs) {
+      if (!this._floatingPanelIds.has(spec.id)) {
+        this.addFloatingPanelFromSpec(spec);
+      }
+    }
+  }
+
   private applyProportions(): void {
     if (!this.api) return;
     const propStr = this.dataProportions;
     if (!propStr) return;
-    const proportions = propStr
-      .split(",")
-      .map(Number)
-      .filter((n) => !Number.isNaN(n) && n > 0);
-    if (proportions.length === 0) return;
-    const total = proportions.reduce((a, b) => a + b, 0);
+    const rawParts = propStr.split(",").map((s) => s.trim());
     const container = this.getDockRoot();
     if (!container) return;
     const w = container.offsetWidth || this.clientWidth || window.innerWidth;
     const h = container.offsetHeight || this.clientHeight || window.innerHeight;
     this.api.layout(w, h);
 
+    const fixedPx: (number | null)[] = rawParts.map((p) => (p.endsWith("px") ? parseInt(p, 10) : null));
+    const proportions: (number | null)[] = rawParts.map((p, i) => (fixedPx[i] !== null ? null : Number(p)));
+    const totalFixed = fixedPx.reduce<number>((a, b) => a + (b ?? 0), 0);
+    const totalPropUnits = proportions.reduce<number>((a, b) => a + (b ?? 0), 0);
+    const remainingW = w - totalFixed;
+
     const specs = this.parsePanelSpecs();
-    const anchors = specs.slice(0, proportions.length);
+    const anchors = specs.slice(0, rawParts.length);
     const seen = new Set<string>();
     for (let i = 0; i < anchors.length; i++) {
       const panel = this.api.getPanel(anchors[i].id);
@@ -331,7 +424,12 @@ class OmniDock extends LitElement {
       const groupId = panel.group.id;
       if (seen.has(groupId)) continue;
       seen.add(groupId);
-      const width = Math.round((w * proportions[i]) / total);
+      let width: number;
+      if (fixedPx[i] !== null) {
+        width = fixedPx[i]!;
+      } else {
+        width = Math.round((remainingW * (proportions[i] ?? 0)) / totalPropUnits);
+      }
       panel.group.api.setSize({ width });
     }
   }

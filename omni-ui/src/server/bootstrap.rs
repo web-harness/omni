@@ -1,7 +1,8 @@
 use crate::lib::sw_api::BootstrapPayload;
 use crate::lib::{
-    AgentEndpoint, BackgroundTask, BackgroundTaskStatus, FileInfo, ModelConfig, Provider,
-    ProviderId, ThreadStatus, Todo, TodoStatus, ToolCall, ToolResult, UiMessage, UiThread,
+    agent_config_hash, AgentEndpoint, BackgroundTask, BackgroundTaskStatus, ModelConfig,
+    Provider, ProviderId, ThreadStatus, Todo, TodoStatus, ToolCall, ToolResult, UiMessage,
+    UiThread,
 };
 use omni_rt::deepagents::{
     config_store, message_store, model_registry, seed, subagent_store, thread_store, todo_store,
@@ -30,7 +31,6 @@ pub async fn build_bootstrap() -> Result<BootstrapPayload, std::io::Error> {
     let mut tool_results: HashMap<String, Vec<ToolResult>> = HashMap::new();
     let mut background_tasks = HashMap::new();
     let mut workspace_path = HashMap::new();
-    let mut workspace_files = HashMap::new();
 
     for thread in threads {
         let thread_id = thread.thread_id.to_string();
@@ -49,7 +49,7 @@ pub async fn build_bootstrap() -> Result<BootstrapPayload, std::io::Error> {
 
         ui_threads.push(UiThread {
             id: thread_id.clone(),
-            title,
+            title: title.clone(),
             status: match thread.status {
                 omni_rt::protocol::ThreadStatus::Idle => ThreadStatus::Idle,
                 omni_rt::protocol::ThreadStatus::Busy => ThreadStatus::Busy,
@@ -60,9 +60,6 @@ pub async fn build_bootstrap() -> Result<BootstrapPayload, std::io::Error> {
         });
 
         workspace_path.insert(thread_id.clone(), workspace.clone());
-        if !workspace_files.contains_key(&workspace) {
-            workspace_files.insert(workspace.clone(), list_workspace_files(&workspace).await?);
-        }
 
         let persisted_messages = message_store::list_messages(&thread_id).await?;
         let thread_messages = if persisted_messages.is_empty() {
@@ -111,6 +108,8 @@ pub async fn build_bootstrap() -> Result<BootstrapPayload, std::io::Error> {
                 },
             })
             .collect::<Vec<_>>();
+        let bootstrap_tool_calls = seeded_tool_calls_for(&thread_id, &thread_todos);
+        let bootstrap_tool_results = seeded_tool_results_for(&thread_id, &thread_todos);
         todos.insert(thread_id.clone(), thread_todos);
 
         let thread_background = subagent_store::list_subagents(&thread_id)
@@ -128,11 +127,16 @@ pub async fn build_bootstrap() -> Result<BootstrapPayload, std::io::Error> {
                 },
             })
             .collect::<Vec<_>>();
+        let mut bootstrap_tool_calls = bootstrap_tool_calls;
+        bootstrap_tool_calls.extend(seeded_background_task_calls_for(
+            &thread_id,
+            &thread_background,
+        ));
         background_tasks.insert(thread_id.clone(), thread_background);
 
         files.insert(thread_id.clone(), Vec::new());
-        tool_calls.entry(thread_id.clone()).or_default();
-        tool_results.entry(thread_id).or_default();
+        tool_calls.insert(thread_id.clone(), bootstrap_tool_calls);
+        tool_results.insert(thread_id, bootstrap_tool_results);
     }
 
     ui_threads.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
@@ -177,67 +181,12 @@ pub async fn build_bootstrap() -> Result<BootstrapPayload, std::io::Error> {
         tool_results,
         background_tasks,
         workspace_path,
-        workspace_files,
         providers,
         models,
         default_model: config_store::get_default_model().await?,
         dicebear_style: read_dicebear_style().await?,
-        agent_endpoints: read_agent_endpoints().await?,
+        agent_endpoints: seeded_agent_endpoints(read_agent_endpoints().await?),
     })
-}
-
-pub async fn list_workspace_files(root: &str) -> Result<Vec<FileInfo>, std::io::Error> {
-    let root = if root.is_empty() {
-        "/home/workspace"
-    } else {
-        root
-    };
-    if !omni_rt::zenfs::exists(root).await? {
-        return Ok(Vec::new());
-    }
-
-    let mut files = Vec::new();
-    walk_workspace(root, root, 0, &mut files).await?;
-    Ok(files)
-}
-
-async fn walk_workspace(
-    root: &str,
-    current: &str,
-    depth: usize,
-    files: &mut Vec<FileInfo>,
-) -> Result<(), std::io::Error> {
-    if depth > 2 {
-        return Ok(());
-    }
-
-    for entry in omni_rt::zenfs::read_dir(current).await? {
-        let path = if current == "/" {
-            format!("/{}", entry.name)
-        } else {
-            format!("{}/{}", current.trim_end_matches('/'), entry.name)
-        };
-        if entry.is_dir {
-            files.push(FileInfo {
-                path: path.clone(),
-                is_dir: true,
-                size: None,
-            });
-            Box::pin(walk_workspace(root, &path, depth + 1, files)).await?;
-        } else if entry.is_file {
-            let stat = omni_rt::zenfs::stat(&path).await.ok();
-            files.push(FileInfo {
-                path,
-                is_dir: false,
-                size: stat.map(|item| item.size),
-            });
-        }
-    }
-
-    if current == root {
-        files.sort_by(|left, right| left.path.cmp(&right.path));
-    }
-    Ok(())
 }
 
 async fn read_agent_endpoints() -> Result<Vec<AgentEndpoint>, std::io::Error> {
@@ -287,5 +236,187 @@ fn message_content(value: &serde_json::Value) -> String {
             .collect::<Vec<_>>()
             .join(" "),
         _ => value.to_string(),
+    }
+}
+
+const NATIVE_GTD_THREAD_ID: &str = "11111111-1111-4111-8111-111111111111";
+
+fn seeded_agent_endpoints(endpoints: Vec<AgentEndpoint>) -> Vec<AgentEndpoint> {
+    if !endpoints.is_empty() {
+        return endpoints;
+    }
+
+    vec![
+        AgentEndpoint {
+            id: agent_config_hash("https://agent.example.com/api", "sk-mock-1"),
+            url: "https://agent.example.com/api".to_string(),
+            bearer_token: "sk-mock-1".to_string(),
+            name: "Research Agent".to_string(),
+            removable: true,
+        },
+        AgentEndpoint {
+            id: agent_config_hash("https://agent2.example.com/api", "sk-mock-2"),
+            url: "https://agent2.example.com/api".to_string(),
+            bearer_token: "sk-mock-2".to_string(),
+            name: "Code Review Agent".to_string(),
+            removable: true,
+        },
+    ]
+}
+
+fn seeded_tool_calls_for(thread_id: &str, todos: &[Todo]) -> Vec<ToolCall> {
+    if thread_id != NATIVE_GTD_THREAD_ID || todos.is_empty() {
+        return Vec::new();
+    }
+
+    vec![ToolCall {
+        id: "tc-todos".to_string(),
+        name: "update_todos".to_string(),
+        args: serde_json::json!({
+            "todos": todos
+                .iter()
+                .map(|todo| serde_json::json!({
+                    "content": todo.content,
+                    "status": match todo.status {
+                        TodoStatus::Pending => "pending",
+                        TodoStatus::InProgress => "in_progress",
+                        TodoStatus::Completed => "completed",
+                        TodoStatus::Cancelled => "cancelled",
+                    }
+                }))
+                .collect::<Vec<_>>()
+        }),
+    }]
+}
+
+fn seeded_background_task_calls_for(thread_id: &str, tasks: &[BackgroundTask]) -> Vec<ToolCall> {
+    if thread_id != NATIVE_GTD_THREAD_ID {
+        return Vec::new();
+    }
+
+    tasks
+        .iter()
+        .map(|task| ToolCall {
+            id: format!("tc-{}", task.id),
+            name: "dispatch_subagent".to_string(),
+            args: serde_json::json!({ "task": task.description }),
+        })
+        .collect()
+}
+
+fn seeded_tool_results_for(thread_id: &str, todos: &[Todo]) -> Vec<ToolResult> {
+    if thread_id != NATIVE_GTD_THREAD_ID || todos.is_empty() {
+        return Vec::new();
+    }
+
+    vec![ToolResult {
+        tool_call_id: "tc-todos".to_string(),
+        content: "Synced".to_string(),
+        is_error: false,
+    }]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        seeded_agent_endpoints, seeded_background_task_calls_for, seeded_tool_calls_for,
+        seeded_tool_results_for, NATIVE_GTD_THREAD_ID,
+    };
+
+    #[test]
+    fn falls_back_to_seeded_agent_endpoints_when_store_is_empty() {
+        let endpoints = seeded_agent_endpoints(Vec::new());
+        assert_eq!(endpoints.len(), 2);
+        assert_eq!(endpoints[0].name, "Research Agent");
+        assert_eq!(endpoints[1].name, "Code Review Agent");
+        assert!(endpoints.iter().all(|endpoint| endpoint.removable));
+    }
+
+    #[test]
+    fn preserves_stored_agent_endpoints_when_present() {
+        let stored = vec![crate::lib::AgentEndpoint {
+            id: "custom".into(),
+            url: "https://custom.example.com".into(),
+            bearer_token: "secret".into(),
+            name: "Custom Agent".into(),
+            removable: true,
+        }];
+
+        let endpoints = seeded_agent_endpoints(stored.clone());
+        assert_eq!(endpoints, stored);
+    }
+
+    #[test]
+    fn seeds_tool_calls_for_native_demo_thread() {
+        let todos = vec![
+            crate::lib::Todo {
+                id: "todo1".into(),
+                content: "Design TodoStore data structure".into(),
+                status: crate::lib::TodoStatus::Completed,
+            },
+            crate::lib::Todo {
+                id: "todo2".into(),
+                content: "Implement CRUD operations".into(),
+                status: crate::lib::TodoStatus::InProgress,
+            },
+        ];
+
+        let calls = seeded_tool_calls_for(NATIVE_GTD_THREAD_ID, &todos);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].name, "update_todos");
+        assert_eq!(
+            calls[0]
+                .args
+                .get("todos")
+                .and_then(serde_json::Value::as_array)
+                .map(|todos| todos.len()),
+            Some(2)
+        );
+        assert_eq!(
+            calls[0]
+                .args
+                .get("todos")
+                .and_then(serde_json::Value::as_array)
+                .and_then(|todos| todos.get(1))
+                .and_then(|todo| todo.get("status"))
+                .and_then(serde_json::Value::as_str),
+            Some("in_progress")
+        );
+    }
+
+    #[test]
+    fn seeds_background_task_calls_for_native_demo_thread() {
+        let tasks = vec![crate::lib::BackgroundTask {
+            id: "sa1".into(),
+            name: "Researcher".into(),
+            description: "Investigate GTD".into(),
+            status: crate::lib::BackgroundTaskStatus::Running,
+        }];
+
+        let calls = seeded_background_task_calls_for(NATIVE_GTD_THREAD_ID, &tasks);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].id, "tc-sa1");
+        assert_eq!(calls[0].name, "dispatch_subagent");
+        assert_eq!(
+            calls[0]
+                .args
+                .get("task")
+                .and_then(serde_json::Value::as_str),
+            Some("Investigate GTD")
+        );
+    }
+
+    #[test]
+    fn seeds_tool_results_for_native_demo_thread() {
+        let todos = vec![crate::lib::Todo {
+            id: "todo1".into(),
+            content: "Design TodoStore data structure".into(),
+            status: crate::lib::TodoStatus::Completed,
+        }];
+
+        let results = seeded_tool_results_for(NATIVE_GTD_THREAD_ID, &todos);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].tool_call_id, "tc-todos");
+        assert!(!results[0].is_error);
     }
 }

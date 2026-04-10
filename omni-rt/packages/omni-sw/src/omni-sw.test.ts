@@ -56,10 +56,5 @@ describe("matchRunRoute", () => {
     expect(matchStoreRoute(new Request("https://example.test/omni/app/x/bootstrap", { method: "GET" }))).toBe(
       "x-bootstrap",
     );
-    expect(
-      matchStoreRoute(
-        new Request("https://example.test/omni/app/x/files?workspace=%2Fhome%2Fworkspace&", { method: "GET" }),
-      ),
-    ).toBe("x-files");
   });
 });

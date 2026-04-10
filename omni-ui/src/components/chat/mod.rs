@@ -8,7 +8,7 @@ use omni_rt::deepagents::model_registry::browser_model_spec;
 
 use crate::components::ui::{Badge, BadgeVariant, Popover};
 use crate::lib::thread_context::apply_stream_event;
-use crate::lib::utils::app_url;
+use crate::lib::utils::api_url;
 use crate::lib::{
     AgentEndpoint, AgentEndpointState, ChatState, ModelState, Role, TasksState, ThreadState,
     ToolCall, ToolResult, UiState, WorkspaceState,
@@ -175,7 +175,7 @@ async fn run_desktop_stream_via_eval(
     let mut eval = document::eval(
         r#"
         const payload = await dioxus.recv();
-        const module = await import("/omni-agent-module.js");
+        const module = await import(`${payload.baseUrl}/omni-agent-module.js`);
         const events = await module.executeRunStream(payload.body, payload.baseUrl);
         for await (const event of events) {
             dioxus.send(event);
@@ -186,7 +186,7 @@ async fn run_desktop_stream_via_eval(
 
     if let Err(error) = eval.send(DesktopAgentModuleRequest {
         body: stream_request_body(req),
-        base_url: app_url("").trim_end_matches('/').to_string(),
+        base_url: api_url("").trim_end_matches('/').to_string(),
     }) {
         chat_state.write().error = Some(error.to_string());
         chat_state.write().is_streaming = false;
@@ -255,7 +255,7 @@ pub fn ChatContainer(thread_id: String) -> Element {
 
                 #[cfg(any(target_arch = "wasm32", not(feature = "desktop")))]
                 match omni_rt::deepagents::sse::SseStream::connect(
-                    &app_url("runs/stream"),
+                    &api_url("runs/stream"),
                     &stream_request_body(&req).to_string(),
                 )
                 .await
@@ -364,7 +364,15 @@ pub fn MessageBubble(message: crate::lib::UiMessage) -> Element {
             div { class: "min-w-0 flex-1",
                 omni-text { "data-text": "{label}", "data-strategy": "none", "data-max-lines": "1", class: "mb-1 text-[10px] font-semibold text-muted-foreground" }
                 div { class: "{bubble_class}",
-                    pre { class: "whitespace-pre-wrap font-sans text-[12px]", "{message.content}" }
+                    if user {
+                        pre { class: "whitespace-pre-wrap font-sans text-[12px]", "{message.content}" }
+                    } else {
+                        omni-marked {
+                            class: "block w-full text-[12px] [&_.markdown-body]:min-h-0 [&_.markdown-body]:bg-transparent [&_.markdown-body]:p-0 [&_.markdown-body_pre]:mb-0 [&_.markdown-body_pre]:mt-2 [&_.markdown-body_p:last-child]:mb-0",
+                            "data-value": "{message.content}",
+                            "data-readonly": "true",
+                        }
+                    }
                 }
             }
             if user {
@@ -414,7 +422,11 @@ fn UpdateTodosRenderer(call: ToolCall, result: Option<ToolResult>) -> Element {
         })
         .unwrap_or_default();
 
-    let is_done = result.is_some();
+    let has_in_progress = todos.iter().any(|(_, status)| status == "in_progress");
+    let has_pending = todos.iter().any(|(_, status)| status == "pending");
+    let is_done = !todos.is_empty() && todos.iter().all(|(_, status)| status == "completed");
+    let is_synced = result.as_ref().is_some_and(|item| !item.is_error);
+    let is_error = result.as_ref().is_some_and(|item| item.is_error);
 
     rsx! {
         div { class: "rounded-sm border border-border bg-background-elevated text-[11px] overflow-hidden",
@@ -429,8 +441,21 @@ fn UpdateTodosRenderer(call: ToolCall, result: Option<ToolResult>) -> Element {
                 Icon { width: 12, height: 12, icon: LdListTodo, class: "text-muted-foreground shrink-0" }
                 omni-text { "data-text": "Update Tasks", "data-strategy": "none", "data-max-lines": "1", class: "font-semibold" }
                 div { class: "ml-auto flex items-center gap-1",
-                    if is_done {
-                        Badge { variant: BadgeVariant::Nominal, "OK" }
+                    if is_error {
+                        Badge { variant: BadgeVariant::Critical, "ERROR" }
+                    } else if has_in_progress {
+                        Badge { variant: BadgeVariant::Info, "IN PROGRESS" }
+                    } else if is_done {
+                        Badge { variant: BadgeVariant::Nominal, "DONE" }
+                        if is_synced {
+                            Badge { variant: BadgeVariant::Info, "SYNCED" }
+                        }
+                    } else if has_pending {
+                        Badge { variant: BadgeVariant::Warning, "PENDING" }
+                        if is_synced {
+                            Badge { variant: BadgeVariant::Info, "SYNCED" }
+                        }
+                    } else if is_synced {
                         Badge { variant: BadgeVariant::Info, "SYNCED" }
                     } else {
                         Badge { variant: BadgeVariant::Info, "RUNNING" }
@@ -654,6 +679,7 @@ pub fn ModelSwitcher() -> Element {
     let agent_state = use_context::<Signal<crate::lib::AgentEndpointState>>();
     let thread_state = use_context::<Signal<ThreadState>>();
     let mut open = use_signal(|| false);
+    let mut anchor = use_signal(|| (0.0f64, 0.0f64));
 
     let tid = thread_state
         .read()
@@ -800,6 +826,8 @@ pub fn ModelSwitcher() -> Element {
         } else {
             Popover {
                 open: open(),
+                anchor_x: anchor().0,
+                anchor_y: anchor().1,
                 on_close: move |_| {
                     pending_download.set(None);
                     pending_delete.set(None);
@@ -808,10 +836,12 @@ pub fn ModelSwitcher() -> Element {
                 trigger: rsx! {
                     button {
                         class: "flex w-[clamp(120px,18vw,180px)] max-w-full cursor-pointer items-center gap-1 rounded-sm border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-background-interactive",
-                        onclick: move |_| {
+                        onclick: move |evt: MouseEvent| {
                             if let Some(model) = selected_model_for_trigger.clone() {
                                 selected_provider.set(model.provider);
                             }
+                            let coords = evt.client_coordinates();
+                            anchor.set((coords.x, coords.y));
                             open.set(!open());
                         },
                         omni-text { "data-text": "{selected_label}", "data-strategy": "shrink-truncate", "data-max-lines": "1", "data-min-size": "9", class: "min-w-0 flex-1 overflow-hidden whitespace-nowrap" }
@@ -1204,6 +1234,7 @@ pub fn WorkspacePicker() -> Element {
     let workspace_state = use_context::<Signal<WorkspaceState>>();
     let thread_state = use_context::<Signal<ThreadState>>();
     let mut open = use_signal(|| false);
+    let mut anchor = use_signal(|| (0.0f64, 0.0f64));
     let presets = vec![
         ("test", "/home/user/projects/test"),
         ("omni", "/home/user/projects/omni"),
@@ -1218,11 +1249,17 @@ pub fn WorkspacePicker() -> Element {
     rsx! {
         Popover {
             open: open(),
+            anchor_x: anchor().0,
+            anchor_y: anchor().1,
             on_close: move |_| open.set(false),
             trigger: rsx! {
                 button {
                     class: "flex items-center gap-1 rounded-sm border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-background-interactive",
-                    onclick: move |_| open.set(!open()),
+                    onclick: move |evt: MouseEvent| {
+                        let coords = evt.client_coordinates();
+                        anchor.set((coords.x, coords.y));
+                        open.set(!open());
+                    },
                     Icon { width: 10, height: 10, icon: LdFolder }
                     omni-text { "data-text": "{workspace_state.read().workspace_for(&tid)}", "data-strategy": "truncate", "data-max-lines": "1", class: "max-w-[160px]" }
                     Icon { width: 10, height: 10, icon: LdChevronDown }
@@ -1251,7 +1288,7 @@ pub fn WorkspacePicker() -> Element {
                                         .workspace_path
                                         .insert(tid_for_click.clone(), workspace_path.clone());
                                     spawn(async move {
-                                        if let Ok(files) = crate::lib::sw_api::list_workspace_files(&workspace_path).await {
+                                        if let Ok(files) = crate::lib::list_workspace_files(&workspace_path).await {
                                             ws_state.write().workspace_files.insert(workspace_path, files);
                                         }
                                     });

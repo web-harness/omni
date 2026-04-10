@@ -46,6 +46,7 @@ Follow your instructions carefully and do not deviate from them. If you are unsu
 - Follow repo's README.md for general project information.
 - Backwards compatibility and defensive programming is forbidden, until asked explicitly by the user.
 - Do not debug Dioxus tooling or Moon orchestration unless the user explicitly asks for that. Focus on your code and let the existing tooling rebuild. Browser verification of your code is allowed and expected when needed.
+- Ad-hoc scripts are strictly forbidden in Moon tasks. Every file operation (copy, move, delete, mkdir) must be expressed using Moon-native toolchain commands (`shx cp`, `shx rm`, `shx mkdir`, etc.). Never introduce Node.js scripts, shell scripts, or any other scripting layer to orchestrate builds.
 
 ## Implementation Principles
 

@@ -14,12 +14,12 @@
     "omni-rt/packages/omni-pdfjs",
     "omni-rt/packages/omni-pptx-renderer",
     "omni-rt/packages/omni-plyr",
-    "omni-rt/packages/omni-popper",
     "omni-rt/packages/omni-pretext",
     "omni-rt/packages/omni-sheetjs",
     "omni-rt/packages/omni-inference",
     "omni-rt/packages/omni-sw",
-    "omni-rt/crates/omni-zenfs"
+    "omni-rt/crates/omni-zenfs",
+    "omni-rt/packages/omni-dockbar"
   ],
   "scripts": {
     "moon": "moon",
@@ -59,7 +59,7 @@
     "shx": "^0.4.0",
     "storybook": "^8.4.0",
     "tsx": "^4.20.6",
-    "typescript": "^5.9.2",
+    "typescript": "^5.9.3",
     "vitest": "^2.1.8",
     "zx": "^8.8.4"
   }

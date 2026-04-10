@@ -7,10 +7,14 @@ const config: StorybookConfig = {
     name: "@storybook/web-components-vite",
     options: {},
   },
-  viteFinal: (config) => {
+  viteFinal: (config, { configType }) => {
     if (process.env.BASE_PATH) {
       config.base = process.env.BASE_PATH;
     }
+    config.define = {
+      ...config.define,
+      __DEV__: configType === "DEVELOPMENT",
+    };
     return config;
   },
 };

@@ -24,13 +24,6 @@ use components::{
 use lib::{default_states, ModelState, Theme, ThreadState, UiState, WorkspaceState};
 use routes::Route;
 
-const FAVICON: Asset = asset!("/assets/favicon.ico");
-const MAIN_CSS: Asset = asset!("/assets/main.css");
-const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
-const FONT_REGULAR: Asset = asset!("/assets/fonts/JetBrainsMono-Regular.woff2");
-const FONT_MEDIUM: Asset = asset!("/assets/fonts/JetBrainsMono-Medium.woff2");
-const FONT_SEMIBOLD: Asset = asset!("/assets/fonts/JetBrainsMono-SemiBold.woff2");
-const FONT_BOLD: Asset = asset!("/assets/fonts/JetBrainsMono-Bold.woff2");
 #[cfg(target_arch = "wasm32")]
 const IFRAME_BOOTSTRAP_EVENT: &str = "omni-iframe-config";
 #[cfg(target_arch = "wasm32")]
@@ -307,6 +300,7 @@ fn start_desktop_server() {
                 let app = axum::Router::new()
                     .merge(crate::server::store_api::router())
                     .route("/x/execute", axum::routing::post(desktop_execute))
+                    .fallback(axum::routing::any(crate::server::assets::serve))
                     .layer(tower_http::cors::CorsLayer::permissive());
                 let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
                     .await
@@ -366,22 +360,56 @@ fn App() -> Element {
             agent_endpoints.endpoints = lib::merge_agent_endpoints(endpoints);
         }
     }
-    let dock_url = lib::utils::app_url("omni-dock.js");
-    let dicebear_url = lib::utils::app_url("omni-dicebear.js");
-    let popper_url = lib::utils::app_url("omni-popper.js");
-    let monaco_url = lib::utils::app_url("omni-monaco.js");
-    let marked_url = lib::utils::app_url("omni-marked.js");
-    let sheetjs_url = lib::utils::app_url("omni-sheetjs.js");
-    let docxjs_url = lib::utils::app_url("omni-docxjs.js");
-    let pdfjs_worker_url = lib::utils::app_url("omni-pdfjs.worker.js");
-    let pdfjs_url = lib::utils::app_url("omni-pdfjs.js");
-    let pptx_renderer_url = lib::utils::app_url("omni-pptx-renderer.js");
-    let plyr_url = lib::utils::app_url("omni-plyr.js");
-    let pretext_url = lib::utils::app_url("omni-pretext.js");
-    let inference_url = lib::utils::app_url("omni-inference.js");
-    let inference_register_url = lib::utils::app_url("omni-inference-register.js");
-    let sw_url = lib::utils::app_url("omni-sw.js");
-    let sw_register_url = lib::utils::app_url("omni-sw-register.js");
+    #[cfg(target_arch = "wasm32")]
+    let favicon_url = asset!("/assets/favicon.ico");
+    #[cfg(not(target_arch = "wasm32"))]
+    let favicon_url = lib::utils::api_url("assets/favicon.ico");
+
+    #[cfg(target_arch = "wasm32")]
+    let main_css_url = asset!("/assets/main.css");
+    #[cfg(not(target_arch = "wasm32"))]
+    let main_css_url = lib::utils::api_url("assets/main.css");
+
+    #[cfg(target_arch = "wasm32")]
+    let tailwind_css_url = asset!("/assets/tailwind.css");
+    #[cfg(not(target_arch = "wasm32"))]
+    let tailwind_css_url = lib::utils::api_url("assets/tailwind.css");
+
+    #[cfg(target_arch = "wasm32")]
+    let font_regular_url = asset!("/assets/fonts/JetBrainsMono-Regular.woff2");
+    #[cfg(not(target_arch = "wasm32"))]
+    let font_regular_url = lib::utils::api_url("assets/fonts/JetBrainsMono-Regular.woff2");
+
+    #[cfg(target_arch = "wasm32")]
+    let font_medium_url = asset!("/assets/fonts/JetBrainsMono-Medium.woff2");
+    #[cfg(not(target_arch = "wasm32"))]
+    let font_medium_url = lib::utils::api_url("assets/fonts/JetBrainsMono-Medium.woff2");
+
+    #[cfg(target_arch = "wasm32")]
+    let font_semibold_url = asset!("/assets/fonts/JetBrainsMono-SemiBold.woff2");
+    #[cfg(not(target_arch = "wasm32"))]
+    let font_semibold_url = lib::utils::api_url("assets/fonts/JetBrainsMono-SemiBold.woff2");
+
+    #[cfg(target_arch = "wasm32")]
+    let font_bold_url = asset!("/assets/fonts/JetBrainsMono-Bold.woff2");
+    #[cfg(not(target_arch = "wasm32"))]
+    let font_bold_url = lib::utils::api_url("assets/fonts/JetBrainsMono-Bold.woff2");
+    let dock_url = lib::utils::api_url("omni-dock.js");
+    let dockbar_url = lib::utils::api_url("omni-dockbar.js");
+    let dicebear_url = lib::utils::api_url("omni-dicebear.js");
+    let monaco_url = lib::utils::api_url("omni-monaco.js");
+    let marked_url = lib::utils::api_url("omni-marked.js");
+    let sheetjs_url = lib::utils::api_url("omni-sheetjs.js");
+    let docxjs_url = lib::utils::api_url("omni-docxjs.js");
+    let pdfjs_worker_url = lib::utils::api_url("omni-pdfjs.worker.js");
+    let pdfjs_url = lib::utils::api_url("omni-pdfjs.js");
+    let pptx_renderer_url = lib::utils::api_url("omni-pptx-renderer.js");
+    let plyr_url = lib::utils::api_url("omni-plyr.js");
+    let pretext_url = lib::utils::api_url("omni-pretext.js");
+    let inference_url = lib::utils::api_url("omni-inference.js");
+    let inference_register_url = lib::utils::api_url("omni-inference-register.js");
+    let sw_url = lib::utils::api_url("omni-sw.js");
+    let sw_register_url = lib::utils::api_url("omni-sw-register.js");
 
     let thread_signal = use_context_provider(|| Signal::new(threads));
     let chat_signal = use_context_provider(|| Signal::new(chat));
@@ -391,6 +419,10 @@ fn App() -> Element {
     let _ui_signal = use_context_provider(|| Signal::new(ui));
     let background_task_signal = use_context_provider(|| Signal::new(background_tasks));
     let agent_endpoint_signal = use_context_provider(|| Signal::new(agent_endpoints));
+    let _floating_dock_signal =
+        use_context_provider(|| Signal::new(lib::FloatingDockState::default()));
+    let _add_agent_draft_signal =
+        use_context_provider(|| Signal::new(lib::AddAgentDraft::default()));
 
     #[cfg(target_arch = "wasm32")]
     install_iframe_runtime_listener(_ui_signal, agent_endpoint_signal);
@@ -419,18 +451,18 @@ fn App() -> Element {
     });
 
     rsx! {
-        document::Link { rel: "icon", href: FAVICON }
-        document::Link { rel: "stylesheet", href: MAIN_CSS }
-        document::Link { rel: "stylesheet", href: TAILWIND_CSS }
+        document::Link { rel: "icon", href: favicon_url }
+        document::Link { rel: "stylesheet", href: main_css_url }
+        document::Link { rel: "stylesheet", href: tailwind_css_url }
         document::Style {
-            "@font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:400;font-display:swap;src:url('{FONT_REGULAR}') format('woff2')}}
-            @font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:500;font-display:swap;src:url('{FONT_MEDIUM}') format('woff2')}}
-            @font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:600;font-display:swap;src:url('{FONT_SEMIBOLD}') format('woff2')}}
-            @font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:700;font-display:swap;src:url('{FONT_BOLD}') format('woff2')}}"
+            "@font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:400;font-display:swap;src:url('{font_regular_url}') format('woff2')}}
+            @font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:500;font-display:swap;src:url('{font_medium_url}') format('woff2')}}
+            @font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:600;font-display:swap;src:url('{font_semibold_url}') format('woff2')}}
+            @font-face{{font-family:'JetBrains Mono';font-style:normal;font-weight:700;font-display:swap;src:url('{font_bold_url}') format('woff2')}}"
         }
         document::Script { src: dock_url, r#type: "module", defer: true }
+        document::Script { src: dockbar_url, r#type: "module", defer: true }
         document::Script { src: dicebear_url, r#type: "module", defer: true }
-        document::Script { src: popper_url, r#type: "module", defer: true }
         document::Script { src: monaco_url, r#type: "module", defer: true }
         document::Script { src: marked_url, r#type: "module", defer: true }
         document::Script { src: sheetjs_url, r#type: "module", defer: true }
@@ -450,11 +482,137 @@ fn App() -> Element {
 }
 
 #[component]
+fn AgentTooltipOverlay(panel: lib::FloatingPanel, label: String) -> Element {
+    let floating_state = use_context::<Signal<lib::FloatingDockState>>();
+    let (ox, oy) = floating_state.read().dock_origin;
+    let left = panel.x + ox;
+    let top = panel.y + oy;
+    rsx! {
+        div {
+            class: "pointer-events-none fixed z-[200] flex items-center px-2 py-1 rounded-sm border border-border bg-background-elevated text-[10px] text-foreground shadow-xl whitespace-nowrap",
+            style: "left: {left}px; top: {top}px;",
+            "{label}"
+        }
+    }
+}
+
+#[component]
+fn AgentCloseBadgeOverlay(panel: lib::FloatingPanel, agent_id: String) -> Element {
+    let mut floating_dock = use_context::<Signal<lib::FloatingDockState>>();
+    let mut agent_endpoint_state = use_context::<Signal<lib::AgentEndpointState>>();
+    let floating_state = use_context::<Signal<lib::FloatingDockState>>();
+    let (ox, oy) = floating_state.read().dock_origin;
+    let left = panel.x + ox;
+    let top = panel.y + oy;
+    let panel_id = panel.id.clone();
+    rsx! {
+        div {
+            class: "fixed z-[200] flex items-center justify-center",
+            style: "left: {left}px; top: {top}px; width: {panel.width}px; height: {panel.height}px;",
+            button {
+                class: "flex h-5 w-5 items-center justify-center rounded-full border border-status-critical/60 bg-status-critical text-white shadow-lg",
+                onclick: move |_| {
+                    agent_endpoint_state.write().remove(&agent_id);
+                    floating_dock.write().close(&panel_id);
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        let id = agent_id.clone();
+                        spawn(async move {
+                            let _ = crate::lib::sw_api::delete_agent_endpoint(&id).await;
+                        });
+                    }
+                },
+                dioxus_free_icons::Icon { width: 10, height: 10, icon: dioxus_free_icons::icons::ld_icons::LdMinus }
+            }
+        }
+    }
+}
+
+#[component]
+fn FloatingPanelSlot(panel: lib::FloatingPanel) -> Element {
+    let mut floating_dock = use_context::<Signal<lib::FloatingDockState>>();
+    let mut agent_endpoint_state = use_context::<Signal<lib::AgentEndpointState>>();
+    let mut add_agent_draft = use_context::<Signal<lib::AddAgentDraft>>();
+    let panel_id = panel.id.clone();
+
+    match panel.kind {
+        lib::FloatingPanelKind::AgentTooltip { .. }
+        | lib::FloatingPanelKind::AgentCloseBadge { .. } => {
+            rsx! { Fragment {} }
+        }
+        lib::FloatingPanelKind::AddAgentPopover => {
+            let panel_id_close = panel_id.clone();
+            rsx! {
+                div {
+                    slot: "{panel_id}",
+                    class: "space-y-3 p-2",
+                    div { class: "space-y-1",
+                        omni-text { "data-text": "Add Agent", "data-strategy": "none", "data-max-lines": "1", class: "text-xs font-semibold" }
+                        omni-text { "data-text": "Connect a LangGraph endpoint for direct chat routing.", "data-strategy": "none", "data-max-lines": "2", class: "text-[10px] text-muted-foreground" }
+                    }
+                    div { class: "space-y-2",
+                        Input {
+                            value: add_agent_draft.read().name.clone(),
+                            placeholder: "Agent name".to_string(),
+                            oninput: move |evt: Event<FormData>| add_agent_draft.write().name = evt.value(),
+                        }
+                        Input {
+                            value: add_agent_draft.read().url.clone(),
+                            placeholder: "https://agent.example.com/api".to_string(),
+                            oninput: move |evt: Event<FormData>| add_agent_draft.write().url = evt.value(),
+                        }
+                        Input {
+                            value: add_agent_draft.read().token.clone(),
+                            placeholder: "Bearer token".to_string(),
+                            oninput: move |evt: Event<FormData>| add_agent_draft.write().token = evt.value(),
+                        }
+                    }
+                    div { class: "flex justify-end",
+                        Button {
+                            onclick: move |_| {
+                                let draft = add_agent_draft.read();
+                                let name = draft.name.trim().to_string();
+                                let url = draft.url.trim().to_string();
+                                let bearer_token = draft.token.trim().to_string();
+                                drop(draft);
+                                if url.is_empty() || bearer_token.is_empty() {
+                                    return;
+                                }
+                                let endpoint = lib::AgentEndpoint {
+                                    id: lib::agent_config_hash(&url, &bearer_token),
+                                    name: if name.is_empty() { lib::derive_agent_name(&url) } else { name },
+                                    url,
+                                    bearer_token,
+                                    removable: true,
+                                };
+                                agent_endpoint_state.write().upsert(endpoint.clone());
+                                *add_agent_draft.write() = lib::AddAgentDraft::default();
+                                floating_dock.write().close(&panel_id_close);
+                                #[cfg(target_arch = "wasm32")]
+                                spawn(async move {
+                                    let _ = crate::lib::sw_api::set_agent_endpoint(&endpoint).await;
+                                });
+                            },
+                            omni-text { "data-text": "Add", "data-strategy": "none", "data-max-lines": "1" }
+                        }
+                    }
+                }
+            }
+        }
+        lib::FloatingPanelKind::ModelPicker { .. }
+        | lib::FloatingPanelKind::WorkspacePicker { .. } => rsx! {
+            div { slot: "{panel_id}" }
+        },
+    }
+}
+
+#[component]
 pub fn AppLayout() -> Element {
     let thread_state = use_context::<Signal<ThreadState>>();
     let mut ui_state = use_context::<Signal<UiState>>();
     let mut workspace_state = use_context::<Signal<WorkspaceState>>();
     let model_state = use_context::<Signal<ModelState>>();
+    let mut floating_dock = use_context::<Signal<lib::FloatingDockState>>();
 
     let thread_id = thread_state
         .read()
@@ -465,7 +623,8 @@ pub fn AppLayout() -> Element {
 
     let open_tabs = workspace_state.read().open_tabs_for(&thread_id);
     let mut panels = vec![
-        json!({"id":"sidebar","slot":"sidebar","title":"Threads","position":{"direction":"left"}}),
+        json!({"id":"agent-rail","slot":"agent-rail","title":"Agents","position":{"direction":"left"},"hideHeader":true,"fixedWidth":48}),
+        json!({"id":"sidebar","slot":"sidebar","title":"Threads","position":{"referencePanel":"agent-rail","direction":"right"}}),
         json!({"id":"chat","slot":"chat","title":"Chat","position":{"referencePanel":"sidebar","direction":"right"}}),
         json!({"id":"tasks","slot":"tasks","title":"Tasks","position":{"referencePanel":"chat","direction":"right"}}),
         json!({"id":"files","slot":"files","title":"Files","position":{"referencePanel":"tasks","direction":"below"}}),
@@ -484,6 +643,23 @@ pub fn AppLayout() -> Element {
     }
     let panel_config = serde_json::to_string(&panels).unwrap_or_default();
 
+    let floating_state = floating_dock.read();
+    let mut floating_panels: Vec<serde_json::Value> = Vec::new();
+    for panel in &floating_state.panels {
+        floating_panels.push(json!({
+            "id": panel.id,
+            "slot": panel.id,
+            "x": panel.x,
+            "y": panel.y,
+            "width": panel.width,
+            "height": panel.height,
+        }));
+    }
+    let floating_config = serde_json::to_string(&floating_panels).unwrap_or_default();
+
+    let active_panels: Vec<lib::FloatingPanel> = floating_state.panels.clone();
+    drop(floating_state);
+
     let theme = if ui_state.read().theme == Theme::Light {
         "light"
     } else {
@@ -492,25 +668,34 @@ pub fn AppLayout() -> Element {
 
     rsx! {
         div {
-            class: "h-screen w-screen overflow-hidden bg-background text-foreground flex",
+            class: "h-screen w-screen overflow-hidden bg-background text-foreground",
             "data-theme": theme,
-            AgentRail {}
             omni-dock {
-                class: "min-w-0 flex-1 h-screen",
+                class: "w-full h-screen",
                 "data-panels": panel_config,
                 "data-active-panel": active_panel.clone(),
-                "data-proportions": "20,60,20",
+                "data-proportions": "48px,20,60,20",
+                "data-floating-panels": floating_config,
+                onmounted: move |evt| async move {
+                    if let Ok(cr) = evt.get_client_rect().await {
+                        floating_dock.write().dock_origin = (cr.min_x(), cr.min_y());
+                    }
+                },
                 input {
                     r#type: "hidden",
                     "data-dock-relay": "true",
                     oninput: move |evt: Event<FormData>| {
                         let panel_id = evt.value();
-                        if !panel_id.is_empty() {
+                        if panel_id.starts_with("floating:") {
+                            let id = &panel_id["floating:".len()..];
+                            floating_dock.write().close(id);
+                        } else if !panel_id.is_empty() {
                             let tid = thread_state.read().active_thread_id.clone().unwrap_or_default();
                             workspace_state.write().open_tabs.entry(tid).or_default().retain(|x| x != &panel_id);
                         }
                     },
                 },
+                div { slot: "agent-rail", class: "h-full w-full overflow-hidden", AgentRail {} }
                 div { slot: "sidebar", class: "h-full w-full overflow-hidden", ThreadSidebar {} }
                 div { slot: "chat", class: "h-full w-full overflow-hidden",
                     if thread_state.read().show_kanban {
@@ -522,6 +707,12 @@ pub fn AppLayout() -> Element {
                 div { slot: "tasks", class: "h-full w-full overflow-auto", TasksSection {} }
                 div { slot: "files", class: "h-full w-full overflow-auto", FilesSection {} }
                 div { slot: "bg-tasks", class: "h-full w-full overflow-auto", BackgroundTasksSection {} }
+                for panel in active_panels.iter() {
+                    FloatingPanelSlot {
+                        key: "{panel.id}",
+                        panel: panel.clone(),
+                    }
+                }
                 for path in open_tabs.iter().filter(|p| p.as_str() != "chat") {
                     {
                         let gen = workspace_state.read().tab_generation.get(path).copied().unwrap_or(0);
@@ -534,6 +725,26 @@ pub fn AppLayout() -> Element {
                             }
                         }
                     }
+                }
+            }
+
+            for panel in active_panels.iter() {
+                match &panel.kind {
+                    lib::FloatingPanelKind::AgentTooltip { label } => rsx! {
+                        AgentTooltipOverlay {
+                            key: "{panel.id}",
+                            panel: panel.clone(),
+                            label: label.clone(),
+                        }
+                    },
+                    lib::FloatingPanelKind::AgentCloseBadge { agent_id } => rsx! {
+                        AgentCloseBadgeOverlay {
+                            key: "{panel.id}",
+                            panel: panel.clone(),
+                            agent_id: agent_id.clone(),
+                        }
+                    },
+                    _ => rsx! { Fragment {} },
                 }
             }
 
