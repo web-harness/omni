@@ -5,7 +5,7 @@ import {
   mockToolCalls,
   mockToolResults,
   mockWorkspaceFiles,
-  scaffoldFiles,
+  ensureWorkspaceScaffold as wasmEnsureWorkspaceScaffold,
   seedAgentEndpoints as wasmSeedAgentEndpoints,
   seedThreads as wasmSeedThreads,
 } from "./deepagents.js";
@@ -14,12 +14,11 @@ import type {
   MockThreadIds,
   MockToolCall,
   MockToolResult,
-  ScaffoldFile,
   SeedAgentEndpoint,
   SeedThread,
 } from "./deepagents.js";
 
-export type { SeedThread, SeedAgentEndpoint, MockFileEntry, MockToolCall, MockToolResult, ScaffoldFile };
+export type { SeedThread, SeedAgentEndpoint, MockFileEntry, MockToolCall, MockToolResult };
 
 let cachedThreadIds: MockThreadIds | null = null;
 
@@ -48,8 +47,8 @@ export const MOCK_THREAD_IDS: MockThreadIds = {
   idea: "55555555-5555-4555-8555-555555555555",
 };
 
-export async function scaffoldFilesFromStore(): Promise<ScaffoldFile[]> {
-  return scaffoldFiles();
+export async function ensureWorkspaceScaffold(): Promise<void> {
+  return wasmEnsureWorkspaceScaffold();
 }
 
 export async function getMockWorkspaceFiles(): Promise<Record<string, MockFileEntry[]>> {

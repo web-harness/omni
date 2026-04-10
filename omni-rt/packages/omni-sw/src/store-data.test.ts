@@ -33,7 +33,7 @@ vi.mock("./store-mocks.js", () => ({
   getMockToolCalls: vi.fn(async () => []),
   getMockToolResults: vi.fn(async () => []),
   getMockWorkspaceFiles: vi.fn(async () => ({})),
-  scaffoldFilesFromStore: vi.fn(async () => []),
+  ensureWorkspaceScaffold: vi.fn(async () => {}),
   seedAgentEndpoints: vi.fn(async () => []),
   seedThreads: vi.fn(async () => []),
 }));

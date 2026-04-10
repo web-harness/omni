@@ -258,6 +258,8 @@ pub fn deepagents_mock_workspace_files() -> Result<JsValue, JsValue> {
 }
 
 #[wasm_bindgen]
-pub fn deepagents_scaffold_files() -> Result<JsValue, JsValue> {
-    serialize(&mock_data::scaffold_files())
+pub async fn deepagents_ensure_workspace_scaffold() -> Result<(), JsValue> {
+    workspace_seed::ensure_workspace_scaffold()
+        .await
+        .map_err(to_js_error)
 }

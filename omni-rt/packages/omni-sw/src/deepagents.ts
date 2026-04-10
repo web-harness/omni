@@ -5,6 +5,7 @@ import initDeepagentsModule, {
   deepagents_delete_run,
   deepagents_delete_thread,
   deepagents_delete_thread_messages,
+  deepagents_ensure_workspace_scaffold,
   deepagents_get_api_key,
   deepagents_get_default_model,
   deepagents_get_stored_default_model,
@@ -23,7 +24,6 @@ import initDeepagentsModule, {
   deepagents_save_thread,
   deepagents_save_message,
   deepagents_save_run,
-  deepagents_scaffold_files,
   deepagents_search_runs,
   deepagents_seed_agent_endpoints,
   deepagents_seed_threads,
@@ -193,7 +193,6 @@ export type SeedAgentEndpoint = {
 export type MockFileEntry = { path: string; is_dir: boolean; size: number | null };
 export type MockToolCall = { id: string; name: string; args: unknown };
 export type MockToolResult = { tool_call_id: string; content: string; is_error: boolean };
-export type ScaffoldFile = { path: string; content: string };
 
 export async function mockThreadIds(): Promise<MockThreadIds> {
   await ensureReady();
@@ -235,7 +234,7 @@ export async function mockWorkspaceFiles(): Promise<Record<string, MockFileEntry
   return deepagents_mock_workspace_files() as Record<string, MockFileEntry[]>;
 }
 
-export async function scaffoldFiles(): Promise<ScaffoldFile[]> {
+export async function ensureWorkspaceScaffold(): Promise<void> {
   await ensureReady();
-  return deepagents_scaffold_files() as ScaffoldFile[];
+  await deepagents_ensure_workspace_scaffold();
 }

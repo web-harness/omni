@@ -1288,7 +1288,7 @@ pub fn WorkspacePicker() -> Element {
                                         .workspace_path
                                         .insert(tid_for_click.clone(), workspace_path.clone());
                                     spawn(async move {
-                                        if let Ok(files) = crate::lib::sw_api::list_workspace_files(&workspace_path).await {
+                                        if let Ok(files) = crate::lib::list_workspace_files(&workspace_path).await {
                                             ws_state.write().workspace_files.insert(workspace_path, files);
                                         }
                                     });

@@ -78,7 +78,6 @@ pub struct BootstrapPayload {
     #[serde(default)]
     pub background_tasks: HashMap<String, Vec<BackgroundTask>>,
     pub workspace_path: HashMap<String, String>,
-    pub workspace_files: HashMap<String, Vec<FileInfo>>,
     pub providers: Vec<Provider>,
     pub models: Vec<ModelConfig>,
     pub default_model: String,
@@ -540,28 +539,6 @@ where
     F: FnMut(BrowserInferenceStatus) + 'static,
 {
     Err(unavailable())
-}
-
-pub async fn list_workspace_files(workspace: &str) -> Result<Vec<super::FileInfo>, std::io::Error> {
-    let encoded = urlencoding::encode(workspace).into_owned();
-    let response = send_json_request(
-        Method::GET,
-        api_url(&format!("x/files?workspace={encoded}")),
-        Option::<&()>::None,
-    )
-    .await?;
-
-    if !response.status().is_success() {
-        return Err(std::io::Error::other(format!(
-            "list files failed: {}",
-            response.status()
-        )));
-    }
-
-    response
-        .json::<Vec<super::FileInfo>>()
-        .await
-        .map_err(err_msg)
 }
 
 #[cfg(not(target_arch = "wasm32"))]

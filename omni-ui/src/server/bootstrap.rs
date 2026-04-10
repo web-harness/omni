@@ -1,6 +1,6 @@
 use crate::lib::sw_api::BootstrapPayload;
 use crate::lib::{
-    agent_config_hash, AgentEndpoint, BackgroundTask, BackgroundTaskStatus, FileInfo, ModelConfig,
+    agent_config_hash, AgentEndpoint, BackgroundTask, BackgroundTaskStatus, ModelConfig,
     Provider, ProviderId, ThreadStatus, Todo, TodoStatus, ToolCall, ToolResult, UiMessage,
     UiThread,
 };
@@ -31,7 +31,6 @@ pub async fn build_bootstrap() -> Result<BootstrapPayload, std::io::Error> {
     let mut tool_results: HashMap<String, Vec<ToolResult>> = HashMap::new();
     let mut background_tasks = HashMap::new();
     let mut workspace_path = HashMap::new();
-    let mut workspace_files = HashMap::new();
 
     for thread in threads {
         let thread_id = thread.thread_id.to_string();
@@ -61,9 +60,6 @@ pub async fn build_bootstrap() -> Result<BootstrapPayload, std::io::Error> {
         });
 
         workspace_path.insert(thread_id.clone(), workspace.clone());
-        if !workspace_files.contains_key(&workspace) {
-            workspace_files.insert(workspace.clone(), list_workspace_files(&workspace).await?);
-        }
 
         let persisted_messages = message_store::list_messages(&thread_id).await?;
         let thread_messages = if persisted_messages.is_empty() {
@@ -185,68 +181,12 @@ pub async fn build_bootstrap() -> Result<BootstrapPayload, std::io::Error> {
         tool_results,
         background_tasks,
         workspace_path,
-        workspace_files,
         providers,
         models,
         default_model: config_store::get_default_model().await?,
         dicebear_style: read_dicebear_style().await?,
         agent_endpoints: seeded_agent_endpoints(read_agent_endpoints().await?),
     })
-}
-
-pub async fn list_workspace_files(root: &str) -> Result<Vec<FileInfo>, std::io::Error> {
-    let root = if root.is_empty() {
-        "/home/workspace"
-    } else {
-        root
-    };
-    if !omni_rt::zenfs::exists(root).await? {
-        return Ok(Vec::new());
-    }
-
-    let mut files = Vec::new();
-    walk_workspace(root, root, 0, &mut files).await?;
-    Ok(files)
-}
-
-async fn walk_workspace(
-    root: &str,
-    current: &str,
-    depth: usize,
-    files: &mut Vec<FileInfo>,
-) -> Result<(), std::io::Error> {
-    if depth > 2 {
-        return Ok(());
-    }
-
-    for entry in omni_rt::zenfs::read_dir(current).await? {
-        let path = if current == "/" {
-            format!("/{}", entry.name)
-        } else {
-            format!("{}/{}", current.trim_end_matches('/'), entry.name)
-        };
-        if entry.is_dir {
-            files.push(FileInfo {
-                path: path.clone(),
-                is_dir: true,
-                size: None,
-            });
-            Box::pin(walk_workspace(root, &path, depth + 1, files)).await?;
-        } else if entry.is_file {
-            let stat = omni_rt::zenfs::stat(&path).await.ok();
-            let seeded_size = omni_rt::deepagents::workspace_seed::seeded_size(&path);
-            files.push(FileInfo {
-                path,
-                is_dir: false,
-                size: seeded_size.or_else(|| stat.map(|item| item.size)),
-            });
-        }
-    }
-
-    if current == root {
-        files.sort_by(|left, right| left.path.cmp(&right.path));
-    }
-    Ok(())
 }
 
 async fn read_agent_endpoints() -> Result<Vec<AgentEndpoint>, std::io::Error> {

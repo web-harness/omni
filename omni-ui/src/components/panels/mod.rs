@@ -91,7 +91,7 @@ pub fn FilesSection() -> Element {
                 let workspace_path_for_task = workspace_path.clone();
                 spawn(async move {
                     if let Ok(fetched) =
-                        crate::lib::sw_api::list_workspace_files(&workspace_path_for_task).await
+                        crate::lib::list_workspace_files(&workspace_path_for_task).await
                     {
                         ws_state
                             .write()
@@ -112,7 +112,7 @@ pub fn FilesSection() -> Element {
                     onclick: move |_| {
                         let workspace_path = workspace.clone();
                         spawn(async move {
-                            if let Ok(files) = crate::lib::sw_api::list_workspace_files(&workspace_path).await {
+                            if let Ok(files) = crate::lib::list_workspace_files(&workspace_path).await {
                                 workspace_state_for_sync
                                     .write()
                                     .workspace_files

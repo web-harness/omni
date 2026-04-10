@@ -452,12 +452,6 @@ pub fn mock_workspace_files() -> BTreeMap<String, Vec<MockFileEntry>> {
 
         let relative = &entry.path[root.len() + 1..];
 
-        if root == "/home/user/projects/test"
-            && (relative.starts_with("fixtures/") || relative == "README.md")
-        {
-            continue;
-        }
-
         let list = grouped.entry(root.clone()).or_default();
         let mut seen: BTreeSet<String> = list.iter().map(|e| e.path.clone()).collect();
 
@@ -490,34 +484,6 @@ pub fn mock_workspace_files() -> BTreeMap<String, Vec<MockFileEntry>> {
     }
 
     grouped
-}
-
-// --- Scaffold files (matches web scaffoldFilesFromStore) ---
-
-#[derive(Serialize)]
-pub struct ScaffoldFile {
-    pub path: String,
-    pub content: String,
-}
-
-pub fn scaffold_files() -> Vec<ScaffoldFile> {
-    workspace_seed::workspace_seed_entries()
-        .into_iter()
-        .map(|entry| {
-            let content = if let Some(text) = entry.text {
-                text.to_string()
-            } else {
-                let fallback = entry
-                    .fixture
-                    .unwrap_or_else(|| entry.path.rsplit('/').next().unwrap_or("sample.txt"));
-                format!("seed:{fallback}\n")
-            };
-            ScaffoldFile {
-                path: entry.path,
-                content,
-            }
-        })
-        .collect()
 }
 
 #[cfg(test)]
@@ -600,12 +566,5 @@ mod tests {
         let files = mock_workspace_files();
         assert!(!files.is_empty());
         assert!(files.contains_key("/home/workspace"));
-    }
-
-    #[test]
-    fn scaffold_files_has_entries() {
-        let files = scaffold_files();
-        assert!(!files.is_empty());
-        assert!(files.iter().any(|f| f.path.ends_with("README.md")));
     }
 }

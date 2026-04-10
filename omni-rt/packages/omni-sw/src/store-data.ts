@@ -23,7 +23,7 @@ import {
 } from "./deepagents.js";
 import {
   MOCK_THREAD_IDS,
-  scaffoldFilesFromStore,
+  ensureWorkspaceScaffold as ensureWorkspaceScaffoldWasm,
   getMockThreadFiles,
   getMockToolCalls,
   getMockToolResults,
@@ -52,7 +52,6 @@ export type BootstrapPayload = {
   tool_results: Record<string, Array<{ tool_call_id: string; content: string; is_error: boolean }>>;
   background_tasks: Record<string, Array<{ id: string; name: string; description: string; status: string }>>;
   workspace_path: Record<string, string>;
-  workspace_files: Record<string, Array<{ path: string; is_dir: boolean; size: number | null }>>;
   providers: Array<{ id: ProviderId; name: string; has_api_key: boolean }>;
   models: Array<{ id: string; name: string; provider: ProviderId }>;
   default_model: string;
@@ -322,52 +321,7 @@ async function seedMockAgentEndpoints(): Promise<void> {
 }
 
 async function ensureWorkspaceScaffold(): Promise<void> {
-  const writeIfMissing = async (path: string, content: string): Promise<void> => {
-    if (await exists(path)) return;
-    await zenMkdir(path.slice(0, path.lastIndexOf("/")), { recursive: true });
-    await zenWriteFile(path, encoder.encode(content));
-  };
-
-  for (const file of await scaffoldFilesFromStore()) {
-    await writeIfMissing(file.path, file.content);
-  }
-}
-
-export async function listWorkspaceFiles(
-  root: string,
-): Promise<Array<{ path: string; is_dir: boolean; size: number | null }>> {
-  const byWorkspace = await getMockWorkspaceFiles();
-  if (root in byWorkspace) {
-    return byWorkspace[root] ?? [];
-  }
-
-  await ensureZenFs();
-  await ensureWorkspaceScaffold();
-  const cleanRoot = root?.startsWith("/") ? root : "/home/workspace";
-  if (!(await exists(cleanRoot))) {
-    return [];
-  }
-
-  const out: Array<{ path: string; is_dir: boolean; size: number | null }> = [];
-
-  const walk = async (dir: string, depth: number): Promise<void> => {
-    if (depth > 2) return;
-    const entries = await zenReadDir(dir);
-    for (const raw of entries) {
-      const entry = raw as DirEntry;
-      const full = `${dir}/${entry.name}`.replace(/\/+/g, "/");
-      if (entry.is_dir) {
-        out.push({ path: full, is_dir: true, size: null });
-        await walk(full, depth + 1);
-      } else if (entry.is_file) {
-        const bytes = await zenReadFile(full);
-        out.push({ path: full, is_dir: false, size: bytes.length });
-      }
-    }
-  };
-
-  await walk(cleanRoot, 0);
-  return out;
+  await ensureWorkspaceScaffoldWasm();
 }
 
 export async function getDefaultModel(): Promise<string> {
@@ -409,7 +363,6 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
   const tool_results: BootstrapPayload["tool_results"] = {};
   const background_tasks: BootstrapPayload["background_tasks"] = {};
   const workspace_path: BootstrapPayload["workspace_path"] = {};
-  const workspace_files = await getMockWorkspaceFiles();
   const railStyleItem = (await readJson(`${AGENT_RAIL_DIR}/dicebear-style.json`)) as Record<string, unknown> | null;
   const storedDicebearStyle = String(
     (railStyleItem?.value as Record<string, unknown> | undefined)?.style ?? railStyleItem?.style ?? "bottts-neutral",
@@ -482,7 +435,6 @@ export async function buildBootstrap(): Promise<BootstrapPayload> {
     tool_results,
     background_tasks,
     workspace_path,
-    workspace_files,
     providers,
     models,
     default_model: defaultModel,

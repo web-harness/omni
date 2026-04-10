@@ -1,4 +1,3 @@
-use crate::lib::FileInfo;
 use crate::server::bootstrap;
 use axum::extract::{Path, Query};
 use axum::http::StatusCode;
@@ -22,7 +21,6 @@ pub fn router() -> Router {
     Router::new()
         .route("/x/bootstrap", get(get_bootstrap))
         .route("/x/providers", get(get_providers))
-        .route("/x/files", get(get_files))
         .route("/agents/search", post(search_agents))
         .route("/agents/{id}", get(get_agent))
         .route("/agents/{id}/schemas", get(get_agent_schema))
@@ -54,11 +52,6 @@ impl IntoResponse for ApiError {
 }
 
 type ApiResult<T> = Result<Json<T>, ApiError>;
-
-#[derive(Deserialize)]
-struct FilesQuery {
-    workspace: Option<String>,
-}
 
 #[derive(Deserialize)]
 struct ThreadSearchBody {
@@ -151,13 +144,6 @@ async fn get_bootstrap() -> ApiResult<crate::lib::sw_api::BootstrapPayload> {
 async fn get_providers() -> ApiResult<Vec<crate::lib::Provider>> {
     let payload = bootstrap::build_bootstrap().await.map_err(io_error)?;
     Ok(Json(payload.providers))
-}
-
-async fn get_files(Query(query): Query<FilesQuery>) -> ApiResult<Vec<FileInfo>> {
-    bootstrap::list_workspace_files(query.workspace.as_deref().unwrap_or("/home/workspace"))
-        .await
-        .map(Json)
-        .map_err(io_error)
 }
 
 async fn search_agents(Json(body): Json<AgentSearchBody>) -> ApiResult<Vec<Agent>> {

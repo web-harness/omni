@@ -7,7 +7,6 @@ import {
   deleteThread,
   getApiKey,
   getStoredDefaultModel,
-  listWorkspaceFiles,
   readProvidersWithKeys,
   setApiKey,
   setDefaultModel,
@@ -157,7 +156,6 @@ export type StoreRoute =
   | "store-namespaces"
   | "x-bootstrap"
   | "x-providers"
-  | "x-files"
   | null;
 
 type ProtocolMessage = {
@@ -904,7 +902,6 @@ export function matchStoreRoute(request: Request): StoreRoute {
 
   if (parts[0] === "x" && parts[1] === "bootstrap" && method === "GET") return "x-bootstrap";
   if (parts[0] === "x" && parts[1] === "providers" && method === "GET") return "x-providers";
-  if (parts[0] === "x" && parts[1] === "files" && method === "GET") return "x-files";
 
   if (parts[0] === "agents" && parts[1] === "search" && method === "POST") return "agents-search";
   if (parts[0] === "agents" && parts.length === 2 && method === "GET") return "agents-get";
@@ -939,11 +936,6 @@ export async function handleStoreRoute(request: Request, route: Exclude<StoreRou
 
     if (route === "x-providers") {
       return Response.json(await readProvidersWithKeys());
-    }
-
-    if (route === "x-files") {
-      const workspace = url.searchParams.get("workspace") ?? "/home/workspace";
-      return Response.json(await listWorkspaceFiles(workspace));
     }
 
     if (route === "agents-search") {
