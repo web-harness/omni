@@ -418,8 +418,10 @@ fn App() -> Element {
     let _ui_signal = use_context_provider(|| Signal::new(ui));
     let background_task_signal = use_context_provider(|| Signal::new(background_tasks));
     let agent_endpoint_signal = use_context_provider(|| Signal::new(agent_endpoints));
-    let _floating_dock_signal = use_context_provider(|| Signal::new(lib::FloatingDockState::default()));
-    let _add_agent_draft_signal = use_context_provider(|| Signal::new(lib::AddAgentDraft::default()));
+    let _floating_dock_signal =
+        use_context_provider(|| Signal::new(lib::FloatingDockState::default()));
+    let _add_agent_draft_signal =
+        use_context_provider(|| Signal::new(lib::AddAgentDraft::default()));
 
     #[cfg(target_arch = "wasm32")]
     install_iframe_runtime_listener(_ui_signal, agent_endpoint_signal);
@@ -478,6 +480,53 @@ fn App() -> Element {
 }
 
 #[component]
+fn AgentTooltipOverlay(panel: lib::FloatingPanel, label: String) -> Element {
+    let floating_state = use_context::<Signal<lib::FloatingDockState>>();
+    let (ox, oy) = floating_state.read().dock_origin;
+    let left = panel.x + ox;
+    let top = panel.y + oy;
+    rsx! {
+        div {
+            class: "pointer-events-none fixed z-[200] flex items-center px-2 py-1 rounded-sm border border-border bg-background-elevated text-[10px] text-foreground shadow-xl whitespace-nowrap",
+            style: "left: {left}px; top: {top}px;",
+            "{label}"
+        }
+    }
+}
+
+#[component]
+fn AgentCloseBadgeOverlay(panel: lib::FloatingPanel, agent_id: String) -> Element {
+    let mut floating_dock = use_context::<Signal<lib::FloatingDockState>>();
+    let mut agent_endpoint_state = use_context::<Signal<lib::AgentEndpointState>>();
+    let floating_state = use_context::<Signal<lib::FloatingDockState>>();
+    let (ox, oy) = floating_state.read().dock_origin;
+    let left = panel.x + ox;
+    let top = panel.y + oy;
+    let panel_id = panel.id.clone();
+    rsx! {
+        div {
+            class: "fixed z-[200] flex items-center justify-center",
+            style: "left: {left}px; top: {top}px; width: {panel.width}px; height: {panel.height}px;",
+            button {
+                class: "flex h-5 w-5 items-center justify-center rounded-full border border-status-critical/60 bg-status-critical text-white shadow-lg",
+                onclick: move |_| {
+                    agent_endpoint_state.write().remove(&agent_id);
+                    floating_dock.write().close(&panel_id);
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        let id = agent_id.clone();
+                        spawn(async move {
+                            let _ = crate::lib::sw_api::delete_agent_endpoint(&id).await;
+                        });
+                    }
+                },
+                dioxus_free_icons::Icon { width: 10, height: 10, icon: dioxus_free_icons::icons::ld_icons::LdMinus }
+            }
+        }
+    }
+}
+
+#[component]
 fn FloatingPanelSlot(panel: lib::FloatingPanel) -> Element {
     let mut floating_dock = use_context::<Signal<lib::FloatingDockState>>();
     let mut agent_endpoint_state = use_context::<Signal<lib::AgentEndpointState>>();
@@ -485,93 +534,71 @@ fn FloatingPanelSlot(panel: lib::FloatingPanel) -> Element {
     let panel_id = panel.id.clone();
 
     match panel.kind {
-        lib::FloatingPanelKind::AgentTooltip { label } => rsx! {
-            div {
-                slot: "{panel_id}",
-                class: "flex items-center px-2 py-1 rounded-sm border border-border bg-background-elevated text-[10px] text-foreground shadow-xl whitespace-nowrap",
-                "{label}"
-            }
-        },
-        lib::FloatingPanelKind::AgentCloseBadge { agent_id } => rsx! {
-            div {
-                slot: "{panel_id}",
-                class: "flex items-center justify-center",
-                button {
-                    class: "flex h-5 w-5 items-center justify-center rounded-full border border-status-critical/60 bg-status-critical text-white shadow-lg",
-                    onclick: move |_| {
-                        agent_endpoint_state.write().remove(&agent_id);
-                        floating_dock.write().close(&panel_id);
-                        #[cfg(target_arch = "wasm32")]
-                        {
-                            let id = agent_id.clone();
-                            spawn(async move {
-                                let _ = crate::lib::sw_api::delete_agent_endpoint(&id).await;
-                            });
-                        }
-                    },
-                    dioxus_free_icons::Icon { width: 10, height: 10, icon: dioxus_free_icons::icons::ld_icons::LdMinus }
-                }
-            }
-        },
+        lib::FloatingPanelKind::AgentTooltip { .. }
+        | lib::FloatingPanelKind::AgentCloseBadge { .. } => {
+            rsx! { Fragment {} }
+        }
         lib::FloatingPanelKind::AddAgentPopover => {
             let panel_id_close = panel_id.clone();
             rsx! {
-            div {
-                slot: "{panel_id}",
-                class: "space-y-3 p-2",
-                div { class: "space-y-1",
-                    omni-text { "data-text": "Add Agent", "data-strategy": "none", "data-max-lines": "1", class: "text-xs font-semibold" }
-                    omni-text { "data-text": "Connect a LangGraph endpoint for direct chat routing.", "data-strategy": "none", "data-max-lines": "2", class: "text-[10px] text-muted-foreground" }
-                }
-                div { class: "space-y-2",
-                    Input {
-                        value: add_agent_draft.read().name.clone(),
-                        placeholder: "Agent name".to_string(),
-                        oninput: move |evt: Event<FormData>| add_agent_draft.write().name = evt.value(),
+                div {
+                    slot: "{panel_id}",
+                    class: "space-y-3 p-2",
+                    div { class: "space-y-1",
+                        omni-text { "data-text": "Add Agent", "data-strategy": "none", "data-max-lines": "1", class: "text-xs font-semibold" }
+                        omni-text { "data-text": "Connect a LangGraph endpoint for direct chat routing.", "data-strategy": "none", "data-max-lines": "2", class: "text-[10px] text-muted-foreground" }
                     }
-                    Input {
-                        value: add_agent_draft.read().url.clone(),
-                        placeholder: "https://agent.example.com/api".to_string(),
-                        oninput: move |evt: Event<FormData>| add_agent_draft.write().url = evt.value(),
+                    div { class: "space-y-2",
+                        Input {
+                            value: add_agent_draft.read().name.clone(),
+                            placeholder: "Agent name".to_string(),
+                            oninput: move |evt: Event<FormData>| add_agent_draft.write().name = evt.value(),
+                        }
+                        Input {
+                            value: add_agent_draft.read().url.clone(),
+                            placeholder: "https://agent.example.com/api".to_string(),
+                            oninput: move |evt: Event<FormData>| add_agent_draft.write().url = evt.value(),
+                        }
+                        Input {
+                            value: add_agent_draft.read().token.clone(),
+                            placeholder: "Bearer token".to_string(),
+                            oninput: move |evt: Event<FormData>| add_agent_draft.write().token = evt.value(),
+                        }
                     }
-                    Input {
-                        value: add_agent_draft.read().token.clone(),
-                        placeholder: "Bearer token".to_string(),
-                        oninput: move |evt: Event<FormData>| add_agent_draft.write().token = evt.value(),
-                    }
-                }
-                div { class: "flex justify-end",
-                    Button {
-                        onclick: move |_| {
-                            let draft = add_agent_draft.read();
-                            let name = draft.name.trim().to_string();
-                            let url = draft.url.trim().to_string();
-                            let bearer_token = draft.token.trim().to_string();
-                            drop(draft);
-                            if url.is_empty() || bearer_token.is_empty() {
-                                return;
-                            }
-                            let endpoint = lib::AgentEndpoint {
-                                id: lib::agent_config_hash(&url, &bearer_token),
-                                name: if name.is_empty() { lib::derive_agent_name(&url) } else { name },
-                                url,
-                                bearer_token,
-                                removable: true,
-                            };
-                            agent_endpoint_state.write().upsert(endpoint.clone());
-                            *add_agent_draft.write() = lib::AddAgentDraft::default();
-                            floating_dock.write().close(&panel_id_close);
-                            #[cfg(target_arch = "wasm32")]
-                            spawn(async move {
-                                let _ = crate::lib::sw_api::set_agent_endpoint(&endpoint).await;
-                            });
-                        },
-                        omni-text { "data-text": "Add", "data-strategy": "none", "data-max-lines": "1" }
+                    div { class: "flex justify-end",
+                        Button {
+                            onclick: move |_| {
+                                let draft = add_agent_draft.read();
+                                let name = draft.name.trim().to_string();
+                                let url = draft.url.trim().to_string();
+                                let bearer_token = draft.token.trim().to_string();
+                                drop(draft);
+                                if url.is_empty() || bearer_token.is_empty() {
+                                    return;
+                                }
+                                let endpoint = lib::AgentEndpoint {
+                                    id: lib::agent_config_hash(&url, &bearer_token),
+                                    name: if name.is_empty() { lib::derive_agent_name(&url) } else { name },
+                                    url,
+                                    bearer_token,
+                                    removable: true,
+                                };
+                                agent_endpoint_state.write().upsert(endpoint.clone());
+                                *add_agent_draft.write() = lib::AddAgentDraft::default();
+                                floating_dock.write().close(&panel_id_close);
+                                #[cfg(target_arch = "wasm32")]
+                                spawn(async move {
+                                    let _ = crate::lib::sw_api::set_agent_endpoint(&endpoint).await;
+                                });
+                            },
+                            omni-text { "data-text": "Add", "data-strategy": "none", "data-max-lines": "1" }
+                        }
                     }
                 }
             }
-        }},
-        lib::FloatingPanelKind::ModelPicker { .. } | lib::FloatingPanelKind::WorkspacePicker { .. } => rsx! {
+        }
+        lib::FloatingPanelKind::ModelPicker { .. }
+        | lib::FloatingPanelKind::WorkspacePicker { .. } => rsx! {
             div { slot: "{panel_id}" }
         },
     }
@@ -696,6 +723,26 @@ pub fn AppLayout() -> Element {
                             }
                         }
                     }
+                }
+            }
+
+            for panel in active_panels.iter() {
+                match &panel.kind {
+                    lib::FloatingPanelKind::AgentTooltip { label } => rsx! {
+                        AgentTooltipOverlay {
+                            key: "{panel.id}",
+                            panel: panel.clone(),
+                            label: label.clone(),
+                        }
+                    },
+                    lib::FloatingPanelKind::AgentCloseBadge { agent_id } => rsx! {
+                        AgentCloseBadgeOverlay {
+                            key: "{panel.id}",
+                            panel: panel.clone(),
+                            agent_id: agent_id.clone(),
+                        }
+                    },
+                    _ => rsx! { Fragment {} },
                 }
             }
 

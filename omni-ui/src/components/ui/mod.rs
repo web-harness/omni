@@ -171,25 +171,16 @@ pub fn Dialog(
 #[component]
 pub fn Popover(
     #[props(default = false)] open: bool,
+    anchor_x: f64,
+    anchor_y: f64,
     on_close: EventHandler<()>,
     trigger: Element,
     children: Element,
 ) -> Element {
-    let mut trigger_rect = use_signal(|| (0.0f64, 0.0f64, 0.0f64, 0.0f64));
-
-    let content_x = trigger_rect().0;
-    let content_y = trigger_rect().3 + 8.0;
+    let bottom_offset = anchor_y - 8.0;
 
     rsx! {
-        div {
-            style: "display: contents;",
-            onmounted: move |e| async move {
-                if let Ok(rect) = e.get_client_rect().await {
-                    trigger_rect.set((rect.origin.x, rect.origin.y, rect.origin.x + rect.size.width, rect.origin.y + rect.size.height));
-                }
-            },
-            {trigger}
-        }
+        {trigger}
         if open {
             div {
                 class: "fixed inset-0 z-[100]",
@@ -200,7 +191,7 @@ pub fn Popover(
             }
             div {
                 class: "fixed z-[110] w-[360px] rounded-sm border border-border bg-background-elevated p-2 shadow-xl",
-                style: "left: {content_x}px; top: {content_y}px;",
+                style: "left: {anchor_x}px; bottom: calc(100vh - {bottom_offset}px);",
                 onclick: move |e: MouseEvent| e.stop_propagation(),
                 {children}
             }

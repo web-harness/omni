@@ -679,6 +679,7 @@ pub fn ModelSwitcher() -> Element {
     let agent_state = use_context::<Signal<crate::lib::AgentEndpointState>>();
     let thread_state = use_context::<Signal<ThreadState>>();
     let mut open = use_signal(|| false);
+    let mut anchor = use_signal(|| (0.0f64, 0.0f64));
 
     let tid = thread_state
         .read()
@@ -825,6 +826,8 @@ pub fn ModelSwitcher() -> Element {
         } else {
             Popover {
                 open: open(),
+                anchor_x: anchor().0,
+                anchor_y: anchor().1,
                 on_close: move |_| {
                     pending_download.set(None);
                     pending_delete.set(None);
@@ -833,10 +836,12 @@ pub fn ModelSwitcher() -> Element {
                 trigger: rsx! {
                     button {
                         class: "flex w-[clamp(120px,18vw,180px)] max-w-full cursor-pointer items-center gap-1 rounded-sm border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-background-interactive",
-                        onclick: move |_| {
+                        onclick: move |evt: MouseEvent| {
                             if let Some(model) = selected_model_for_trigger.clone() {
                                 selected_provider.set(model.provider);
                             }
+                            let coords = evt.client_coordinates();
+                            anchor.set((coords.x, coords.y));
                             open.set(!open());
                         },
                         omni-text { "data-text": "{selected_label}", "data-strategy": "shrink-truncate", "data-max-lines": "1", "data-min-size": "9", class: "min-w-0 flex-1 overflow-hidden whitespace-nowrap" }
@@ -1229,6 +1234,7 @@ pub fn WorkspacePicker() -> Element {
     let workspace_state = use_context::<Signal<WorkspaceState>>();
     let thread_state = use_context::<Signal<ThreadState>>();
     let mut open = use_signal(|| false);
+    let mut anchor = use_signal(|| (0.0f64, 0.0f64));
     let presets = vec![
         ("test", "/home/user/projects/test"),
         ("omni", "/home/user/projects/omni"),
@@ -1243,11 +1249,17 @@ pub fn WorkspacePicker() -> Element {
     rsx! {
         Popover {
             open: open(),
+            anchor_x: anchor().0,
+            anchor_y: anchor().1,
             on_close: move |_| open.set(false),
             trigger: rsx! {
                 button {
                     class: "flex items-center gap-1 rounded-sm border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-background-interactive",
-                    onclick: move |_| open.set(!open()),
+                    onclick: move |evt: MouseEvent| {
+                        let coords = evt.client_coordinates();
+                        anchor.set((coords.x, coords.y));
+                        open.set(!open());
+                    },
                     Icon { width: 10, height: 10, icon: LdFolder }
                     omni-text { "data-text": "{workspace_state.read().workspace_for(&tid)}", "data-strategy": "truncate", "data-max-lines": "1", class: "max-w-[160px]" }
                     Icon { width: 10, height: 10, icon: LdChevronDown }
